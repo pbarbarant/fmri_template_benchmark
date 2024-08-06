@@ -26,7 +26,6 @@ class Solver(BaseSolver):
         "alpha": [0.5],
         "rho": [100.0],
         "eps": [1.0],
-        "solver": ["mm"],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -211,7 +210,7 @@ class Solver(BaseSolver):
             mesh_sample=mesh_sample,
             nits_barycenter=10,
             init_barycenter_features=np.mean(features_list, axis=0),
-            solver=self.solver,
+            solver="mm",
             coarse_mapping_solver_params={
                 "nits_bcd": nits_bcd,
                 "nits_uot": nits_uot,
