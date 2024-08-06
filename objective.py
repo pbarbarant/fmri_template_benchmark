@@ -6,7 +6,6 @@ from benchopt import BaseObjective, safe_import_context
 with safe_import_context() as import_ctx:
     # import warnings
     import numpy as np
-    from sklearn.dummy import DummyClassifier
     from sklearn.svm import LinearSVC
 
     # from sklearn.exceptions import ConvergenceWarning
@@ -68,10 +67,9 @@ class Objective(BaseObjective):
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
         self.mask = mask
-        
+
     def compute_score(self, X_train, y_train, X_test, y_test):
-        # clf = LinearSVC(max_iter=int(self.max_iter))
-        clf = DummyClassifier()
+        clf = LinearSVC(max_iter=int(self.max_iter))
         clf.fit(X_train, y_train)
         return clf.score(X_test, y_test)
 
@@ -89,14 +87,17 @@ class Objective(BaseObjective):
             y_train = folds_dict[subject]["y_train"]
             X_test = folds_dict[subject]["X_test"]
             y_test = folds_dict[subject]["y_test"]
-            score_dict[subject] = self.compute_score(X_train, y_train, X_test, y_test)
-        
+            score_dict[subject] = self.compute_score(
+                X_train, y_train, X_test, y_test
+            )
+
         avg_score = np.mean(list(score_dict.values()))
         print(f"Average decoding accuracy: {avg_score:.2f}")
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         return dict(
             value=avg_score,
+            scores=list(score_dict.values()),
         )
 
     def get_one_result(self):
