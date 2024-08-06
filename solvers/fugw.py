@@ -67,8 +67,7 @@ class Solver(BaseSolver):
         print("Segmentation shape:", self.segmentation.shape)
         print("Anisotropy shape:", self.anisotropy)
         print("Number of samples:", self.n_samples)
-        
-        
+
     def sample_geometry(self, segmentation, geometry_embedding, n_samples):
         """Sample the geometry of the mask"""
         return coarse_to_fine.sample_volume_uniformly(
@@ -76,7 +75,7 @@ class Solver(BaseSolver):
             embeddings=geometry_embedding,
             n_samples=n_samples,
         )
-        
+
     def prepare_geometry_embedding(
         self, segmentation, n_landmarks, anisotropy, verbose
     ):
@@ -99,7 +98,7 @@ class Solver(BaseSolver):
             geometry_embedding_normalized,
             max_distance,
         )
-        
+
     def project(self, features, plan):
         """Project features using the given transport plan
 
@@ -115,38 +114,43 @@ class Solver(BaseSolver):
         """
         source_features_tensor = torch.tensor(features, dtype=torch.float32)
         transformed_data = (
-                (
-                    torch.sparse.mm(
-                        plan.to("cpu").transpose(0, 1),
-                        source_features_tensor.T,
-                    ).to_dense()
-                    / (
-                        torch.sparse.sum(plan.to("cpu"), dim=0)
-                        .to_dense()
-                        .reshape(-1, 1)
-                        # Add very small value to handle null rows
-                        + 1e-16
-                    )
+            (
+                torch.sparse.mm(
+                    plan.to("cpu").transpose(0, 1),
+                    source_features_tensor.T,
+                ).to_dense()
+                / (
+                    torch.sparse.sum(plan.to("cpu"), dim=0)
+                    .to_dense()
+                    .reshape(-1, 1)
+                    # Add very small value to handle null rows
+                    + 1e-16
                 )
-                .T.detach()
-                .cpu()
             )
+            .T.detach()
+            .cpu()
+        )
         return transformed_data.numpy()
-    
+
     def normalize(self, features):
         """Normalize the features between -1 and 1
-        
+
         Parameters
         ----------
         features : ndarray of shape (n_samples, n_features)
             Features to normalize
-            
+
         Returns
         -------
         ndarray
             Normalized features
         """
-        return 2 * (features - features.min(axis=0)) / (features.max(axis=0) - features.min(axis=0)) - 1
+        return (
+            2
+            * (features - features.min(axis=0))
+            / (features.max(axis=0) - features.min(axis=0))
+            - 1
+        )
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -159,7 +163,7 @@ class Solver(BaseSolver):
 
         # List of source subjects
         subject_list = list(self.dict_alignment.keys())
-        
+
         # Compute the Barycenter
         sparse_barycenter = FUGWSparseBarycenter(
             alpha_coarse=self.alpha,
@@ -170,7 +174,7 @@ class Solver(BaseSolver):
             eps_fine=self.eps,
             selection_radius=1e-4,
         )
-        
+
         nits_bcd = 5
         nits_uot = 100
         features_list = [
@@ -178,25 +182,23 @@ class Solver(BaseSolver):
             for subject in subject_list
         ]
         n_voxels = features_list[0].shape[1]
-        
+
         # Weights are uniform
-        weights_list = [
-            np.ones(n_voxels) / n_voxels for _ in features_list
-        ]
-        
+        weights_list = [np.ones(n_voxels) / n_voxels for _ in features_list]
+
         _, geometry_embedding_normalized, _ = self.prepare_geometry_embedding(
             self.segmentation,
             n_landmarks=100,
             anisotropy=self.anisotropy,
             verbose=True,
         )
-        
+
         mesh_sample = self.sample_geometry(
             self.segmentation,
             geometry_embedding_normalized,
             self.n_samples,
         )
-        
+
         (
             _,
             _,
@@ -221,7 +223,7 @@ class Solver(BaseSolver):
             device="auto",
             verbose=True,
         )
-        
+
         # Generate a dict of plan for each subject
         self.plans = dict()
         for subject, plan in zip(subject_list, plans):
@@ -229,23 +231,36 @@ class Solver(BaseSolver):
 
         for left_out_subject in subject_list:
             # Train data
-            X_train = np.vstack([
-                self.project(self.mask.transform(self.dict_decoding[subject]), self.plans[subject])
-                for subject in subject_list if subject != left_out_subject
-            ])
+            X_train = np.vstack(
+                [
+                    self.project(
+                        self.mask.transform(self.dict_decoding[subject]),
+                        self.plans[subject],
+                    )
+                    for subject in subject_list
+                    if subject != left_out_subject
+                ]
+            )
             self.y_train = np.hstack(
-                [self.dict_labels[subject] for subject in subject_list if subject != left_out_subject]    
+                [
+                    self.dict_labels[subject]
+                    for subject in subject_list
+                    if subject != left_out_subject
+                ]
             ).ravel()
 
             # Test data
-            X_test = self.project(self.mask.transform(self.dict_decoding[left_out_subject]), self.plans[left_out_subject])
+            X_test = self.project(
+                self.mask.transform(self.dict_decoding[left_out_subject]),
+                self.plans[left_out_subject],
+            )
             self.y_test = self.dict_labels[left_out_subject].ravel()
 
             # Standard scaling
             se = StandardScaler()
             self.X_train = se.fit_transform(X_train)
             self.X_test = se.transform(X_test)
-            
+
             self.folds_dict[left_out_subject] = dict(
                 X_train=self.X_train,
                 y_train=self.y_train,

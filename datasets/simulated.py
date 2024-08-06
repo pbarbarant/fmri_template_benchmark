@@ -42,7 +42,7 @@ class Dataset(BaseDataset):
         # Create a masker to extract the data from the brain volume.
         mask_img = datasets.load_mni152_brain_mask(resolution=3)
         mask = maskers.NiftiMasker(mask_img=mask_img).fit()
-        
+
         dict_alignment = dict()
         dict_decoding = dict()
         dict_labels = dict()

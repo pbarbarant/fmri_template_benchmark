@@ -56,18 +56,25 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
-        
+
         # List of source subjects
         subject_list = list(self.dict_alignment.keys())
 
         for left_out_subject in subject_list:
             # Train data
-            X_train = np.vstack([
-                self.mask.transform(self.dict_decoding[subject])
-                for subject in subject_list if subject != left_out_subject
-            ])
+            X_train = np.vstack(
+                [
+                    self.mask.transform(self.dict_decoding[subject])
+                    for subject in subject_list
+                    if subject != left_out_subject
+                ]
+            )
             self.y_train = np.hstack(
-                [self.dict_labels[subject] for subject in subject_list if subject != left_out_subject]    
+                [
+                    self.dict_labels[subject]
+                    for subject in subject_list
+                    if subject != left_out_subject
+                ]
             ).ravel()
 
             # Test data
@@ -78,14 +85,13 @@ class Solver(BaseSolver):
             se = StandardScaler()
             self.X_train = se.fit_transform(X_train)
             self.X_test = se.transform(X_test)
-            
+
             self.folds_dict[left_out_subject] = dict(
                 X_train=self.X_train,
                 y_train=self.y_train,
                 X_test=self.X_test,
                 y_test=self.y_test,
             )
-    
 
     def get_result(self):
         # Return the result from one optimization run.
