@@ -230,7 +230,7 @@ class Solver(BaseSolver):
         for left_out_subject in subject_list:
             # Train data
             X_train = np.vstack([
-                self.project(self.mask.transform(self.dict_alignment[subject]), self.plans[subject])
+                self.project(self.mask.transform(self.dict_decoding[subject]), self.plans[subject])
                 for subject in subject_list if subject != left_out_subject
             ])
             self.y_train = np.hstack(
@@ -238,7 +238,7 @@ class Solver(BaseSolver):
             ).ravel()
 
             # Test data
-            X_test = self.project(self.mask.transform(self.dict_alignment[left_out_subject]), self.plans[left_out_subject])
+            X_test = self.project(self.mask.transform(self.dict_decoding[left_out_subject]), self.plans[left_out_subject])
             self.y_test = self.dict_labels[left_out_subject].ravel()
 
             # Standard scaling
