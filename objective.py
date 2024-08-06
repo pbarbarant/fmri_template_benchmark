@@ -4,25 +4,28 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
+    # import warnings
     import numpy as np
+    from sklearn.svm import LinearSVC
+
+    # from sklearn.exceptions import ConvergenceWarning
 
 
 # The benchmark objective must be named `Objective` and
 # inherit from `BaseObjective` for `benchopt` to work properly.
 class Objective(BaseObjective):
-
     # Name to select the objective in the CLI and to display the results.
-    name = "Ordinary Least Squares"
+    name = "fMRI decoding"
 
     # URL of the main repo for this benchmark.
-    url = "https://github.com/pbarbarant/fmri_template_benchmark"
+    url = "https://github.com/pbarbarant/fmri_alignment_benchmark"
 
     # List of parameters for the objective. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
-        'whiten_y': [False, True],
+        "max_iter": [1e2],
     }
 
     # List of packages needed to run the benchmark.
@@ -32,40 +35,69 @@ class Objective(BaseObjective):
     # solvers or datasets should be declared in Dataset or Solver (see
     # simulated.py and python-gd.py).
     # Example syntax: requirements = ['numpy', 'pip:jax', 'pytorch:pytorch']
-    requirements = ["numpy"]
+    install_pip = "pip"
+    requirements = [
+        "pip:fmralign",
+        "pip:fastsrm",
+        "scikit-learn",
+        "numpy",
+        "joblib",
+    ]
+
+    # warnings.filterwarnings("ignore", category=FutureWarning)
+    # warnings.filterwarnings("ignore", category=UserWarning)
+    # warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    # warnings.filterwarnings("ignore", category=RuntimeWarning)
 
     # Minimal version of benchopt required to run this benchmark.
     # Bump it up if the benchmark depends on a new feature of benchopt.
     min_benchopt_version = "1.5"
 
-    def set_data(self, X, y):
+    def set_data(
+        self,
+        dict_alignment,
+        dict_decoding,
+        dict_labels,
+        target,
+        mask,
+    ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
-        self.X, self.y = X, y
+        self.dict_alignment = dict_alignment
+        self.dict_decoding = dict_decoding
+        self.dict_labels = dict_labels
+        self.target = target
+        self.mask = mask
 
-        # `set_data` can be used to preprocess the data. For instance,
-        # if `whiten_y` is True, remove the mean of `y`.
-        if self.whiten_y:
-            y -= y.mean(axis=0)
-
-    def evaluate_result(self, beta):
+    def evaluate_result(self, X_train, y_train, X_test, y_test):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
-        diff = self.y - self.X @ beta
 
+        # Fit a linear SVM on the training data and evaluate the score on the
+        # test data.
+        clf = LinearSVC(max_iter=int(self.max_iter))
+        clf.fit(X_train, y_train)
+        score = clf.score(X_test, y_test)
+        print(f"Decoding accuracy: {score:.2f}")
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         return dict(
-            value=.5 * diff @ diff,
+            value=score,
         )
 
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
         # with `self.evaluate_result`. This is mainly for testing purposes.
-        return dict(beta=np.zeros(self.X.shape[1]))
+        result = dict(
+            X_train=np.random.randn(10, 10),
+            y_train=np.random.randint(2, size=10),
+            X_test=np.random.randn(10, 10),
+            y_test=np.random.randint(2, size=10),
+        )
+        return result
 
     def get_objective(self):
         # Define the information to pass to each solver to run the benchmark.
@@ -74,6 +106,9 @@ class Objective(BaseObjective):
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
         return dict(
-            X=self.X,
-            y=self.y,
+            dict_alignment=self.dict_alignment,
+            dict_decoding=self.dict_decoding,
+            dict_labels=self.dict_labels,
+            target=self.target,
+            mask=self.mask,
         )
