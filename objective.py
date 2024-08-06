@@ -6,6 +6,7 @@ from benchopt import BaseObjective, safe_import_context
 with safe_import_context() as import_ctx:
     # import warnings
     import numpy as np
+    from sklearn.dummy import DummyClassifier
     from sklearn.svm import LinearSVC
 
     # from sklearn.exceptions import ConvergenceWarning
@@ -58,7 +59,6 @@ class Objective(BaseObjective):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        target,
         mask,
     ):
         # The keyword arguments of this function are the keys of the dictionary
@@ -67,10 +67,15 @@ class Objective(BaseObjective):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.target = target
         self.mask = mask
+        
+    def compute_score(self, X_train, y_train, X_test, y_test):
+        # clf = LinearSVC(max_iter=int(self.max_iter))
+        clf = DummyClassifier()
+        clf.fit(X_train, y_train)
+        return clf.score(X_test, y_test)
 
-    def evaluate_result(self, X_train, y_train, X_test, y_test):
+    def evaluate_result(self, folds_dict):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
@@ -78,14 +83,20 @@ class Objective(BaseObjective):
 
         # Fit a linear SVM on the training data and evaluate the score on the
         # test data.
-        clf = LinearSVC(max_iter=int(self.max_iter))
-        clf.fit(X_train, y_train)
-        score = clf.score(X_test, y_test)
-        print(f"Decoding accuracy: {score:.2f}")
+        score_dict = dict()
+        for subject in folds_dict.keys():
+            X_train = folds_dict[subject]["X_train"]
+            y_train = folds_dict[subject]["y_train"]
+            X_test = folds_dict[subject]["X_test"]
+            y_test = folds_dict[subject]["y_test"]
+            score_dict[subject] = self.compute_score(X_train, y_train, X_test, y_test)
+        
+        avg_score = np.mean(list(score_dict.values()))
+        print(f"Average decoding accuracy: {avg_score:.2f}")
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         return dict(
-            value=score,
+            value=avg_score,
         )
 
     def get_one_result(self):
@@ -109,6 +120,5 @@ class Objective(BaseObjective):
             dict_alignment=self.dict_alignment,
             dict_decoding=self.dict_decoding,
             dict_labels=self.dict_labels,
-            target=self.target,
             mask=self.mask,
         )
