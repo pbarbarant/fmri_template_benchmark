@@ -20,8 +20,6 @@ def load_dataset(subject, data_path, mask):
 
 def load_mask(data_path, memory):
     masker_path = data_path / "masks" / "mask.nii.gz"
-    connected_mask = masking.compute_background_mask(
-        masker_path, connected=True
-    )
+    connected_mask = masking.compute_background_mask(masker_path, connected=True)
     mask = maskers.NiftiMasker(connected_mask, memory=memory).fit()
     return mask

@@ -87,9 +87,7 @@ class Objective(BaseObjective):
             y_train = folds_dict[subject]["y_train"]
             X_test = folds_dict[subject]["X_test"]
             y_test = folds_dict[subject]["y_test"]
-            score_dict[subject] = self.compute_score(
-                X_train, y_train, X_test, y_test
-            )
+            score_dict[subject] = self.compute_score(X_train, y_train, X_test, y_test)
 
         avg_score = np.mean(list(score_dict.values()))
         print(f"Average decoding accuracy: {avg_score:.2f}")

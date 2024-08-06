@@ -40,9 +40,7 @@ sns.boxplot(
 # Customize the plot
 ax.set_xlabel("Accuracy", fontweight="bold")
 ax.set_ylabel("Dataset", fontweight="bold")
-ax.set_title(
-    "Prediction accuracies for various template estimators", fontweight="bold"
-)
+ax.set_title("Prediction accuracies for various template estimators", fontweight="bold")
 
 # Move the legend outside the plot
 sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))

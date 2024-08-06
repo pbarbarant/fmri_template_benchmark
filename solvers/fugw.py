@@ -52,9 +52,7 @@ class Solver(BaseSolver):
         self.dict_labels = dict_labels
         self.mask = mask
         self.folds_dict = dict()
-        self.anisotropy = tuple(
-            np.abs(self.mask.mask_img_.affine.diagonal()[:3])
-        )
+        self.anisotropy = tuple(np.abs(self.mask.mask_img_.affine.diagonal()[:3]))
         # Get main connected component of segmentation
         self.segmentation = (
             masking.compute_background_mask(
@@ -119,9 +117,7 @@ class Solver(BaseSolver):
                     source_features_tensor.T,
                 ).to_dense()
                 / (
-                    torch.sparse.sum(plan.to("cpu"), dim=0)
-                    .to_dense()
-                    .reshape(-1, 1)
+                    torch.sparse.sum(plan.to("cpu"), dim=0).to_dense().reshape(-1, 1)
                     # Add very small value to handle null rows
                     + 1e-16
                 )
