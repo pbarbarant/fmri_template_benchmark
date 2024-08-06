@@ -4,8 +4,9 @@ __pycache__
 __cache__
 *.egg-info
 .coverage
-**/outputs
+**/outputs*
 joblib/
+benchopt_run/
 
 # IDE specific folders
 .vscode
