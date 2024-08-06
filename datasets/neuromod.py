@@ -15,24 +15,12 @@ class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
     name = "Neuromod"
 
-    # List of parameters to generate the datasets. The benchmark will consider
-    # the cross product for each key in the dictionary.
-    # Any parameters 'param' defined here is available as `self.param`.
-    parameters = {
-        "target": [
-            "sub-01",
-            "sub-02",
-            "sub-03",
-            "sub-05",
-        ],
-    }
-
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
     install_pip = "pip"
     requirements = ["nilearn", "pandas"]
 
-    def __init__(self, target="sub-01"):
+    def __init__(self):
         self.subjects = [
             "sub-01",
             "sub-02",
@@ -71,6 +59,5 @@ class Dataset(BaseDataset):
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
-            target=self.target,
             mask=mask,
         )
