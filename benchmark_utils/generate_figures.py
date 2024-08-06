@@ -1,217 +1,57 @@
 # %%
-import os
-import glob
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-import seaborn as sns
 from pathlib import Path
 
-plt.rcParams["figure.dpi"] = 500
+import seaborn as sns
+import matplotlib.pyplot as plt
+import scienceplots
 
-# %%
-# Path to the data
-data_path = Path(
-    "/data/parietal/store3/work/pbarbara/fmri_alignment_benchmark/outputs_copy"
+path_fugw = Path(
+    "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/outputs/benchopt_run_2024-08-06_21h39m08.parquet"
 )
-figures_path = data_path / "figures"
-figures_path.mkdir(parents=True, exist_ok=True)
-# Parse the latest file
-file_list = glob.glob(os.path.join(data_path, "*.parquet"))
-latest_file = max(file_list, key=os.path.getmtime)
-df = pd.read_parquet(latest_file)
-# Filter out useless data
-df = df[["solver_name", "objective_value", "data_name", "time"]]
-# df[df["data_name"].str.contains("Lang")]
-# %%
-# Remove the simulated data
-df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
-# Remove Neuromod data
-df.drop(df[df["data_name"].str.contains("Neuromod")].index, inplace=True)
-
-# Compute the mean and std of the objective value for each subject
-df2 = df.groupby(["solver_name", "data_name"]).agg(
-    {"objective_value": ["mean"], "time": ["mean"]}
+path_anat = Path(
+    "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/outputs/benchopt_run_2024-08-06_21h31m32.parquet"
 )
-df2.columns = ["_".join(x) for x in df2.columns.ravel()]
-df2.reset_index(inplace=True)
-df2.drop(df2[~df2["solver_name"].str.contains("identity")].index, inplace=True)
-df2 = df2[
-    [
-        "data_name",
-        "objective_value_mean",
-        "time_mean",
-    ]
-]
 
-# Substract df by the mean of the objective value for each solver
-df = df.merge(df2, on=["data_name"])
-df["objective_value_diff"] = df["objective_value"] - df["objective_value_mean"]
-df["time"] = df["time"] / df["time_mean"]
-df = df.drop(
-    columns=[
-        "objective_value_mean",
-        "time_mean",
-    ]
-)
-df["objective_value_diff"] *= 100
-df["data_name"] = df["data_name"].str.replace(r"\[.*?\]", "", regex=True)
-# df["solver_name"] = df["solver_name"].str.replace(r"\[.*?\]", "", regex=True)
+df_anat = pd.read_parquet(path_anat)
+df_fugw = pd.read_parquet(path_fugw)
+df = pd.concat([df_anat, df_fugw])
 
-# Drop anatomical alignment
-df.drop(df[df["solver_name"].str.contains("identity")].index, inplace=True)
+# Expand the lists in df["objective_scores"]
+df = df.explode("objective_scores")
 
-# %%
-# seaborn box plot
-plt.figure(figsize=(5, 7))
-sns.set_theme(style="ticks", palette="pastel")
-plt.rcParams["figure.dpi"] = 500
-ax1 = sns.boxplot(
+# Set the style and font scale for better readability
+plt.style.use(["science", "nature", "no-latex"])
+sns.set_context("paper", font_scale=1.3)
+
+# Create the figure and axes with a specific size
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Create the box plot
+sns.boxplot(
     data=df,
-    x="objective_value_diff",
+    x="objective_scores",
     y="data_name",
     hue="solver_name",
-    boxprops=dict(facecolor=(0, 0, 0, 0)),
     showfliers=False,
-)
-sns.stripplot(
-    x="objective_value_diff",
-    y="data_name",
-    data=df,
-    size=4,
-    hue="solver_name",
-    dodge=True,
-    jitter=True,
-    palette="tab10",
-)
-ax1.xaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
-plt.xlabel("Per subject accuracy gain (relative to anatomical)")
-plt.ylabel("Dataset")
-
-# Remove the default legend
-plt.gca().legend_.remove()
-# Manually add a legend for the stripplot
-handles, labels = plt.gca().get_legend_handles_labels()
-plt.legend(
-    handles[-len(handles) // 2 :],  # noqa E203
-    labels[-len(labels) // 2 :],  # noqa E203
-    title="Solver",
-    loc="center left",
-    bbox_to_anchor=(1, 0.5),
+    ax=ax,
 )
 
-solvers = df["solver_name"].unique()
-# Fill with grey rectangles
-for i in range(len(df["data_name"].unique())):
-    ax1.add_patch(
-        plt.Rectangle(
-            (-100, i - 0.5),
-            200,
-            1,
-            fill=True,
-            color="grey",
-            alpha=0.1 * (1 - i % 2),
-        )
-    )
-for x in np.arange(-100, 100, 25):
-    if x == 0:
-        plt.axvline(x=x, color="black", alpha=0.7, linestyle="-")
-    else:
-        plt.axvline(x=x, color="black", alpha=0.2, linestyle="--")
-# plt.yticks(
-#     np.arange(len(solvers)),
-#     [
-#         "FUGW (ours)",
-#         # "FastSRM",
-#         "Anatomical",
-#         # "Piecewise\noptimal transport",
-#         "Piecewise\nProcrustes",
-#         "Piecewise\nridge regression",
-#     ],
-# )
-plt.title("Prediction accuracy over all target subjects\n")
-plt.xlim(-100, 100)
-plt.savefig(figures_path / "accuracy_gain.svg", bbox_inches="tight")
+# Customize the plot
+ax.set_xlabel("Accuracy", fontweight="bold")
+ax.set_ylabel("Dataset", fontweight="bold")
+ax.set_title(
+    "Prediction accuracies for various template estimators", fontweight="bold"
+)
+
+# Move the legend outside the plot
+sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
+
+# Adjust the layout to prevent the legend from being cut off
+plt.tight_layout()
+
+# Save the figure with high resolution
+# plt.savefig("boxplot_paper_ready.png", dpi=300, bbox_inches="tight")
+
+# Display the plot
 plt.show()
-
-# %%
-# seaborn box plot for time
-plt.figure(figsize=(5, 5))
-sns.set_theme(style="ticks", palette="pastel")
-plt.rcParams["figure.dpi"] = 500
-ax1 = sns.boxplot(
-    data=df,
-    x="objective_value",
-    y="data_name",
-    hue="solver_name",
-    boxprops=dict(facecolor=(0, 0, 0, 0)),
-    showfliers=False,
-    # showmeans=True,
-)
-sns.stripplot(
-    x="objective_value",
-    y="data_name",
-    data=df,
-    size=4,
-    hue="solver_name",
-    dodge=True,
-    jitter=True,
-    palette="tab10",
-)
-plt.xlabel("Time factor (relative to anatomical)")
-ax1.xaxis.set_major_formatter(mtick.PercentFormatter(decimals=0, symbol="x"))
-plt.ylabel("Dataset")
-
-# Remove the default legend
-plt.gca().legend_.remove()
-# Manually add a legend for the stripplot
-handles, labels = plt.gca().get_legend_handles_labels()
-plt.legend(
-    handles[-len(handles) // 2 :],  # noqa E203
-    labels[-len(labels) // 2 :],  # noqa E203
-    title="Solver",
-    loc="center left",
-    bbox_to_anchor=(1, 0.5),
-)
-
-solvers = [
-    "FUGW (ours)",
-    "FastSRM",
-    "Piecewise optimal transport",
-    "Piecewise Procrustes",
-    "Piecewise ridge regression",
-]
-# Fill with grey rectangles
-for i in range(len(solvers)):
-    ax1.add_patch(
-        plt.Rectangle(
-            (-20, i - 0.5),
-            60,
-            1,
-            fill=True,
-            color="grey",
-            alpha=0.1 * (1 - i % 2),
-        )
-    )
-for x in np.arange(0, 100):
-    if x == 1:
-        plt.axvline(x=x, color="black", alpha=0.7, linestyle="-")
-    elif x % 5 == 0:
-        plt.axvline(x=x, color="black", alpha=0.2, linestyle="--")
-# plt.yticks(
-#     np.arange(len(solvers)),
-#     [
-#         "FUGW (ours)",
-#         "FastSRM",
-#         "Piecewise\noptimal transport",
-#         "Piecewise\nProcrustes",
-#         "Piecewise\nridge regression",
-#     ],
-# )
-plt.title("Relative time\n")
-plt.xlim(-2, 30)
-plt.savefig(figures_path / "time.png", bbox_inches="tight")
-plt.show()
-
-df
