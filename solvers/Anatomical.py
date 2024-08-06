@@ -38,7 +38,6 @@ class Solver(BaseSolver):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        target,
         mask,
     ):
         # Define the information received by each solver from the objective.
@@ -49,8 +48,8 @@ class Solver(BaseSolver):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.target = target
         self.mask = mask
+        self.folds_dict = dict()
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -62,41 +61,34 @@ class Solver(BaseSolver):
         X_test = []
 
         # List of source subjects
-        source_subjects = list(self.dict_alignment.keys())
-        source_subjects.remove(self.target)
-        target_data_alignment = self.dict_alignment[self.target]
-        target_data_decoding = self.dict_decoding[self.target]
+        subject_list = list(self.dict_alignment.keys())
 
-        # Launch the alignments
-        for source_subject in source_subjects:
-            source_data_alignment = self.dict_alignment[source_subject]
-            source_data_decoding = self.dict_decoding[source_subject]
+        for left_out_subject in subject_list:
+            # Train data
+            X_train = np.vstack([
+                self.mask.transform(self.dict_alignment[source])
+                for source in subject_list if source != left_out_subject
+            ])
+            self.y_train = np.hstack(
+                [self.dict_labels[source] for source in subject_list if source != left_out_subject]    
+            ).ravel()
+
+            # Test data
+            X_test = self.mask.transform(self.dict_alignment[left_out_subject])
+            self.y_test = self.dict_labels[left_out_subject].ravel()
+
+            # Standard scaling
+            se = StandardScaler()
+            self.X_train = se.fit_transform(X_train)
+            self.X_test = se.transform(X_test)
             
-            alignment_estimator = PairwiseAlignment(
-                alignment_method="identity",
-                n_pieces=self.n_pieces,
-                mask=self.mask,
-                memory=Memory(),
-                memory_level=1,
-            ).fit(source_data_alignment, target_data_alignment)
-
-            aligned_data = alignment_estimator.transform(source_data_decoding)
-            X_train.append(self.mask.transform(aligned_data))
-            source_labels = self.dict_labels[source_subject]
-            y_train.append(source_labels)
-
-        # Train data
-        X_train = np.vstack(X_train)
-        self.y_train = np.hstack(y_train).ravel()
-
-        # Test data
-        X_test = self.mask.transform(target_data_decoding)
-        self.y_test = self.dict_labels[self.target].ravel()
-
-        # Standard scaling
-        se = StandardScaler()
-        self.X_train = se.fit_transform(X_train)
-        self.X_test = se.transform(X_test)
+            self.folds_dict[left_out_subject] = dict(
+                X_train=self.X_train,
+                y_train=self.y_train,
+                X_test=self.X_test,
+                y_test=self.y_test,
+            )
+    
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -105,8 +97,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            X_train=self.X_train,
-            y_train=self.y_train,
-            X_test=self.X_test,
-            y_test=self.y_test,
+            folds_dict=self.folds_dict,
         )
