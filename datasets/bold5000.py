@@ -21,12 +21,6 @@ class Dataset(BaseDataset):
     # the cross product for each key in the dictionary.
     # Any parameters 'param' defined here is available as `self.param`.
     parameters = {
-        "target": [
-            "sub-CSI1",
-            "sub-CSI2",
-            "sub-CSI3",
-            "sub-CSI4",
-        ],
         "fold": [
             "fold_01",
             "fold_02",
@@ -40,7 +34,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = ["nilearn", "pandas"]
 
-    def __init__(self, target="sub-CSI1", fold="fold_01"):
+    def __init__(self, fold="fold_01"):
         self.subjects = [
             "sub-CSI1",
             "sub-CSI2",
@@ -90,6 +84,5 @@ class Dataset(BaseDataset):
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
-            target=self.target,
             mask=mask,
         )
