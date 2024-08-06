@@ -17,7 +17,7 @@ with safe_import_context() as import_ctx:
 # inherit from `BaseSolver` for `benchopt` to work properly.
 class Solver(BaseSolver):
     # Name to select the solver in the CLI and to display the results.
-    name = "identity"
+    name = "Anatomical"
 
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
