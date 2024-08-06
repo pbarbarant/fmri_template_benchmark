@@ -5,9 +5,11 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from fmralign.alignment_methods import FugwAlignment
+    from fugw.mappings import FUGWSparseBarycenter
+    from fugw.scripts import coarse_to_fine, lmds
     from sklearn.preprocessing import StandardScaler
     import numpy as np
+    import torch
     from nilearn import masking
 
 
@@ -21,9 +23,9 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "alpha": [0.05, 0.1, 0.2],
-        "rho": [1e2],
-        "eps": [1e-6 , 1e-4, 1e-2],
+        "alpha": [0.5],
+        "rho": [100.0],
+        "eps": [1.0],
         "solver": ["mm"],
     }
 
@@ -39,7 +41,6 @@ class Solver(BaseSolver):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        target,
         mask,
     ):
         # Define the information received by each solver from the objective.
@@ -50,8 +51,8 @@ class Solver(BaseSolver):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.target = target
         self.mask = mask
+        self.folds_dict = dict()
         self.anisotropy = tuple(
             np.abs(self.mask.mask_img_.affine.diagonal()[:3])
         )
@@ -66,6 +67,86 @@ class Solver(BaseSolver):
         print("Segmentation shape:", self.segmentation.shape)
         print("Anisotropy shape:", self.anisotropy)
         print("Number of samples:", self.n_samples)
+        
+        
+    def sample_geometry(self, segmentation, geometry_embedding, n_samples):
+        """Sample the geometry of the mask"""
+        return coarse_to_fine.sample_volume_uniformly(
+            segmentation,
+            embeddings=geometry_embedding,
+            n_samples=n_samples,
+        )
+        
+    def prepare_geometry_embedding(
+        self, segmentation, n_landmarks, anisotropy, verbose
+    ):
+        """Compute the normalized geometry embedding"""
+        geometry_embedding = lmds.compute_lmds_volume(
+            segmentation,
+            k=12,
+            n_landmarks=n_landmarks,
+            anisotropy=anisotropy,
+            verbose=verbose,
+        ).nan_to_num()
+
+        (
+            geometry_embedding_normalized,
+            max_distance,
+        ) = coarse_to_fine.random_normalizing(geometry_embedding)
+
+        return (
+            geometry_embedding,
+            geometry_embedding_normalized,
+            max_distance,
+        )
+        
+    def project(self, features, plan):
+        """Project features using the given transport plan
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            Source features
+
+        Returns
+        -------
+        ndarray
+            Projected features
+        """
+        source_features_tensor = torch.tensor(features, dtype=torch.float32)
+        transformed_data = (
+                (
+                    torch.sparse.mm(
+                        plan.to("cpu").transpose(0, 1),
+                        source_features_tensor.T,
+                    ).to_dense()
+                    / (
+                        torch.sparse.sum(plan.to("cpu"), dim=0)
+                        .to_dense()
+                        .reshape(-1, 1)
+                        # Add very small value to handle null rows
+                        + 1e-16
+                    )
+                )
+                .T.detach()
+                .cpu()
+            )
+        return transformed_data.numpy()
+    
+    def normalize(self, features):
+        """Normalize the features between -1 and 1
+        
+        Parameters
+        ----------
+        features : ndarray of shape (n_samples, n_features)
+            Features to normalize
+            
+        Returns
+        -------
+        ndarray
+            Normalized features
+        """
+        return 2 * (features - features.min(axis=0)) / (features.max(axis=0) - features.min(axis=0)) - 1
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -77,64 +158,100 @@ class Solver(BaseSolver):
         X_test = []
 
         # List of source subjects
-        source_subjects = list(self.dict_alignment.keys())
-        source_subjects.remove(self.target)
-        target_data_alignment = self.dict_alignment[self.target]
-        target_data_decoding = self.dict_decoding[self.target]
+        subject_list = list(self.dict_alignment.keys())
+        
+        # Compute the Barycenter
+        sparse_barycenter = FUGWSparseBarycenter(
+            alpha_coarse=self.alpha,
+            alpha_fine=self.alpha,
+            rho_coarse=self.rho,
+            rho_fine=self.rho,
+            eps_coarse=self.eps,
+            eps_fine=self.eps,
+            selection_radius=1e-4,
+        )
+        
+        nits_bcd = 5
+        nits_uot = 100
+        features_list = [
+            self.normalize(self.mask.transform(self.dict_alignment[subject]))
+            for subject in subject_list
+        ]
+        n_voxels = features_list[0].shape[1]
+        
+        # Weights are uniform
+        weights_list = [
+            np.ones(n_voxels) / n_voxels for _ in features_list
+        ]
+        
+        _, geometry_embedding_normalized, _ = self.prepare_geometry_embedding(
+            self.segmentation,
+            n_landmarks=100,
+            anisotropy=self.anisotropy,
+            verbose=True,
+        )
+        
+        mesh_sample = self.sample_geometry(
+            self.segmentation,
+            geometry_embedding_normalized,
+            self.n_samples,
+        )
+        
+        (
+            _,
+            _,
+            plans,
+            _,
+        ) = sparse_barycenter.fit(
+            weights_list,
+            features_list,
+            geometry_embedding_normalized,
+            mesh_sample=mesh_sample,
+            nits_barycenter=10,
+            init_barycenter_features=np.mean(features_list, axis=0),
+            solver=self.solver,
+            coarse_mapping_solver_params={
+                "nits_bcd": nits_bcd,
+                "nits_uot": nits_uot,
+            },
+            fine_mapping_solver_params={
+                "nits_bcd": nits_bcd,
+                "nits_uot": nits_uot,
+            },
+            device="auto",
+            verbose=True,
+        )
+        
+        # Generate a dict of plan for each subject
+        self.plans = dict()
+        for subject, plan in zip(subject_list, plans):
+            self.plans[subject] = plan
 
-        # Launch the alignments
-        for source_subject in source_subjects:
-            source_data_alignment = self.dict_alignment[source_subject]
-            source_data_decoding = self.dict_decoding[source_subject]
+        for left_out_subject in subject_list:
+            # Train data
+            X_train = np.vstack([
+                self.project(self.mask.transform(self.dict_alignment[subject]), self.plans[subject])
+                for subject in subject_list if subject != left_out_subject
+            ])
+            self.y_train = np.hstack(
+                [self.dict_labels[subject] for subject in subject_list if subject != left_out_subject]    
+            ).ravel()
 
-            alignment_estimator = FugwAlignment(
-                self.segmentation,
-                alpha_coarse=self.alpha,
-                alpha_fine=self.alpha,
-                rho_coarse=self.rho,
-                rho_fine=self.rho,
-                eps_coarse=self.eps,
-                eps_fine=self.eps,
-                method="coarse-to-fine",
-                anisotropy=self.anisotropy,
-                reg_mode="independent",
-                divergence="kl",
-                n_landmarks=100,
-                n_samples=self.n_samples,
-                radius=10,
-                verbose=True,
-                coarse_mapping_solver="mm",
-                fine_mapping_solver="mm",
-                coarse_mapping_solver_params={
-                    "nits_bcd": 5,
-                },
-                fine_mapping_solver_params={
-                    "nits_bcd": 5,
-                },
-            ).fit(
-                self.mask.transform(source_data_alignment),
-                self.mask.transform(target_data_alignment),
+            # Test data
+            X_test = self.project(self.mask.transform(self.dict_alignment[left_out_subject]), self.plans[left_out_subject])
+            self.y_test = self.dict_labels[left_out_subject].ravel()
+
+            # Standard scaling
+            se = StandardScaler()
+            self.X_train = se.fit_transform(X_train)
+            self.X_test = se.transform(X_test)
+            
+            self.folds_dict[left_out_subject] = dict(
+                X_train=self.X_train,
+                y_train=self.y_train,
+                X_test=self.X_test,
+                y_test=self.y_test,
             )
-
-            aligned_data = alignment_estimator.transform(
-                self.mask.transform(source_data_decoding)
-            )
-            X_train.append(aligned_data)
-            source_labels = self.dict_labels[source_subject]
-            y_train.append(source_labels)
-
-        # Train data
-        X_train = np.vstack(X_train)
-        self.y_train = np.hstack(y_train).ravel()
-
-        # Test data
-        X_test = self.mask.transform(target_data_decoding)
-        self.y_test = self.dict_labels[self.target].ravel()
-
-        # Standard scaling
-        se = StandardScaler()
-        self.X_train = se.fit_transform(X_train)
-        self.X_test = se.transform(X_test)
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -143,8 +260,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            X_train=self.X_train,
-            y_train=self.y_train,
-            X_test=self.X_test,
-            y_test=self.y_test,
+            folds_dict=self.folds_dict,
         )
