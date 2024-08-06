@@ -17,9 +17,6 @@ class Dataset(BaseDataset):
     # List of parameters to generate the datasets. The benchmark will consider
     # the cross product for each key in the dictionary.
     # Any parameters 'param' defined here is available as `self.param`.
-    parameters = {
-        "target": ["sub-01", "sub-02", "sub-03"],
-    }
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -28,7 +25,6 @@ class Dataset(BaseDataset):
 
     def __init__(
         self,
-        target="sub-01",
     ):
         self.subjects = ["sub-01", "sub-02", "sub-03"]
         self.n_samples_alignement = 150
@@ -55,7 +51,7 @@ class Dataset(BaseDataset):
         dict_decoding = dict()
         dict_labels = dict()
         for subject in self.subjects:
-            # Generate pseudorandom data using `numpy` for target subject.
+            # Generate pseudorandom data using `numpy` for each subject.
             data_alignment = self.generate_mock_data_subject(
                 n_samples=self.n_samples_alignement
             )
@@ -65,11 +61,7 @@ class Dataset(BaseDataset):
             # Convert the data to a brain volume using the masker.
             data_alignment = mask.inverse_transform(data_alignment)
             data_decoding = mask.inverse_transform(data_decoding)
-            # Generate pseudorandom labels using `numpy` for target subject
-            labels_target = self.generate_fake_labels(
-                n_samples=self.n_samples_decoding
-            )
-            # Generate pseudorandom labels using `numpy` for target subject
+            # Generate pseudorandom labels using `numpy` for each subject.
             labels = self.generate_fake_labels(
                 n_samples=self.n_samples_decoding
             )
@@ -82,6 +74,5 @@ class Dataset(BaseDataset):
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
-            target=self.target,
             mask=mask,
         )
