@@ -7,6 +7,7 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fmralign.template_alignment import TemplateAlignment
     from sklearn.preprocessing import StandardScaler
+    from nilearn import image
     import numpy as np
 
 
@@ -56,6 +57,19 @@ class Solver(BaseSolver):
 
         # List of source subjects
         subject_list = list(self.dict_alignment.keys())
+        target_train = list(self.dict_alignment.values())
+
+        # Build a merged alignment/decoding dataset for each subject
+        template_train = [
+            image.concat_imgs(
+                [self.dict_alignment[subject], self.dict_decoding[subject]]
+            )
+            for subject in subject_list
+        ]
+        train_index = range(target_train[0].shape[-1])
+        test_index = range(
+            target_train[0].shape[-1], template_train[0].shape[-1]
+        )
 
         template_estim = TemplateAlignment(
             n_pieces=self.n_pieces,
@@ -63,16 +77,17 @@ class Solver(BaseSolver):
             mask=self.mask,
             n_jobs=10,
         )
-        template_estim.fit(list(self.dict_alignment.values()))
+        template_estim.fit(template_train)
+        predicted_imgs = template_estim.transform(
+            target_train, train_index, test_index
+        )
 
-        for left_out_subject in subject_list:
+        for i, left_out_subject in enumerate(subject_list):
             # Train data
             X_train = np.vstack(
                 [
-                    self.mask.transform(
-                        template_estim.transform(self.dict_decoding[subject])
-                    )
-                    for subject in subject_list
+                    self.mask.transform(predicted_imgs[j])
+                    for j, subject in enumerate(subject_list)
                     if subject != left_out_subject
                 ]
             )
@@ -85,9 +100,7 @@ class Solver(BaseSolver):
             ).ravel()
 
             # Test data
-            X_test = self.mask.transform(
-                template_estim.transform(self.dict_decoding[left_out_subject])
-            )
+            X_test = self.mask.transform(predicted_imgs[i])
             self.y_test = self.dict_labels[left_out_subject].ravel()
 
             # Standard scaling
