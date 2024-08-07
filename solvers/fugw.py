@@ -24,8 +24,9 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "alpha": [0.5],
-        "rho": [100.0],
-        "eps": [1.0],
+        "rho": [1e4],
+        "eps": [1e-4],
+        "radius": [3, 5, 7, 10, 12],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -52,7 +53,9 @@ class Solver(BaseSolver):
         self.dict_labels = dict_labels
         self.mask = mask
         self.folds_dict = dict()
-        self.anisotropy = tuple(np.abs(self.mask.mask_img_.affine.diagonal()[:3]))
+        self.anisotropy = tuple(
+            np.abs(self.mask.mask_img_.affine.diagonal()[:3])
+        )
         # Get main connected component of segmentation
         self.segmentation = (
             masking.compute_background_mask(
@@ -117,7 +120,9 @@ class Solver(BaseSolver):
                     source_features_tensor.T,
                 ).to_dense()
                 / (
-                    torch.sparse.sum(plan.to("cpu"), dim=0).to_dense().reshape(-1, 1)
+                    torch.sparse.sum(plan.to("cpu"), dim=0)
+                    .to_dense()
+                    .reshape(-1, 1)
                     # Add very small value to handle null rows
                     + 1e-16
                 )
@@ -152,23 +157,9 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
-        X_train = []
-        y_train = []
-        X_test = []
 
         # List of source subjects
         subject_list = list(self.dict_alignment.keys())
-
-        # Compute the Barycenter
-        sparse_barycenter = FUGWSparseBarycenter(
-            alpha_coarse=self.alpha,
-            alpha_fine=self.alpha,
-            rho_coarse=self.rho,
-            rho_fine=self.rho,
-            eps_coarse=self.eps,
-            eps_fine=self.eps,
-            selection_radius=1e-4,
-        )
 
         nits_bcd = 5
         nits_uot = 100
@@ -181,11 +172,13 @@ class Solver(BaseSolver):
         # Weights are uniform
         weights_list = [np.ones(n_voxels) / n_voxels for _ in features_list]
 
-        _, geometry_embedding_normalized, _ = self.prepare_geometry_embedding(
-            self.segmentation,
-            n_landmarks=100,
-            anisotropy=self.anisotropy,
-            verbose=True,
+        _, geometry_embedding_normalized, max_distance = (
+            self.prepare_geometry_embedding(
+                self.segmentation,
+                n_landmarks=100,
+                anisotropy=self.anisotropy,
+                verbose=True,
+            )
         )
 
         mesh_sample = self.sample_geometry(
@@ -194,6 +187,16 @@ class Solver(BaseSolver):
             self.n_samples,
         )
 
+        # Compute the Barycenter
+        sparse_barycenter = FUGWSparseBarycenter(
+            alpha_coarse=self.alpha,
+            alpha_fine=self.alpha,
+            rho_coarse=self.rho,
+            rho_fine=self.rho,
+            eps_coarse=self.eps,
+            eps_fine=self.eps,
+            selection_radius=self.radius / max_distance,
+        )
         (
             _,
             _,
