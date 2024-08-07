@@ -8,6 +8,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scienceplots  # noqa: F401
 
+plt.rcParams["figure.dpi"] = 500
+
 data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
@@ -53,7 +55,9 @@ sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
 plt.tight_layout()
 
 # Save the figure with high resolution
-# plt.savefig("boxplot_paper_ready.png", dpi=300, bbox_inches="tight")
+plt.savefig(
+    figures_path / "boxplot_paper_ready.png", dpi=500, bbox_inches="tight"
+)
 
 # Display the plot
 plt.show()
