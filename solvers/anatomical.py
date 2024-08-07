@@ -1,5 +1,3 @@
-from numpy import source
-import pandas as pd
 from benchopt import BaseSolver, safe_import_context
 
 # Protect the import with `safe_import_context()`. This allows:
@@ -7,10 +5,8 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from fmralign.pairwise_alignment import PairwiseAlignment
     from sklearn.preprocessing import StandardScaler
     import numpy as np
-    from joblib import Memory
 
 
 # The benchmark solvers must be named `Solver` and
