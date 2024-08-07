@@ -21,6 +21,9 @@ df = pd.read_parquet(latest_file)
 # Remove the simulated data
 df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
 
+# Merge all BOLD5000 folds into one
+df.loc[df["data_name"].str.contains("BOLD5000"), "data_name"] = "BOLD5000"
+
 # Expand the lists in df["objective_scores"]
 df = df.explode("objective_scores")
 
