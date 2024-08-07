@@ -1,21 +1,23 @@
 # %%
 import pandas as pd
+import os
+import glob
 from pathlib import Path
 
 import seaborn as sns
 import matplotlib.pyplot as plt
-import scienceplots
+import scienceplots  # noqa: F401
 
-path_fugw = Path(
-    "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/outputs/benchopt_run_2024-08-06_21h39m08.parquet"
-)
-path_anat = Path(
-    "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/outputs/benchopt_run_2024-08-06_21h31m32.parquet"
-)
+data_path = Path(__file__).parent.parent / "outputs"
+figures_path = data_path / "figures"
+figures_path.mkdir(parents=True, exist_ok=True)
+# Parse the latest file
+file_list = glob.glob(os.path.join(data_path, "*.parquet"))
+latest_file = max(file_list, key=os.path.getmtime)
+df = pd.read_parquet(latest_file)
 
-df_anat = pd.read_parquet(path_anat)
-df_fugw = pd.read_parquet(path_fugw)
-df = pd.concat([df_anat, df_fugw])
+# Remove the simulated data
+df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
 
 # Expand the lists in df["objective_scores"]
 df = df.explode("objective_scores")
@@ -40,7 +42,9 @@ sns.boxplot(
 # Customize the plot
 ax.set_xlabel("Accuracy", fontweight="bold")
 ax.set_ylabel("Dataset", fontweight="bold")
-ax.set_title("Prediction accuracies for various template estimators", fontweight="bold")
+ax.set_title(
+    "Prediction accuracies for various template estimators", fontweight="bold"
+)
 
 # Move the legend outside the plot
 sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
