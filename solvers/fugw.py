@@ -23,10 +23,10 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "alpha": [0.0, 0.5, 1.0],
-        "rho": [1e4],
+        "alpha": [0.0, 0.25, 0.5, 0.75, 1.0],
+        "rho": [1e2, 1e4, 1e6],
         "eps": [1e-4],
-        "nits_barycenter": [10, 20, 30],
+        "nits_barycenter": [10],
         "radius": [7],
     }
 
