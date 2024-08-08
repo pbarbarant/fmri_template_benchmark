@@ -23,10 +23,11 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "alpha": [0.5],
+        "alpha": [0.0, 0.5, 1.0],
         "rho": [1e4],
         "eps": [1e-4],
-        "radius": [3, 5, 7, 10, 12],
+        "nits_barycenter": [10, 20, 30],
+        "radius": [7],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -207,7 +208,7 @@ class Solver(BaseSolver):
             features_list,
             geometry_embedding_normalized,
             mesh_sample=mesh_sample,
-            nits_barycenter=10,
+            nits_barycenter=self.nits_barycenter,
             init_barycenter_features=np.mean(features_list, axis=0),
             solver="mm",
             coarse_mapping_solver_params={
