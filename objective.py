@@ -6,7 +6,7 @@ from benchopt import BaseObjective, safe_import_context
 with safe_import_context() as import_ctx:
     # import warnings
     import numpy as np
-    from sklearn.svm import LinearSVC
+    from nilearn.decoding import Decoder
 
     # from sklearn.exceptions import ConvergenceWarning
 
@@ -68,11 +68,6 @@ class Objective(BaseObjective):
         self.dict_labels = dict_labels
         self.mask = mask
 
-    def compute_score(self, X_train, y_train, X_test, y_test):
-        clf = LinearSVC(max_iter=int(self.max_iter))
-        clf.fit(X_train, y_train)
-        return clf.score(X_test, y_test)
-
     def evaluate_result(self, folds_dict):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
@@ -82,12 +77,21 @@ class Objective(BaseObjective):
         # Fit a linear SVM on the training data and evaluate the score on the
         # test data.
         score_dict = dict()
+        decoder = Decoder(
+            estimator="svc",
+            mask=self.mask,
+        )
         for subject in folds_dict.keys():
-            X_train = folds_dict[subject]["X_train"]
+            X_train = self.mask.inverse_transform(
+                folds_dict[subject]["X_train"]
+            )
             y_train = folds_dict[subject]["y_train"]
-            X_test = folds_dict[subject]["X_test"]
+            X_test = self.mask.inverse_transform(folds_dict[subject]["X_test"])
             y_test = folds_dict[subject]["y_test"]
-            score_dict[subject] = self.compute_score(X_train, y_train, X_test, y_test)
+
+            decoder.fit(X_train, y_train)
+            y_pred = decoder.predict(X_test)
+            score_dict[subject] = (y_pred == y_test).mean()
 
         avg_score = np.mean(list(score_dict.values()))
         print(f"Average decoding accuracy: {avg_score:.2f}")
