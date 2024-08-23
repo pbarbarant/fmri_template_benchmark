@@ -5,7 +5,6 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from sklearn.preprocessing import StandardScaler
     import numpy as np
 
 
@@ -18,9 +17,7 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {
-        "n_pieces": [300],
-    }
+    parameters = {}
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
@@ -53,41 +50,15 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        # List of source subjects
-        subject_list = list(self.dict_alignment.keys())
-
-        for left_out_subject in subject_list:
-            # Train data
-            X_train = np.vstack(
-                [
-                    self.mask.transform(self.dict_decoding[subject])
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            )
-            self.y_train = np.hstack(
-                [
-                    self.dict_labels[subject]
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            ).ravel()
-
-            # Test data
-            X_test = self.mask.transform(self.dict_decoding[left_out_subject])
-            self.y_test = self.dict_labels[left_out_subject].ravel()
-
-            # Standard scaling
-            se = StandardScaler()
-            self.X_train = se.fit_transform(X_train)
-            self.X_test = se.transform(X_test)
-
-            self.folds_dict[left_out_subject] = dict(
-                X_train=self.X_train,
-                y_train=self.y_train,
-                X_test=self.X_test,
-                y_test=self.y_test,
-            )
+        self.X = np.concatenate(
+            [
+                self.mask.transform(self.dict_decoding[subject])
+                for subject in self.dict_decoding.keys()
+            ]
+        )
+        self.y = np.concatenate(
+            np.array(list(self.dict_labels.values())), axis=0
+        )
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -96,5 +67,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            folds_dict=self.folds_dict,
+            aligned_dataset=(self.X, self.y),
         )
