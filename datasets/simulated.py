@@ -58,7 +58,9 @@ class Dataset(BaseDataset):
             data_alignment = mask.inverse_transform(data_alignment)
             data_decoding = mask.inverse_transform(data_decoding)
             # Generate pseudorandom labels using `numpy` for each subject.
-            labels = self.generate_fake_labels(n_samples=self.n_samples_decoding)
+            labels = self.generate_fake_labels(
+                n_samples=self.n_samples_decoding
+            )
             dict_alignment[subject] = data_alignment
             dict_decoding[subject] = data_decoding
             dict_labels[subject] = labels
@@ -69,4 +71,5 @@ class Dataset(BaseDataset):
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
             mask=mask,
+            dataset_name=self.name,
         )
