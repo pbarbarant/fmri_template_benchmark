@@ -91,9 +91,6 @@ class Solver(BaseSolver):
             np.array(list(self.dict_labels.values())), axis=0
         )
 
-        print(f"X shape: {self.X.shape}")
-        print(f"y shape: {self.y.shape}")
-
     def get_result(self):
         # Return the result from one optimization run.
         # The outputs of this function is a dictionary which defines the
