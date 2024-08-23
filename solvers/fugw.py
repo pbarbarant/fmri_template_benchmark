@@ -22,9 +22,9 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "alpha": [0.0, 0.25, 0.5, 0.75, 1.0],
-        "rho": [1e2, 1e4, 1e6],
-        "eps": [1e-4, 1e-2, 1.0],
+        "alpha": [0.5],
+        "rho": [1e2],
+        "eps": [1e-2],
         "nits_barycenter": [10],
         "radius": [7],
     }
@@ -230,7 +230,7 @@ class Solver(BaseSolver):
         self.X = np.concatenate(
             [
                 self.project(
-                    self.mask.transform(self.dict_alignment[subject]),
+                    self.mask.transform(self.dict_decoding[subject]),
                     self.plans[subject],
                 )
                 for subject in subject_list
@@ -252,5 +252,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            aligned_dataset=(self.X, self.y),
+            aligned_dataset=(self.X, self.y, self.name),
         )
