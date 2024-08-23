@@ -3,6 +3,7 @@
 __pycache__
 __cache__
 *.egg-info
+*.pkl
 .coverage
 **/outputs*
 joblib/
