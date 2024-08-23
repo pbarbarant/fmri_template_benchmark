@@ -83,7 +83,7 @@ class Objective(BaseObjective):
 
         print(f"Dataset name: {dataset_name}")
 
-    def project_on_surface(self, X, hemi="left", mesh="fsaverage5"):
+    def _project_on_surface(self, X, hemi="left", mesh="fsaverage5"):
         """Project data on fsaverage surface"""
         fsaverage = datasets.fetch_surf_fsaverage(mesh=mesh)
         pial_mesh = fsaverage[f"pial_{hemi}"]
@@ -91,7 +91,7 @@ class Objective(BaseObjective):
         X_hemi = surface.vol_to_surf(img, pial_mesh).T
         return X_hemi
 
-    def compute_adjacency_matrix(self, hemi="left", mesh="fsaverage5"):
+    def _compute_adjacency_matrix(self, hemi="left", mesh="fsaverage5"):
         fsaverage = datasets.fetch_surf_fsaverage(mesh=mesh)
         infl_mesh = fsaverage[f"infl_{hemi}"]
         coords, _ = surface.load_surf_mesh(infl_mesh)
@@ -100,14 +100,14 @@ class Objective(BaseObjective):
         adjacency = nn.fit(coords).radius_neighbors_graph(coords).tolil()
         return adjacency
 
-    def compute_searchlight_scores(self, estimator, X, y, adjacency, cv=3):
+    def _compute_searchlight_scores(self, estimator, X, y, adjacency, cv=3):
         # Cross-validated search light
         scores = decoding.searchlight.search_light(
             X, y, estimator, adjacency, cv=cv, n_jobs=10
         )
         return scores
 
-    def plot_searchlight_scores(
+    def _plot_searchlight_scores(
         self,
         estimator,
         X,
@@ -122,14 +122,14 @@ class Objective(BaseObjective):
         fsaverage = datasets.fetch_surf_fsaverage(mesh=mesh)
         inflated_mesh = fsaverage[f"infl_{hemi}"]
 
-        X_hemi = self.project_on_surface(X, hemi, mesh)
+        X_hemi = self._project_on_surface(X, hemi, mesh)
 
         # Plot the searchlight scores
-        scores = self.compute_searchlight_scores(
+        scores = self._compute_searchlight_scores(
             estimator,
             X_hemi,
             y,
-            adjacency=self.compute_adjacency_matrix(hemi, mesh),
+            adjacency=self._compute_adjacency_matrix(hemi, mesh),
             cv=cv,
         )
 
@@ -169,7 +169,7 @@ class Objective(BaseObjective):
 
         print(f"Chance level: {chance:.2f}")
 
-        self.plot_searchlight_scores(
+        self._plot_searchlight_scores(
             svc_estimator,
             X,
             y,
