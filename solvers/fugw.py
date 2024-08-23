@@ -7,7 +7,6 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fugw.mappings import FUGWSparseBarycenter
     from fugw.scripts import coarse_to_fine, lmds
-    from sklearn.preprocessing import StandardScaler
     import numpy as np
     import torch
     from nilearn import masking
@@ -25,8 +24,8 @@ class Solver(BaseSolver):
     parameters = {
         "alpha": [0.0, 0.25, 0.5, 0.75, 1.0],
         "rho": [1e2, 1e4, 1e6],
-        "eps": [1e-4],
-        "nits_barycenter": [10],
+        "eps": [1e-4, 1e-2, 1.0],
+        "nits_barycenter": [1],
         "radius": [7],
     }
 
@@ -162,7 +161,7 @@ class Solver(BaseSolver):
         # List of source subjects
         subject_list = list(self.dict_alignment.keys())
 
-        nits_bcd = 5
+        nits_bcd = 1
         nits_uot = 100
         features_list = [
             self.normalize(self.mask.transform(self.dict_alignment[subject]))
@@ -228,44 +227,23 @@ class Solver(BaseSolver):
         for subject, plan in zip(subject_list, plans):
             self.plans[subject] = plan
 
-        for left_out_subject in subject_list:
-            # Train data
-            X_train = np.vstack(
-                [
-                    self.project(
-                        self.mask.transform(self.dict_decoding[subject]),
-                        self.plans[subject],
-                    )
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            )
-            self.y_train = np.hstack(
-                [
-                    self.dict_labels[subject]
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            ).ravel()
+        self.X = np.concatenate(
+            [
+                self.project(
+                    self.mask.transform(self.dict_alignment[subject]),
+                    self.plans[subject],
+                )
+                for subject in subject_list
+            ],
+            axis=0,
+        )
 
-            # Test data
-            X_test = self.project(
-                self.mask.transform(self.dict_decoding[left_out_subject]),
-                self.plans[left_out_subject],
-            )
-            self.y_test = self.dict_labels[left_out_subject].ravel()
+        self.y = np.concatenate(
+            np.array(list(self.dict_labels.values())), axis=0
+        )
 
-            # Standard scaling
-            se = StandardScaler()
-            self.X_train = se.fit_transform(X_train)
-            self.X_test = se.transform(X_test)
-
-            self.folds_dict[left_out_subject] = dict(
-                X_train=self.X_train,
-                y_train=self.y_train,
-                X_test=self.X_test,
-                y_test=self.y_test,
-            )
+        print("X shape:", self.X.shape)
+        print("y shape:", self.y.shape)
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -274,5 +252,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            folds_dict=self.folds_dict,
+            aligned_dataset=(self.X, self.y),
         )
