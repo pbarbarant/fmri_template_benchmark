@@ -65,4 +65,5 @@ class Dataset(BaseDataset):
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
             mask=mask,
+            dataset_name=self.name,
         )
