@@ -25,7 +25,7 @@ class Solver(BaseSolver):
         "alpha": [0.0, 0.25, 0.5, 0.75, 1.0],
         "rho": [1e2, 1e4, 1e6],
         "eps": [1e-4, 1e-2, 1.0],
-        "nits_barycenter": [1],
+        "nits_barycenter": [10],
         "radius": [7],
     }
 
@@ -161,7 +161,7 @@ class Solver(BaseSolver):
         # List of source subjects
         subject_list = list(self.dict_alignment.keys())
 
-        nits_bcd = 1
+        nits_bcd = 5
         nits_uot = 100
         features_list = [
             self.normalize(self.mask.transform(self.dict_alignment[subject]))
