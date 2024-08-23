@@ -98,5 +98,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            aligned_dataset=(self.X, self.y),
+            aligned_dataset=(self.X, self.y, self.name),
         )
