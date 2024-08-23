@@ -82,38 +82,17 @@ class Solver(BaseSolver):
             target_train, train_index, test_index
         )
 
-        for i, left_out_subject in enumerate(subject_list):
-            # Train data
-            X_train = np.vstack(
-                [
-                    self.mask.transform(predicted_imgs[j])
-                    for j, subject in enumerate(subject_list)
-                    if subject != left_out_subject
-                ]
-            )
-            self.y_train = np.hstack(
-                [
-                    self.dict_labels[subject]
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            ).ravel()
+        self.X = np.concatenate(
+            [self.mask.transform(img) for img in predicted_imgs],
+            axis=0,
+        )
 
-            # Test data
-            X_test = self.mask.transform(predicted_imgs[i])
-            self.y_test = self.dict_labels[left_out_subject].ravel()
+        self.y = np.concatenate(
+            np.array(list(self.dict_labels.values())), axis=0
+        )
 
-            # Standard scaling
-            se = StandardScaler()
-            self.X_train = se.fit_transform(X_train)
-            self.X_test = se.transform(X_test)
-
-            self.folds_dict[left_out_subject] = dict(
-                X_train=self.X_train,
-                y_train=self.y_train,
-                X_test=self.X_test,
-                y_test=self.y_test,
-            )
+        print(f"X shape: {self.X.shape}")
+        print(f"y shape: {self.y.shape}")
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -122,5 +101,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            folds_dict=self.folds_dict,
+            aligned_dataset=(self.X, self.y),
         )
