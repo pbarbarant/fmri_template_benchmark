@@ -116,6 +116,7 @@ class Objective(BaseObjective):
         hemi="left",
         mesh="fsaverage5",
         threshold=0.0,
+        solver_name="",
         output_dir=Path(__file__).parent / "figures",
     ):
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -134,7 +135,7 @@ class Objective(BaseObjective):
         )
 
         # Save scores with joblib
-        joblib.dump(scores, output_dir / "searchlight_scores.pkl")
+        joblib.dump(scores, output_dir / f"{hemi}_searchlight_scores.pkl")
 
         # Plot the scores on the surface
         fig = plotting.plot_surf_stat_map(
@@ -145,7 +146,7 @@ class Objective(BaseObjective):
             threshold=threshold,
             bg_map=fsaverage[f"sulc_{hemi}"],
         )
-        fig.savefig(output_dir / "searchlight_scores.png")
+        fig.savefig(output_dir / f"{hemi}_searchlight_scores.png")
 
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
@@ -153,7 +154,7 @@ class Objective(BaseObjective):
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
 
-        X, y = aligned_dataset
+        X, y, solver_name = aligned_dataset
         # Shuffle X and y
         X, y = shuffle(X, y)
 
@@ -169,16 +170,21 @@ class Objective(BaseObjective):
 
         print(f"Chance level: {chance:.2f}")
 
-        self._plot_searchlight_scores(
-            svc_estimator,
-            X,
-            y,
-            cv,
-            hemi="left",
-            mesh=self.mesh,
-            threshold=chance,
-            output_dir=Path(__file__).parent / "figures" / self.dataset_name,
-        )
+        for hemi in ["left", "right"]:
+            self._plot_searchlight_scores(
+                svc_estimator,
+                X,
+                y,
+                cv,
+                hemi=hemi,
+                mesh=self.mesh,
+                threshold=chance,
+                solver_name=solver_name,
+                output_dir=Path(__file__).parent
+                / "figures"
+                / self.dataset_name
+                / solver_name,
+            )
 
         avg_score = np.mean(scores)
         print(f"Average decoding accuracy: {avg_score:.2f}")
