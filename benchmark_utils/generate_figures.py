@@ -27,12 +27,11 @@ df.loc[df["data_name"].str.contains("BOLD5000"), "data_name"] = "BOLD5000"
 # Expand the lists in df["objective_scores"]
 df = df.explode("objective_scores")
 
-# Sort alphabetically by solver name
-df["solver_name"] = pd.Categorical(
-    df["solver_name"],
-    categories=sorted(df["solver_name"].unique()),
-    ordered=True,
-)
+# Sort alphabetically by dataset name and solver name
+df.sort_values(by=["data_name", "solver_name"], inplace=True)
+
+# Fix underscores in the solver names
+df["solver_name"] = df["solver_name"].str.replace("_", " ")
 
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
@@ -49,20 +48,20 @@ sns.boxplot(
     hue="solver_name",
     showfliers=False,
     ax=ax,
-    fill=False,
-    legend=False,
-    color="k",
+    # fill=False,
+    # legend=False,
+    # color="k",
 )
 # Create the scatter plot
-sns.stripplot(
-    data=df,
-    x="objective_scores",
-    y="data_name",
-    size=4,
-    hue="solver_name",
-    dodge=True,
-    jitter=True,
-)
+# sns.stripplot(
+#     data=df,
+#     x="objective_scores",
+#     y="data_name",
+#     size=4,
+#     hue="solver_name",
+#     dodge=True,
+#     jitter=True,
+# )
 
 # Customize the plot
 ax.set_xlabel("Accuracy", fontweight="bold")
@@ -93,8 +92,98 @@ plt.tight_layout()
 
 # Save the figure with high resolution
 plt.savefig(
-    figures_path / "boxplot_accuracies.png", dpi=500, bbox_inches="tight"
+    figures_path / "boxplot_accuracies.pdf", dpi=500, bbox_inches="tight"
 )
 
 # Display the plot
 plt.show()
+
+
+# %%
+# Keep only the FUGW solvers with eps=0.01 and rho=100.0 and
+# the Procrustes and Anatomical solvers
+df_short = df[
+    df["solver_name"].str.contains("FUGW")
+    & df["solver_name"].str.contains("eps=0.01")
+    & df["solver_name"].str.contains("rho=100.0]")
+    | df["solver_name"].str.contains("Procrustes")
+    | df["solver_name"].str.contains("Anatomical")
+]
+
+# Remove the useless annotations
+df_short["solver_name"] = df_short["solver_name"].str.replace(
+    r"FUGW\[alpha=([\d.]+).*?\]", r"FUGW(alpha=\1)", regex=True
+)
+
+df_short["solver_name"] = df_short["solver_name"].str.replace(
+    r"\[.*\]", "", regex=True
+)
+# Sort alphabetically by dataset name and solver name
+df_short.sort_values(by=["solver_name", "data_name"], inplace=True)
+
+# Drop the Neuromod dataset
+df_short.drop(
+    df_short[df_short["data_name"].str.contains("Neuromod")].index,
+    inplace=True,
+)
+
+
+# Create the figure and axes with a specific size
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Create the box plot
+sns.boxplot(
+    data=df_short,
+    x="objective_scores",
+    y="data_name",
+    hue="solver_name",
+    showfliers=False,
+    ax=ax,
+    fill=False,
+    legend=False,
+    color="k",
+)
+# Create the scatter plot
+sns.stripplot(
+    data=df_short,
+    x="objective_scores",
+    y="data_name",
+    size=4,
+    hue="solver_name",
+    dodge=True,
+    jitter=True,
+)
+
+# Customize the plot
+ax.set_xlabel("Accuracy", fontweight="bold")
+ax.set_ylabel("Dataset", fontweight="bold")
+ax.set_title(
+    "Prediction accuracies for various template estimators",
+    fontweight="bold",
+    fontsize="large",
+)
+# Set the legend title
+ax.legend(title="Alignment method", title_fontsize="large")
+
+# Move the legend outside the plot
+sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
+
+# Add gray rectangles to separate the datasets
+for i, data_name in enumerate(df_short["data_name"].unique()):
+    if i % 2 == 0:
+        ax.axhspan(i - 0.5, i + 0.5, color="gray", alpha=0.05)
+
+# Fix underscores in the dataset names
+ax.set_yticklabels(
+    [name.replace("_", " ") for name in df_short["data_name"].unique()]
+)
+
+# Adjust the layout to prevent the legend from being cut off
+plt.tight_layout()
+
+# Save the figure with high resolution
+plt.savefig(
+    figures_path / "boxplot_accuracies_summary.pdf",
+    dpi=500,
+    bbox_inches="tight",
+)
