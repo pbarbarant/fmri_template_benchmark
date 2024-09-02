@@ -7,6 +7,9 @@ from benchopt import BaseDataset, safe_import_context
 with safe_import_context() as import_ctx:
     import numpy as np
     from nilearn import maskers, datasets
+    from nilearn.experimental.surface._surface_image import SurfaceImage
+    from nilearn.experimental.surface._datasets import load_fsaverage
+    from nilearn.experimental import surface
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -23,16 +26,31 @@ class Dataset(BaseDataset):
         self,
     ):
         self.subjects = ["sub-01", "sub-02", "sub-03"]
-        self.n_samples_alignement = 150
+        self.n_samples_alignement = 200
         self.n_samples_decoding = 150
-        self.n_features = 69765
 
-    def generate_mock_data_subject(self, n_samples):
-        data_decoding = np.random.randn(n_samples, self.n_features)
-        return data_decoding
+    def _sample_data_hemi(self, n_samples, n_vertices):
+        return np.random.randn(n_samples, n_vertices)
 
-    def generate_fake_labels(self, n_samples):
-        return np.random.randint(10, size=n_samples)
+    def _sample_data_subject(self, n_samples, n_vertices):
+        left_data = self._sample_data_hemi(n_samples, n_vertices)
+        right_data = self._sample_data_hemi(n_samples, n_vertices)
+        return left_data, right_data
+
+    def _sample_surface_image(self, mesh, n_samples, n_vertices):
+        left_data, right_data = self._sample_data_subject(
+            n_samples, n_vertices
+        )
+        return SurfaceImage(
+            mesh=mesh,
+            data={
+                "left": left_data,
+                "right": right_data,
+            },
+        )
+
+    def _sample_labels(self, n_samples):
+        return np.random.randint(2, size=n_samples)
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -40,36 +58,33 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # Create a masker to extract the data from the brain volume.
-        mask_img = datasets.load_mni152_brain_mask(resolution=3)
-        mask = maskers.NiftiMasker(mask_img=mask_img).fit()
+        mesh = load_fsaverage("fsaverage3")["pial"]
+        n_vertices = mesh.n_vertices // 2
 
         dict_alignment = dict()
         dict_decoding = dict()
         dict_labels = dict()
+
         for subject in self.subjects:
-            # Generate pseudorandom data using `numpy` for each subject.
-            data_alignment = self.generate_mock_data_subject(
-                n_samples=self.n_samples_alignement
+            # Generate random surface images for each subject.
+            dict_alignment[subject] = self._sample_surface_image(
+                mesh, self.n_samples_alignement, n_vertices
             )
-            data_decoding = self.generate_mock_data_subject(
+            dict_decoding[subject] = self._sample_surface_image(
+                mesh, self.n_samples_decoding, n_vertices
+            )
+            # Generate random labels using for each subject.
+            dict_labels[subject] = self._sample_labels(
                 n_samples=self.n_samples_decoding
             )
-            # Convert the data to a brain volume using the masker.
-            data_alignment = mask.inverse_transform(data_alignment)
-            data_decoding = mask.inverse_transform(data_decoding)
-            # Generate pseudorandom labels using `numpy` for each subject.
-            labels = self.generate_fake_labels(
-                n_samples=self.n_samples_decoding
-            )
-            dict_alignment[subject] = data_alignment
-            dict_decoding[subject] = data_decoding
-            dict_labels[subject] = labels
+
+        masker = surface.SurfaceMasker().fit(dict_alignment["sub-01"])
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
+            dataset_name=self.name,
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
-            mask=mask,
-            dataset_name=self.name,
+            masker=masker,
         )
