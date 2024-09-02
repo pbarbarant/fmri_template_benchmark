@@ -31,7 +31,7 @@ class Solver(BaseSolver):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        mask,
+        masker,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
@@ -41,8 +41,7 @@ class Solver(BaseSolver):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.mask = mask
-        self.folds_dict = dict()
+        self.masker = masker
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -50,14 +49,24 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        self.X = np.concatenate(
-            [
-                self.mask.transform(self.dict_decoding[subject])
-                for subject in self.dict_decoding.keys()
-            ]
+        self.X = self.masker.inverse_transform(
+            np.concatenate(
+                [
+                    self.masker.transform(self.dict_decoding[subject])
+                    for subject in self.dict_decoding.keys()
+                ]
+            )
         )
         self.y = np.concatenate(
             np.array(list(self.dict_labels.values())), axis=0
+        )
+
+        # Create cross-validation object on each subject
+        self.groups = np.concatenate(
+            [
+                np.repeat(i, self.dict_decoding[subject].data.shape[0])
+                for i, subject in enumerate(self.dict_decoding.keys())
+            ]
         )
 
     def get_result(self):
@@ -67,5 +76,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            aligned_dataset=(self.X, self.y, self.name),
+            aligned_dataset=(self.X, self.y, self.groups, self.name),
         )
