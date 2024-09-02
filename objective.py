@@ -13,12 +13,13 @@ with safe_import_context() as import_ctx:
     from sklearn import neighbors
     from sklearn.svm import LinearSVC
     from sklearn.pipeline import make_pipeline
-    from sklearn.model_selection import cross_val_score
+    from sklearn.model_selection import LeaveOneGroupOut
     from sklearn.preprocessing import StandardScaler
     from sklearn.dummy import DummyClassifier
     from sklearn.utils import shuffle
 
     from nilearn import datasets, surface, decoding, plotting
+    from nilearn._utils import param_validation
 
 
 # The benchmark objective must be named `Objective` and
@@ -66,22 +67,22 @@ class Objective(BaseObjective):
 
     def set_data(
         self,
+        dataset_name,
         dict_alignment,
         dict_decoding,
         dict_labels,
-        mask,
-        dataset_name,
+        masker,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
+        self.dataset_name = dataset_name
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.mask = mask
-        self.dataset_name = dataset_name
+        self.masker = masker
 
-        print(f"Dataset name: {dataset_name}")
+        print(f"Running on: {dataset_name}")
 
     def _project_on_surface(self, X, hemi="left", mesh="fsaverage5"):
         """Project data on fsaverage surface"""
@@ -148,51 +149,77 @@ class Objective(BaseObjective):
         )
         fig.savefig(output_dir / f"{hemi}_searchlight_scores.png")
 
+    def _compute_decoding_scores(self, X, y, groups, estimator="svc"):
+        # Patch the decoder to avoid using a NiftiMasker
+        def monkeypatch_masker_checks():
+            def adjust_screening_percentile(
+                screening_percentile, *args, **kwargs
+            ):
+                return screening_percentile
+
+            param_validation.adjust_screening_percentile = (
+                adjust_screening_percentile
+            )
+
+        monkeypatch_masker_checks()
+
+        # Create a decoder
+        decoder = decoding.Decoder(
+            estimator=estimator,
+            mask=self.masker,
+            standardize="zscore_sample",
+            screening_percentile=5,
+            scoring="accuracy",
+            cv=LeaveOneGroupOut(),
+        )
+        decoder.fit(X, y, groups=groups)
+        cv_scores = decoder.cv_scores_
+        # Turn cv_scores into a matrix
+        cv_scores = (
+            np.array(list(cv_scores.values()))
+            .reshape(len(np.unique(groups)), -1)
+            .mean(axis=1)
+        )
+        return cv_scores.flatten()
+
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
 
-        X, y, solver_name = aligned_dataset
-        # Shuffle X and y
-        X, y = shuffle(X, y)
-
-        cv = 3
-
-        svc_estimator = make_pipeline(
-            StandardScaler(), LinearSVC(max_iter=int(self.max_iter))
+        X, y, groups, solver_name = aligned_dataset
+        cv_scores_svc = self._compute_decoding_scores(X, y, groups)
+        cv_scores_dummy = self._compute_decoding_scores(
+            X,
+            y,
+            groups,
+            estimator="dummy_classifier",
         )
-        dummy_estimator = make_pipeline(StandardScaler(), DummyClassifier())
+        avg_score = np.mean(cv_scores_svc)
+        # for hemi in ["left", "right"]:
+        #     self._plot_searchlight_scores(
+        #         svc_estimator,
+        #         X,
+        #         y,
+        #         cv,
+        #         hemi=hemi,
+        #         mesh=self.mesh,
+        #         threshold=chance,
+        #         solver_name=solver_name,
+        #         output_dir=Path(__file__).parent
+        #         / "figures"
+        #         / self.dataset_name
+        #         / solver_name,
+        #     )
 
-        scores = cross_val_score(svc_estimator, X, y, cv=cv)
-        chance = np.mean(cross_val_score(dummy_estimator, X, y, cv=cv))
-
-        print(f"Chance level: {chance:.2f}")
-
-        for hemi in ["left", "right"]:
-            self._plot_searchlight_scores(
-                svc_estimator,
-                X,
-                y,
-                cv,
-                hemi=hemi,
-                mesh=self.mesh,
-                threshold=chance,
-                solver_name=solver_name,
-                output_dir=Path(__file__).parent
-                / "figures"
-                / self.dataset_name
-                / solver_name,
-            )
-
-        avg_score = np.mean(scores)
         print(f"Average decoding accuracy: {avg_score:.2f}")
+        print(f"Chance level: {np.mean(cv_scores_dummy):.2f}")
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         return dict(
             value=avg_score,
-            scores=scores,
+            cv_scores=cv_scores_svc,
         )
 
     def get_one_result(self):
@@ -216,5 +243,5 @@ class Objective(BaseObjective):
             dict_alignment=self.dict_alignment,
             dict_decoding=self.dict_decoding,
             dict_labels=self.dict_labels,
-            mask=self.mask,
+            masker=self.masker,
         )
