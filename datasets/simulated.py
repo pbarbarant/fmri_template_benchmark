@@ -16,6 +16,7 @@ with safe_import_context() as import_ctx:
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
     name = "Simulated"
+    mesh_name = "fsaverage5"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -58,7 +59,7 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # Create a masker to extract the data from the brain volume.
-        mesh = load_fsaverage("fsaverage3")["pial"]
+        mesh = load_fsaverage(self.mesh_name)["pial"]
         n_vertices = mesh.n_vertices // 2
 
         dict_alignment = dict()
