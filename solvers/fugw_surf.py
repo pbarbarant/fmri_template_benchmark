@@ -25,8 +25,7 @@ class Solver(BaseSolver):
     parameters = {
         "alpha": [0.5],
         "rho": [float("inf")],
-        "eps": [1e-4],
-        "resolution": ["fsaverage4"],
+        "eps": [1.0],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -41,7 +40,8 @@ class Solver(BaseSolver):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        mask,
+        masker,
+        mesh_name,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
@@ -51,14 +51,120 @@ class Solver(BaseSolver):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.mask = mask
+        self.masker = masker
+        self.mesh_name = mesh_name
+
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
-        self.nits_barycenter = 10
+        self.nits_barycenter = 1
         self.nits_bcd = 5
         self.nits_uot = 100
         print("Device:", self.device)
+
+    def _normalize(self, features):
+        """Normalize the features between -1 and 1
+
+        Parameters
+        ----------
+        features : ndarray of shape (n_samples, n_features)
+            Features to normalize
+
+        Returns
+        -------
+        ndarray
+            Normalized features
+        """
+        return features / np.linalg.norm(features, axis=1).reshape(-1, 1)
+
+    def _compute_plans_hemi(
+        self,
+        subject_list,
+        device,
+        hemi,
+    ):
+        """Compute the barycenter and the transport plans
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        ndarray
+            Barycenter features
+
+        list of ndarray of shape (n_features, n_samples)
+            List of transport plans
+        """
+        print(f"Computing features for {hemi} hemisphere")
+        features_list = [
+            self._normalize(
+                np.nan_to_num(self.dict_alignment[subject].data.parts[hemi])
+            )
+            for subject in subject_list
+        ]
+
+        print(f"Computing geometry for {hemi} hemisphere")
+        geometry, d_max = fetch_surf_geometry(
+            f"pial_{hemi}",
+            method="euclidean",
+            resolution=self.mesh_name,
+        )
+        geometry /= d_max
+        n_voxels = features_list[0].shape[1]
+
+        # Weights are uniform
+        weights_list = [np.ones(n_voxels) / n_voxels for _ in features_list]
+
+        euclidean_mean = np.mean(features_list, axis=0)
+        fugw_barycenter = FUGWBarycenter(
+            alpha=self.alpha,
+            rho=self.rho,
+            eps=self.eps,
+        )
+        _, barycenter_features, _, plans, _, _ = fugw_barycenter.fit(
+            weights_list,
+            features_list,
+            [geometry],
+            nits_barycenter=self.nits_barycenter,
+            device=device,
+            init_barycenter_features=euclidean_mean,
+            solver="mm",
+            solver_params={
+                "nits_bcd": self.nits_bcd,
+                "nits_uot": self.nits_uot,
+            },
+            verbose=True,
+        )
+
+        # Generate a dictionary of plans for each subject
+        plans_hemi = dict(zip(subject_list, plans))
+        return plans_hemi
+
+    def _compute_plans(
+        self,
+        subject_list,
+        device,
+    ):
+        plans_left = self._compute_plans_hemi(
+            subject_list,
+            device,
+            "left",
+        )
+        plans_right = self._compute_plans_hemi(
+            subject_list,
+            device,
+            "right",
+        )
+
+        plans = dict()
+        for subject in subject_list:
+            plans[subject] = {
+                "left": plans_left[subject],
+                "right": plans_right[subject],
+            }
+
+        return plans
 
     def _project(self, features, plan):
         """Project features using the given transport plan
@@ -90,143 +196,12 @@ class Solver(BaseSolver):
         )
         return transformed_data.numpy()
 
-    def _normalize(self, features):
-        """Normalize the features between -1 and 1
-
-        Parameters
-        ----------
-        features : ndarray of shape (n_samples, n_features)
-            Features to normalize
-
-        Returns
-        -------
-        ndarray
-            Normalized features
-        """
-        return features / np.linalg.norm(features, axis=1).reshape(-1, 1)
-
-    def _compute_bary_plans(
-        self,
-        features_list,
-        weights_list,
-        geometry,
-        device,
-        hemi,
-    ):
-        """Compute the barycenter and the transport plans
-
-        Parameters
-        ----------
-        features_list : list of ndarray of shape (n_samples, n_features)
-            List of source features
-
-        weights_list : list of ndarray of shape (n_features,)
-            List of source weights
-
-        geometry : ndarray of shape (n_features,)
-            Geometry of the target space
-
-        Returns
-        -------
-        ndarray
-            Barycenter features
-
-        list of ndarray of shape (n_features, n_samples)
-            List of transport plans
-        """
-        euclidean_mean = np.mean(features_list, axis=0)
-        fugw_barycenter = FUGWBarycenter(
-            alpha=self.alpha,
-            rho=self.rho,
-            eps=self.eps,
-        )
-        _, barycenter_features, _, plans, _, _ = fugw_barycenter.fit(
-            weights_list,
-            features_list,
-            [geometry],
-            nits_barycenter=self.nits_barycenter,
-            device=device,
-            init_barycenter_features=euclidean_mean,
-            solver="mm",
-            solver_params={
-                "nits_bcd": self.nits_bcd,
-                "nits_uot": self.nits_uot,
-            },
-            verbose=True,
-        )
-
-        fsaverage = fetch_surf_fsaverage(mesh=self.resolution)
-        plotting.plot_surf(
-            fsaverage[f"infl_{hemi}"],
-            barycenter_features[0, :].cpu().numpy(),
-            bg_map=fsaverage[f"sulc_{hemi}"],
-            hemi=hemi,
-            cmap="coolwarm",
-            title="Barycenter",
-            output_file=f"barycenter_{hemi}.png",
-        )
-        plotting.plot_surf(
-            fsaverage[f"infl_{hemi}"],
-            euclidean_mean[0, :],
-            bg_map=fsaverage[f"sulc_{hemi}"],
-            hemi=hemi,
-            cmap="coolwarm",
-            title="Euclidean mean",
-            output_file=f"euclidean_mean_{hemi}.png",
-        )
-        return plans
-
-    def _barycenter_hemi(self, hemi, subject_list, device):
-        fsaverage = fetch_surf_fsaverage(mesh=self.resolution)
-        print(f"Computing features for {hemi} hemisphere")
-        features_list = [
-            self._normalize(
-                np.nan_to_num(
-                    surface.vol_to_surf(
-                        self.dict_alignment[subject],
-                        surf_mesh=fsaverage[f"infl_{hemi}"],
-                    ).T
-                )
-            )
-            for subject in subject_list
-        ]
-
-        print(f"Computing geometry for {hemi} hemisphere")
-        geometry, d_max = fetch_surf_geometry(
-            f"infl_{hemi}",
-            method="euclidean",
-            resolution=self.resolution,
-        )
-        geometry /= d_max
-        n_voxels = features_list[0].shape[1]
-
-        # Weights are uniform
-        weights_list = [np.ones(n_voxels) / n_voxels for _ in features_list]
-        plans = self._compute_bary_plans(
-            features_list, weights_list, geometry, device=device, hemi=hemi
-        )
-
-        # Generate a dictionary of plans for each subject
-        self.plans = dict(zip(subject_list, plans))
-
-        # Project and concatenate the transformed data for each subject
-        X_hemi = np.concatenate(
-            [
-                self._project(
-                    np.nan_to_num(
-                        surface.vol_to_surf(
-                            self.dict_decoding[subject],
-                            surf_mesh=fsaverage[f"infl_{hemi}"],
-                        ).T
-                    ),
-                    plan,
-                )
-                for subject, plan in self.plans.items()
-            ],
-            axis=0,
-        )
-
-        return X_hemi
+    def _project_img(self, img, plan):
+        features = []
+        for hemi in ["left", "right"]:
+            features_hemi = img.data.parts[hemi]
+            features.append(self._project(features_hemi, plan[hemi]))
+        return np.concatenate(features, axis=1)
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -236,21 +211,25 @@ class Solver(BaseSolver):
 
         # List of source subjects
 
-        subject_list = list(self.dict_alignment.keys())
-        self.X = np.concatenate(
-            [
-                self._barycenter_hemi(hemi, subject_list, device=self.device)
-                for hemi in ["left", "right"]
-            ],
-            axis=1,
+        plans = self._compute_plans(
+            list(self.dict_alignment.keys()),
+            self.device,
+        )
+
+        self.X = self.masker.inverse_transform(
+            np.concatenate(
+                [
+                    self._project_img(
+                        self.dict_decoding[subject], plans[subject]
+                    )
+                    for subject in self.dict_decoding.keys()
+                ]
+            )
         )
 
         self.y = np.concatenate(
             np.array(list(self.dict_labels.values())), axis=0
         )
-
-        print("X shape:", self.X.shape)
-        print("y shape:", self.y.shape)
 
     def get_result(self):
         # Return the result from one optimization run.
