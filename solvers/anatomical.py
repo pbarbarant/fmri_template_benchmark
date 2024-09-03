@@ -61,14 +61,6 @@ class Solver(BaseSolver):
             np.array(list(self.dict_labels.values())), axis=0
         )
 
-        # Create cross-validation object on each subject
-        self.groups = np.concatenate(
-            [
-                np.repeat(i, self.dict_decoding[subject].data.shape[0])
-                for i, subject in enumerate(self.dict_decoding.keys())
-            ]
-        )
-
     def get_result(self):
         # Return the result from one optimization run.
         # The outputs of this function is a dictionary which defines the
@@ -76,5 +68,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            aligned_dataset=(self.X, self.y, self.groups, self.name),
+            aligned_dataset=(self.X, self.y, self.name),
         )
