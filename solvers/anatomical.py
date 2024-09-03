@@ -32,6 +32,7 @@ class Solver(BaseSolver):
         dict_decoding,
         dict_labels,
         masker,
+        mesh_name,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
@@ -42,6 +43,7 @@ class Solver(BaseSolver):
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
         self.masker = masker
+        self.mesh_name = mesh_name
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
