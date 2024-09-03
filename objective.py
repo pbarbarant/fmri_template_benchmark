@@ -72,6 +72,7 @@ class Objective(BaseObjective):
         dict_decoding,
         dict_labels,
         masker,
+        mesh_name,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
@@ -81,6 +82,7 @@ class Objective(BaseObjective):
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
         self.masker = masker
+        self.mesh_name = mesh_name
 
         print(f"Running on: {dataset_name}")
 
@@ -188,7 +190,16 @@ class Objective(BaseObjective):
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
 
-        X, y, groups, solver_name = aligned_dataset
+        X, y, solver_name = aligned_dataset
+
+        # Create cross-validation object on each subject
+        groups = np.concatenate(
+            [
+                np.repeat(i, self.dict_decoding[subject].data.shape[0])
+                for i, subject in enumerate(self.dict_decoding.keys())
+            ]
+        )
+
         cv_scores_svc = self._compute_decoding_scores(X, y, groups)
         cv_scores_dummy = self._compute_decoding_scores(
             X,
@@ -244,4 +255,5 @@ class Objective(BaseObjective):
             dict_decoding=self.dict_decoding,
             dict_labels=self.dict_labels,
             masker=self.masker,
+            mesh_name=self.mesh_name,
         )
