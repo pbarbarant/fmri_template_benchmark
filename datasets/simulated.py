@@ -16,7 +16,7 @@ with safe_import_context() as import_ctx:
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
     name = "Simulated"
-    mesh_name = "fsaverage5"
+    mesh_name = "fsaverage3"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -81,6 +81,8 @@ class Dataset(BaseDataset):
 
         masker = surface.SurfaceMasker().fit(dict_alignment["sub-01"])
 
+        print(dict_alignment["sub-01"].data.parts["left"].shape)
+
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
             dataset_name=self.name,
@@ -88,4 +90,5 @@ class Dataset(BaseDataset):
             dict_decoding=dict_decoding,
             dict_labels=dict_labels,
             masker=masker,
+            mesh_name=self.mesh_name,
         )
