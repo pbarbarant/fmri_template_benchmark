@@ -6,6 +6,8 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from scipy import linalg
+    from sklearn.cluster import KMeans, FeatureAgglomeration
+    from joblib import Parallel, delayed
 
     import numpy as np
 
