@@ -6,7 +6,6 @@ from benchopt import BaseDataset, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     import numpy as np
-    from nilearn import maskers, datasets
     from nilearn.experimental.surface._surface_image import SurfaceImage
     from nilearn.experimental.surface._datasets import load_fsaverage
     from nilearn.experimental import surface
