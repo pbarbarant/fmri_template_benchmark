@@ -240,6 +240,7 @@ class Objective(BaseObjective):
             aligned_dataset=(
                 np.random.randn(100, 10),
                 np.random.randint(2, size=100),
+                "random",
             )
         )
         return result
