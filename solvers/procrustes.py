@@ -21,7 +21,10 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {}
+    parameters = {
+        "n_iter": [10],
+        "n_parcels": [300],
+    }
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
@@ -106,13 +109,16 @@ class Solver(BaseSolver):
         self, imgs, n_iter=10, scaling=False, primal=None
     ):
         """
-        Compute a template X and a list of transformation matrices R.
+        Compute the template of a set of images using Procrustes analysis
+
 
         Parameters
         ----------
-        imgs: list of (n_samples, n_features) nd array
-            list of data to align
-        scaling: bool
+        imgs: (n_subjects, n_features, n_vertices) nd array
+            set of images
+        n_iter: int, optional
+            number of iterations
+        scaling: bool, optional
             If scaling is true, computes a floating scaling parameter sc such that:
             ||sc * RX - Y||^2 is minimized and
             - R is an orthogonal matrix
@@ -124,25 +130,142 @@ class Solver(BaseSolver):
 
         Returns
         ----------
-        X: (n_samples, n_features) nd array
-            template data
-        R: list of (n_features, n_features) nd array
-            list of transformation matrix
-        sc: int
-            scaling parameter
+        X: (n_features, n_vertices) nd array
+            template
+        R_list: list of (n_features, n_features) nd array
+            list of transformation matrices
+        sc_list: list of int
+            list of scaling parameters
         """
         # Initialize the template as the mean of the images
-        X = np.mean(imgs)
-        R_list = []
-        for i in range(n_iter):
-            for Y in imgs:
+        n_sub, _, n_vertices = imgs.shape
+        X = np.mean(imgs, axis=0)
+        R_list = [np.eye(n_vertices) for _ in range(n_sub)]
+        sc_list = [1 for _ in range(n_sub)]
+        for _ in range(n_iter):
+            for i, Y in enumerate(imgs):
                 R, sc = self._scaled_procrustes(
                     X, Y, scaling=scaling, primal=primal
                 )
                 X = X.dot(R.T) * sc
-                if i == n_iter - 1:
-                    R_list.append(R)
-        return X, R_list, sc
+                R_list[i] = R
+                sc_list[i] = sc
+        return X, R_list, sc_list
+
+    def _compute_alignments(self, subject_list):
+        """
+        Compute the template and the transformation matrices in parceled fashion
+        for a set of subjects
+
+        Parameters
+        ----------
+        subject_list: list of str
+            List of subjects
+
+        Returns
+        -------
+        labels: (n_vertices,) nd array
+            parcellation
+        template: (n_features, n_vertices) nd array
+            template
+        R_list_parcelled: list of list of rotation matrices
+            for each parcel and each subject
+        sc_list_parcelled: list of list of scaling parameters
+            for each parcel and each subject
+        """
+        imgs = np.stack(
+            [
+                self.masker.transform(self.dict_alignment[subject])
+                for subject in subject_list
+            ]
+        )
+
+        labels = self._compute_parcellation(
+            imgs[0], clustering="kmeans", n_parcels=self.n_parcels
+        )
+        unique_labels = np.unique(labels)
+        # Compute the template and the transformation matrices for each label
+        outputs = Parallel(n_jobs=-1)(
+            delayed(self._template_procrustes)(imgs[..., labels == label])
+            for label in unique_labels
+        )
+        template = [output[0] for output in outputs]
+        R_list_parcelled = [output[1] for output in outputs]
+        sc_list_parcelled = [output[2] for output in outputs]
+
+        return labels, template, R_list_parcelled, sc_list_parcelled
+
+    def _compute_parcellation(self, data, clustering="kmeans", n_parcels=10):
+        """Compute a parcellation of the data using clustering
+
+        Parameters
+        ----------
+        data : ndarray of shape (n_samples, n_vertices)
+            Data used to compute the parcellation
+        clustering : str, optional
+            Clustering strategy, by default "kmeans"
+        n_parcels : int, optional
+            Number of parcels, by default 10
+
+        Returns
+        -------
+        labels
+            ndarray of shape (n_vertices,) containing the parcel labels of each
+            vertex
+        """
+        # Reshape the data to 2D (n_vertices, n_samples)
+        n_vertices = data.shape[1]
+        data_2d = data.reshape(n_vertices, -1)
+
+        # Choose the clustering method
+        if clustering.lower() == "kmeans":
+            clusterer = KMeans(n_clusters=n_parcels, random_state=42)
+        elif clustering.lower() == "ward":
+            clusterer = FeatureAgglomeration(
+                n_clusters=n_parcels, linkage="ward"
+            )
+        else:
+            raise ValueError(
+                "Unsupported clustering method. Choose 'kmeans' or 'ward'."
+            )
+
+        # Fit the clustering
+        labels = clusterer.fit_predict(data_2d).reshape(data.shape[1])
+
+        return labels
+
+    def _project(self, X, labels, R_list, sc_list, n_sub):
+        """Project the data of a subject onto the template
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_vertices)
+            Data to project
+        labels : ndarray of shape (n_vertices,)
+            Array containing the parcel labels of each vertex
+        R_list : List
+            List of list of rotation matrices for each parcel and each subject
+        sc_list : List
+            List of list of scaling parameters for each parcel and each subject
+        n_sub : int
+            Subject index
+
+        Returns
+        -------
+        X_transform : ndarray of shape (n_samples, n_vertices)
+            Transformed data
+        """
+        # Decompose X into parcels
+        X_transform = np.zeros_like(X)
+        unique_labels = np.unique(labels)
+
+        for i in range(len(unique_labels)):
+            label = unique_labels[i]
+            X_reduced = X[:, labels == label]
+            X_transform[:, labels == label] = (
+                X_reduced.dot(R_list[i][n_sub].T) * sc_list[i][n_sub]
+            )
+        return X_transform
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -150,11 +273,21 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
+        labels, template, R_list, sc_list = self._compute_alignments(
+            list(self.dict_alignment.keys())
+        )
+
         self.X = self.masker.inverse_transform(
             np.concatenate(
                 [
-                    self.masker.transform(self.dict_decoding[subject])
-                    for subject in self.dict_decoding.keys()
+                    self._project(
+                        self.masker.transform(self.dict_decoding[subject]),
+                        labels,
+                        R_list,
+                        sc_list,
+                        i,
+                    )
+                    for i, subject in enumerate(self.dict_decoding.keys())
                 ]
             )
         )
