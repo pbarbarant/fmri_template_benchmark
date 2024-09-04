@@ -1,6 +1,8 @@
 import joblib
 import pandas as pd
-from nilearn import masking, maskers
+from nilearn import masking, maskers, surface
+from nilearn.experimental.surface._datasets import load_fsaverage
+from nilearn.experimental.surface._surface_image import SurfaceImage
 
 
 def load_dataset(subject, data_path, mask):
@@ -25,3 +27,25 @@ def load_mask(data_path, memory):
     )
     mask = maskers.NiftiMasker(connected_mask, memory=memory).fit()
     return mask
+
+
+def project_on_surf(data, mesh_name="fsaverage3"):
+    mesh = load_fsaverage(mesh_name)["pial"]
+    left_data = surface.vol_to_surf(data, mesh.parts["left"]).T
+    right_data = surface.vol_to_surf(data, mesh.parts["right"]).T
+    return SurfaceImage(
+        mesh=mesh,
+        data={
+            "left": left_data,
+            "right": right_data,
+        },
+    )
+
+
+def load_dataset_surf(subject, data_path, mask, mesh_name):
+    data_alignment, data_decoding, labels_decoding = load_dataset(
+        subject, data_path, mask
+    )
+    data_alignment_surf = project_on_surf(data_alignment, mesh_name)
+    data_decoding_surf = project_on_surf(data_decoding, mesh_name)
+    return data_alignment_surf, data_decoding_surf, labels_decoding
