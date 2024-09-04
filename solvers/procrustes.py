@@ -152,7 +152,7 @@ class Solver(BaseSolver):
                 sc_list[i] = sc
         return X, R_list, sc_list
 
-    def _compute_alignments(self, subject_list):
+    def _compute_alignments(self, subject_list, n_jobs=10):
         """
         Compute the template and the transformation matrices in parceled fashion
         for a set of subjects
@@ -185,7 +185,7 @@ class Solver(BaseSolver):
         )
         unique_labels = np.unique(labels)
         # Compute the template and the transformation matrices for each label
-        outputs = Parallel(n_jobs=-1)(
+        outputs = Parallel(n_jobs=n_jobs)(
             delayed(self._template_procrustes)(imgs[..., labels == label])
             for label in unique_labels
         )
@@ -274,7 +274,7 @@ class Solver(BaseSolver):
         # https://benchopt.github.io/performance_curves.html
 
         labels, template, R_list, sc_list = self._compute_alignments(
-            list(self.dict_alignment.keys())
+            list(self.dict_alignment.keys()), n_jobs=10
         )
 
         self.X = self.masker.inverse_transform(
