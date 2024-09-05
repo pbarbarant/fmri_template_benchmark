@@ -24,8 +24,8 @@ df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
 # Merge all BOLD5000 folds into one
 df.loc[df["data_name"].str.contains("BOLD5000"), "data_name"] = "BOLD5000"
 
-# Expand the lists in df["objective_scores"]
-df = df.explode("objective_scores")
+# Expand the lists in df["objective_cv_scores"]
+df = df.explode("objective_cv_scores")
 
 # Sort alphabetically by dataset name and solver name
 df.sort_values(by=["data_name", "solver_name"], inplace=True)
@@ -43,7 +43,7 @@ fig, ax = plt.subplots(figsize=(12, 20))
 # Create the box plot
 sns.boxplot(
     data=df,
-    x="objective_scores",
+    x="objective_cv_scores",
     y="data_name",
     hue="solver_name",
     showfliers=False,
@@ -55,7 +55,7 @@ sns.boxplot(
 # Create the scatter plot
 # sns.stripplot(
 #     data=df,
-#     x="objective_scores",
+#     x="objective_cv_scores",
 #     y="data_name",
 #     size=4,
 #     hue="solver_name",
@@ -134,7 +134,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 # Create the box plot
 sns.boxplot(
     data=df_short,
-    x="objective_scores",
+    x="objective_cv_scores",
     y="data_name",
     hue="solver_name",
     showfliers=False,
@@ -146,7 +146,7 @@ sns.boxplot(
 # Create the scatter plot
 sns.stripplot(
     data=df_short,
-    x="objective_scores",
+    x="objective_cv_scores",
     y="data_name",
     size=4,
     hue="solver_name",
