@@ -51,13 +51,11 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        self.X = self.masker.inverse_transform(
-            np.concatenate(
-                [
-                    self.masker.transform(self.dict_decoding[subject])
-                    for subject in self.dict_decoding.keys()
-                ]
-            )
+        self.X = np.concatenate(
+            [
+                self.masker.transform(self.dict_decoding[subject])
+                for subject in self.dict_decoding.keys()
+            ]
         )
         self.y = np.concatenate(
             np.array(list(self.dict_labels.values())), axis=0
