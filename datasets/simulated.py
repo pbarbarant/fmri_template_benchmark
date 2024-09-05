@@ -50,7 +50,7 @@ class Dataset(BaseDataset):
         )
 
     def _sample_labels(self, n_samples):
-        return np.random.randint(2, size=n_samples)
+        return np.random.randint(10, size=n_samples)
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -79,8 +79,6 @@ class Dataset(BaseDataset):
             )
 
         masker = surface.SurfaceMasker().fit(dict_alignment["sub-01"])
-
-        print(dict_alignment["sub-01"].data.parts["left"].shape)
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
