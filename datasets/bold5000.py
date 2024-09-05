@@ -1,15 +1,16 @@
 from benchopt import BaseDataset, safe_import_context
 
-
 # Protect the import with `safe_import_context()`. This allows:
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchmark_utils.config import DATA_PATH_BOLD5000, MEMORY
-    from benchmark_utils.datasets_utils import load_mask
     from pathlib import Path
+
     import joblib
     import pandas as pd
+
+    from benchmark_utils.config import DATA_PATH_BOLD5000, MEMORY
+    from benchmark_utils.datasets_utils import load_mask
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`

@@ -4,8 +4,8 @@ from benchopt import BaseSolver, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchopt.stopping_criterion import SingleRunCriterion
     import numpy as np
+    from benchopt.stopping_criterion import SingleRunCriterion
 
 
 # The benchmark solvers must be named `Solver` and

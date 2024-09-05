@@ -4,19 +4,16 @@ from benchopt import BaseSolver, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
+    import numpy as np
     from benchopt.stopping_criterion import SingleRunCriterion
-    from scipy import linalg
-    from sklearn.cluster import KMeans, AgglomerativeClustering
     from joblib import Parallel, delayed
     from nilearn.experimental.surface._surface_image import SurfaceImage
     from nilearn.surface import load_surf_mesh
+    from scipy import linalg
+    from sklearn.cluster import AgglomerativeClustering, KMeans
 
-    from benchmark_utils.solver_utils import (
-        mesh_connectivity_matrix,
-        plot_surf_img,
-    )
-
-    import numpy as np
+    from benchmark_utils.solver_utils import (mesh_connectivity_matrix,
+                                              plot_surf_img)
 
 
 # The benchmark solvers must be named `Solver` and

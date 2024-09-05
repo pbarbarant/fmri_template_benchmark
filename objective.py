@@ -7,19 +7,16 @@ with safe_import_context() as import_ctx:
     # import warnings
     from pathlib import Path
 
-    import numpy as np
     import joblib
-
+    import numpy as np
+    from nilearn import datasets, decoding, plotting, surface
+    from nilearn._utils import param_validation
     from sklearn import neighbors
-    from sklearn.svm import LinearSVC
-    from sklearn.pipeline import make_pipeline
+    from sklearn.dummy import DummyClassifier
     from sklearn.model_selection import LeaveOneGroupOut, cross_val_score
+    from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
-    from sklearn.dummy import DummyClassifier
-
-    from nilearn import datasets, surface, decoding, plotting
-    from nilearn._utils import param_validation
 
 
 # The benchmark objective must be named `Objective` and

@@ -4,12 +4,12 @@ from benchopt import BaseSolver, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchopt.stopping_criterion import SingleRunCriterion
-    from fugw.mappings import FUGWBarycenter
-    from fugw.datasets import fetch_surf_geometry
     import numpy as np
     import torch
-    from nilearn import surface, plotting
+    from benchopt.stopping_criterion import SingleRunCriterion
+    from fugw.datasets import fetch_surf_geometry
+    from fugw.mappings import FUGWBarycenter
+    from nilearn import plotting, surface
     from nilearn.datasets import fetch_surf_fsaverage
 
 

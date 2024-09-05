@@ -1,6 +1,6 @@
 import joblib
 import pandas as pd
-from nilearn import masking, maskers, surface
+from nilearn import maskers, masking, surface
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
 
