@@ -5,11 +5,12 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from fugw.mappings import FUGWSparseBarycenter
-    from fugw.scripts import coarse_to_fine, lmds
+    from fugw.mappings import FUGWBarycenter
+    from fugw.datasets import fetch_surf_geometry
     import numpy as np
     import torch
-    from nilearn import masking
+    from nilearn import surface, plotting
+    from nilearn.datasets import fetch_surf_fsaverage
 
 
 # The benchmark solvers must be named `Solver` and
@@ -23,10 +24,8 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "alpha": [0.5],
-        "rho": [1e2],
-        "eps": [1e-2],
-        "nits_barycenter": [10],
-        "radius": [7],
+        "rho": [float("inf")],
+        "eps": [1.0],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -41,7 +40,8 @@ class Solver(BaseSolver):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        mask,
+        masker,
+        mesh_name,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
@@ -51,88 +51,18 @@ class Solver(BaseSolver):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.mask = mask
-        self.folds_dict = dict()
-        self.anisotropy = tuple(
-            np.abs(self.mask.mask_img_.affine.diagonal()[:3])
+        self.masker = masker
+        self.mesh_name = mesh_name
+
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
         )
-        # Get main connected component of segmentation
-        self.segmentation = (
-            masking.compute_background_mask(
-                self.mask.mask_img_, connected=True
-            ).get_fdata()
-            > 0
-        )
-        self.n_samples = 1000 if self.anisotropy[0] < 3 else 3000
-        print("Segmentation shape:", self.segmentation.shape)
-        print("Anisotropy shape:", self.anisotropy)
-        print("Number of samples:", self.n_samples)
+        self.nits_barycenter = 10
+        self.nits_bcd = 5
+        self.nits_uot = 100
+        print("Device:", self.device)
 
-    def sample_geometry(self, segmentation, geometry_embedding, n_samples):
-        """Sample the geometry of the mask"""
-        return coarse_to_fine.sample_volume_uniformly(
-            segmentation,
-            embeddings=geometry_embedding,
-            n_samples=n_samples,
-        )
-
-    def prepare_geometry_embedding(
-        self, segmentation, n_landmarks, anisotropy, verbose
-    ):
-        """Compute the normalized geometry embedding"""
-        geometry_embedding = lmds.compute_lmds_volume(
-            segmentation,
-            k=12,
-            n_landmarks=n_landmarks,
-            anisotropy=anisotropy,
-            verbose=verbose,
-        ).nan_to_num()
-
-        (
-            geometry_embedding_normalized,
-            max_distance,
-        ) = coarse_to_fine.random_normalizing(geometry_embedding)
-
-        return (
-            geometry_embedding,
-            geometry_embedding_normalized,
-            max_distance,
-        )
-
-    def project(self, features, plan):
-        """Project features using the given transport plan
-
-        Parameters
-        ----------
-        X : ndarray of shape (n_samples, n_features)
-            Source features
-
-        Returns
-        -------
-        ndarray
-            Projected features
-        """
-        source_features_tensor = torch.tensor(features, dtype=torch.float32)
-        transformed_data = (
-            (
-                torch.sparse.mm(
-                    plan.to("cpu").transpose(0, 1),
-                    source_features_tensor.T,
-                ).to_dense()
-                / (
-                    torch.sparse.sum(plan.to("cpu"), dim=0)
-                    .to_dense()
-                    .reshape(-1, 1)
-                    # Add very small value to handle null rows
-                    + 1e-16
-                )
-            )
-            .T.detach()
-            .cpu()
-        )
-        return transformed_data.numpy()
-
-    def normalize(self, features):
+    def _normalize(self, features):
         """Normalize the features between -1 and 1
 
         Parameters
@@ -145,12 +75,133 @@ class Solver(BaseSolver):
         ndarray
             Normalized features
         """
-        return (
-            2
-            * (features - features.min(axis=0))
-            / (features.max(axis=0) - features.min(axis=0))
-            - 1
+        return features / np.linalg.norm(features, axis=1).reshape(-1, 1)
+
+    def _compute_plans_hemi(
+        self,
+        subject_list,
+        device,
+        hemi,
+    ):
+        """Compute the barycenter and the transport plans
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        ndarray
+            Barycenter features
+
+        list of ndarray of shape (n_features, n_samples)
+            List of transport plans
+        """
+        print(f"Computing features for {hemi} hemisphere")
+        features_list = [
+            self._normalize(
+                np.nan_to_num(self.dict_alignment[subject].data.parts[hemi])
+            )
+            for subject in subject_list
+        ]
+
+        print(f"Computing geometry for {hemi} hemisphere")
+        geometry, d_max = fetch_surf_geometry(
+            f"pial_{hemi}",
+            method="euclidean",
+            resolution=self.mesh_name,
         )
+        geometry /= d_max
+        n_voxels = features_list[0].shape[1]
+
+        # Weights are uniform
+        weights_list = [np.ones(n_voxels) / n_voxels for _ in features_list]
+
+        euclidean_mean = np.mean(features_list, axis=0)
+        fugw_barycenter = FUGWBarycenter(
+            alpha=self.alpha,
+            rho=self.rho,
+            eps=self.eps,
+        )
+        _, barycenter_features, _, plans, _, _ = fugw_barycenter.fit(
+            weights_list,
+            features_list,
+            [geometry],
+            nits_barycenter=self.nits_barycenter,
+            device=device,
+            init_barycenter_features=euclidean_mean,
+            solver="mm",
+            solver_params={
+                "nits_bcd": self.nits_bcd,
+                "nits_uot": self.nits_uot,
+            },
+            verbose=True,
+        )
+
+        # Generate a dictionary of plans for each subject
+        plans_hemi = dict(zip(subject_list, plans))
+        return plans_hemi
+
+    def _compute_plans(
+        self,
+        subject_list,
+        device,
+    ):
+        plans_left = self._compute_plans_hemi(
+            subject_list,
+            device,
+            "left",
+        )
+        plans_right = self._compute_plans_hemi(
+            subject_list,
+            device,
+            "right",
+        )
+
+        plans = dict()
+        for subject in subject_list:
+            plans[subject] = {
+                "left": plans_left[subject],
+                "right": plans_right[subject],
+            }
+
+        return plans
+
+    def _project(self, features, plan):
+        """Project features using the given transport plan
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            Source features
+
+        Returns
+        -------
+        ndarray
+            Projected features
+        """
+        source_features_tensor = torch.tensor(
+            features, dtype=torch.float32, device=self.device
+        )
+        transformed_data = (
+            (
+                (plan.T @ source_features_tensor.T)
+                / (
+                    plan.sum(dim=0).reshape(-1, 1)
+                    # Add very small value to handle null rows
+                    + 1e-16
+                )
+            )
+            .T.detach()
+            .cpu()
+        )
+        return transformed_data.numpy()
+
+    def _project_img(self, img, plan):
+        features = []
+        for hemi in ["left", "right"]:
+            features_hemi = img.data.parts[hemi]
+            features.append(self._project(features_hemi, plan[hemi]))
+        return np.concatenate(features, axis=1)
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -159,91 +210,26 @@ class Solver(BaseSolver):
         # https://benchopt.github.io/performance_curves.html
 
         # List of source subjects
-        subject_list = list(self.dict_alignment.keys())
 
-        nits_bcd = 5
-        nits_uot = 100
-        features_list = [
-            self.normalize(self.mask.transform(self.dict_alignment[subject]))
-            for subject in subject_list
-        ]
-        n_voxels = features_list[0].shape[1]
+        plans = self._compute_plans(
+            list(self.dict_alignment.keys()),
+            self.device,
+        )
 
-        # Weights are uniform
-        weights_list = [np.ones(n_voxels) / n_voxels for _ in features_list]
-
-        _, geometry_embedding_normalized, max_distance = (
-            self.prepare_geometry_embedding(
-                self.segmentation,
-                n_landmarks=100,
-                anisotropy=self.anisotropy,
-                verbose=True,
+        self.X = self.masker.inverse_transform(
+            np.concatenate(
+                [
+                    self._project_img(
+                        self.dict_decoding[subject], plans[subject]
+                    )
+                    for subject in self.dict_decoding.keys()
+                ]
             )
-        )
-
-        mesh_sample = self.sample_geometry(
-            self.segmentation,
-            geometry_embedding_normalized,
-            self.n_samples,
-        )
-
-        # Compute the Barycenter
-        sparse_barycenter = FUGWSparseBarycenter(
-            alpha_coarse=self.alpha,
-            alpha_fine=self.alpha,
-            rho_coarse=self.rho,
-            rho_fine=self.rho,
-            eps_coarse=self.eps,
-            eps_fine=self.eps,
-            selection_radius=self.radius / max_distance,
-        )
-        (
-            _,
-            _,
-            plans,
-            _,
-        ) = sparse_barycenter.fit(
-            weights_list,
-            features_list,
-            geometry_embedding_normalized,
-            mesh_sample=mesh_sample,
-            nits_barycenter=self.nits_barycenter,
-            init_barycenter_features=np.mean(features_list, axis=0),
-            solver="mm",
-            coarse_mapping_solver_params={
-                "nits_bcd": nits_bcd,
-                "nits_uot": nits_uot,
-            },
-            fine_mapping_solver_params={
-                "nits_bcd": nits_bcd,
-                "nits_uot": nits_uot,
-            },
-            device="auto",
-            verbose=True,
-        )
-
-        # Generate a dict of plan for each subject
-        self.plans = dict()
-        for subject, plan in zip(subject_list, plans):
-            self.plans[subject] = plan
-
-        self.X = np.concatenate(
-            [
-                self.project(
-                    self.mask.transform(self.dict_decoding[subject]),
-                    self.plans[subject],
-                )
-                for subject in subject_list
-            ],
-            axis=0,
         )
 
         self.y = np.concatenate(
             np.array(list(self.dict_labels.values())), axis=0
         )
-
-        print("X shape:", self.X.shape)
-        print("y shape:", self.y.shape)
 
     def get_result(self):
         # Return the result from one optimization run.
