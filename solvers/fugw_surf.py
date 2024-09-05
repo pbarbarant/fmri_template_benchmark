@@ -57,7 +57,7 @@ class Solver(BaseSolver):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
-        self.nits_barycenter = 1
+        self.nits_barycenter = 10
         self.nits_bcd = 5
         self.nits_uot = 100
         print("Device:", self.device)
