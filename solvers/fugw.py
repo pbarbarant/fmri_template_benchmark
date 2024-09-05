@@ -216,15 +216,11 @@ class Solver(BaseSolver):
             self.device,
         )
 
-        self.X = self.masker.inverse_transform(
-            np.concatenate(
-                [
-                    self._project_img(
-                        self.dict_decoding[subject], plans[subject]
-                    )
-                    for subject in self.dict_decoding.keys()
-                ]
-            )
+        self.X = np.concatenate(
+            [
+                self._project_img(self.dict_decoding[subject], plans[subject])
+                for subject in self.dict_decoding.keys()
+            ]
         )
 
         self.y = np.concatenate(
