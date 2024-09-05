@@ -12,8 +12,10 @@ with safe_import_context() as import_ctx:
     from scipy import linalg
     from sklearn.cluster import AgglomerativeClustering, KMeans
 
-    from benchmark_utils.solver_utils import (mesh_connectivity_matrix,
-                                              plot_surf_img)
+    from benchmark_utils.solver_utils import (
+        mesh_connectivity_matrix,
+        plot_surf_img,
+    )
 
 
 # The benchmark solvers must be named `Solver` and
