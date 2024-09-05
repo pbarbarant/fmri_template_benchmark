@@ -58,14 +58,14 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        # srm_path = os.path.join(MEMORY, "fastsrm")
-        # if not os.path.exists(srm_path):
-        #     os.makedirs(srm_path)
+        srm_path = os.path.join(MEMORY, "fastsrm")
+        if not os.path.exists(srm_path):
+            os.makedirs(srm_path)
 
         srm = IdentifiableFastSRM(
             n_components=self.n_components,
             aggregate="mean",
-            temp_dir=None,
+            temp_dir=srm_path,
             tol=1e-10,
             n_iter=100,
             n_jobs=5,
