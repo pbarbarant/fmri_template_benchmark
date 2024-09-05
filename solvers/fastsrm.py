@@ -7,7 +7,6 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fastsrm.identifiable_srm import IdentifiableFastSRM
     import os
-    from sklearn.preprocessing import StandardScaler
     import numpy as np
     from benchmark_utils.config import MEMORY
 
@@ -37,7 +36,8 @@ class Solver(BaseSolver):
         dict_alignment,
         dict_decoding,
         dict_labels,
-        mask,
+        masker,
+        mesh_name,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
@@ -47,8 +47,8 @@ class Solver(BaseSolver):
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
         self.dict_labels = dict_labels
-        self.mask = mask
-        self.folds_dict = dict()
+        self.masker = masker
+        self.mesh_name = mesh_name
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -56,67 +56,36 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        # List of source subjects
-        subject_list = list(self.dict_alignment.keys())
-
-        srm_path = os.path.join(MEMORY, "fastsrm")
-        if not os.path.exists(srm_path):
-            os.makedirs(srm_path)
+        # srm_path = os.path.join(MEMORY, "fastsrm")
+        # if not os.path.exists(srm_path):
+        #     os.makedirs(srm_path)
 
         srm = IdentifiableFastSRM(
             n_components=self.n_components,
             aggregate="mean",
-            temp_dir=srm_path,
+            temp_dir=None,
             tol=1e-10,
             n_iter=100,
             n_jobs=5,
         )
 
         alignment_array = [
-            self.mask.transform(contrasts).T
+            self.masker.transform(contrasts).T
             for _, contrasts in self.dict_alignment.items()
         ]
         alignment_estimator = srm.fit(alignment_array)
 
-        for left_out_subject in subject_list:
-            # Train data
-            X_train = np.vstack(
-                [
-                    alignment_estimator.transform(
-                        [
-                            self.mask.transform(
-                                self.dict_decoding[left_out_subject]
-                            ).T
-                        ]
-                    ).T
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            )
-            self.y_train = np.hstack(
-                [
-                    self.dict_labels[subject]
-                    for subject in subject_list
-                    if subject != left_out_subject
-                ]
-            ).ravel()
-
-            # Test data
-            X_test = self.mask.transform(self.dict_decoding[left_out_subject])
-            X_test = alignment_estimator.transform([X_test.T]).T
-            self.y_test = self.dict_labels[left_out_subject].ravel()
-
-            # Standard scaling
-            se = StandardScaler()
-            self.X_train = se.fit_transform(X_train)
-            self.X_test = se.transform(X_test)
-
-            self.folds_dict[left_out_subject] = dict(
-                X_train=self.X_train,
-                y_train=self.y_train,
-                X_test=self.X_test,
-                y_test=self.y_test,
-            )
+        self.X = np.concatenate(
+            [
+                alignment_estimator.transform(
+                    [self.masker.transform(self.dict_decoding[subject]).T]
+                ).T
+                for subject in self.dict_decoding.keys()
+            ]
+        )
+        self.y = np.concatenate(
+            np.array(list(self.dict_labels.values())), axis=0
+        )
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -125,5 +94,5 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            folds_dict=self.folds_dict,
+            aligned_dataset=(self.X, self.y, self.name),
         )
