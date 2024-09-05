@@ -13,10 +13,10 @@ with safe_import_context() as import_ctx:
     from sklearn import neighbors
     from sklearn.svm import LinearSVC
     from sklearn.pipeline import make_pipeline
-    from sklearn.model_selection import LeaveOneGroupOut
+    from sklearn.model_selection import LeaveOneGroupOut, cross_val_score
     from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import LinearSVC
     from sklearn.dummy import DummyClassifier
-    from sklearn.utils import shuffle
 
     from nilearn import datasets, surface, decoding, plotting
     from nilearn._utils import param_validation
@@ -200,13 +200,26 @@ class Objective(BaseObjective):
             ]
         )
 
-        cv_scores_svc = self._compute_decoding_scores(X, y, groups)
-        cv_scores_dummy = self._compute_decoding_scores(
+        pipeline_svc = make_pipeline(
+            StandardScaler(), LinearSVC(max_iter=int(self.max_iter))
+        )
+
+        cv_scores_svc = cross_val_score(
+            pipeline_svc,
             X,
             y,
-            groups,
-            estimator="dummy_classifier",
+            groups=groups,
+            cv=LeaveOneGroupOut(),
+            n_jobs=10,
         )
+        cv_scores_dummy = cross_val_score(
+            DummyClassifier(strategy="most_frequent"),
+            X,
+            y,
+            groups=groups,
+            cv=LeaveOneGroupOut(),
+        )
+
         avg_score = np.mean(cv_scores_svc)
         # for hemi in ["left", "right"]:
         #     self._plot_searchlight_scores(
