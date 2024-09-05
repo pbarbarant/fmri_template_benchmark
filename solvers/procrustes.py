@@ -6,8 +6,15 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from scipy import linalg
-    from sklearn.cluster import KMeans, FeatureAgglomeration
+    from sklearn.cluster import KMeans, AgglomerativeClustering
     from joblib import Parallel, delayed
+    from nilearn.experimental.surface._surface_image import SurfaceImage
+    from nilearn.surface import load_surf_mesh
+
+    from benchmark_utils.solver_utils import (
+        mesh_connectivity_matrix,
+        plot_surf_img,
+    )
 
     import numpy as np
 
@@ -181,7 +188,10 @@ class Solver(BaseSolver):
         )
 
         labels = self._compute_parcellation(
-            imgs[0], clustering="kmeans", n_parcels=self.n_parcels
+            imgs[0],
+            clustering="ward",
+            n_parcels=self.n_parcels,
+            mesh=next(iter(self.dict_alignment.values())).mesh,
         )
         unique_labels = np.unique(labels)
         # Compute the template and the transformation matrices for each label
@@ -195,7 +205,9 @@ class Solver(BaseSolver):
 
         return labels, template, R_list_parcelled, sc_list_parcelled
 
-    def _compute_parcellation(self, data, clustering="kmeans", n_parcels=10):
+    def _compute_parcellation(
+        self, data, mesh=None, clustering="kmeans", n_parcels=10
+    ):
         """Compute a parcellation of the data using clustering
 
         Parameters
@@ -213,26 +225,56 @@ class Solver(BaseSolver):
             ndarray of shape (n_vertices,) containing the parcel labels of each
             vertex
         """
+        if n_parcels % 2 != 0:
+            raise ValueError("The number of parcels must be even.")
+        n_parcels_hemi = n_parcels // 2
+
         # Reshape the data to 2D (n_vertices, n_samples)
         n_vertices = data.shape[1]
         data_2d = data.reshape(n_vertices, -1)
 
         # Choose the clustering method
         if clustering.lower() == "kmeans":
-            clusterer = KMeans(n_clusters=n_parcels, random_state=42)
+            clusterer = KMeans(n_clusters=n_parcels_hemi, random_state=42)
+            # Fit the clustering
+            labels = clusterer.fit_predict(data_2d).reshape(data.shape[1])
+
+            return labels
+
         elif clustering.lower() == "ward":
-            clusterer = FeatureAgglomeration(
-                n_clusters=n_parcels, linkage="ward"
+            # Compute the connectivity matrix for each hemisphere
+            coordinates_left, faces_left = load_surf_mesh(mesh.parts["left"])
+            coordinates_right, faces_right = load_surf_mesh(
+                mesh.parts["right"]
             )
+            connectivity_left = mesh_connectivity_matrix(
+                coordinates_left, faces_left
+            )
+            connectivity_right = mesh_connectivity_matrix(
+                coordinates_right, faces_right
+            )
+            clusterer_left = AgglomerativeClustering(
+                n_clusters=n_parcels_hemi,
+                connectivity=connectivity_left,
+                linkage="ward",
+            )
+            clusterer_right = AgglomerativeClustering(
+                n_clusters=n_parcels_hemi,
+                connectivity=connectivity_right,
+                linkage="ward",
+            )
+            labels_left = clusterer_left.fit_predict(
+                np.ones(n_vertices // 2).reshape(-1, 1)
+            )
+            labels_right = clusterer_right.fit_predict(
+                np.ones(n_vertices // 2).reshape(-1, 1)
+            )
+
+            return np.concatenate([labels_left, labels_right])
         else:
             raise ValueError(
                 "Unsupported clustering method. Choose 'kmeans' or 'ward'."
             )
-
-        # Fit the clustering
-        labels = clusterer.fit_predict(data_2d).reshape(data.shape[1])
-
-        return labels
 
     def _project(self, X, labels, R_list, sc_list, n_sub):
         """Project the data of a subject onto the template
@@ -277,19 +319,29 @@ class Solver(BaseSolver):
             list(self.dict_alignment.keys()), n_jobs=10
         )
 
-        self.X = self.masker.inverse_transform(
-            np.concatenate(
-                [
-                    self._project(
-                        self.masker.transform(self.dict_decoding[subject]),
-                        labels,
-                        R_list,
-                        sc_list,
-                        i,
-                    )
-                    for i, subject in enumerate(self.dict_decoding.keys())
-                ]
-            )
+        img_labels = SurfaceImage(
+            mesh=next(iter(self.dict_alignment.values())).mesh,
+            data={
+                "left": labels[: len(labels) // 2],
+                "right": labels[len(labels) // 2 :],
+            },
+        )
+
+        fig = plot_surf_img(img_labels, cmap="tab20")
+        fig.suptitle(f"Parcellation of the brain in {self.n_parcels} parcels")
+        fig.savefig(f"figures/parcellation_{self.n_parcels}.pdf")
+
+        self.X = np.concatenate(
+            [
+                self._project(
+                    self.masker.transform(self.dict_decoding[subject]),
+                    labels,
+                    R_list,
+                    sc_list,
+                    i,
+                )
+                for i, subject in enumerate(self.dict_decoding.keys())
+            ]
         )
         self.y = np.concatenate(
             np.array(list(self.dict_labels.values())), axis=0
