@@ -29,7 +29,8 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "n_iter": [10],
-        "n_parcels": [300],
+        "n_parcels": [100, 200, 300, 400, 500],
+        "clustering": ["ward", "kmeans"],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -188,7 +189,7 @@ class Solver(BaseSolver):
 
         labels = self._compute_parcellation(
             imgs[0],
-            clustering="ward",
+            clustering=self.clustering,
             n_parcels=self.n_parcels,
             mesh=next(iter(self.dict_alignment.values())).mesh,
         )
