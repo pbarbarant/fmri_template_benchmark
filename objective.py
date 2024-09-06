@@ -9,14 +9,14 @@ with safe_import_context() as import_ctx:
 
     import joblib
     import numpy as np
-    from nilearn import datasets, decoding, plotting, surface
-    from nilearn._utils import param_validation
-    from sklearn import neighbors
+    import matplotlib.pyplot as plt
     from sklearn.dummy import DummyClassifier
     from sklearn.model_selection import LeaveOneGroupOut, cross_val_score
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
+
+    from benchmark_utils.solver_utils import plot_surf_img
 
 
 # The benchmark objective must be named `Objective` and
@@ -83,6 +83,36 @@ class Objective(BaseObjective):
 
         print(f"Running on: {dataset_name}")
 
+    def plot_aligned_dataset(self, X, y, groups, solver_name, dataset_name):
+        contrasts = np.unique(y)
+        subjects = np.unique(groups)
+        for subject in subjects:
+            X_subject = X[groups == subject]
+            y_subject = y[groups == subject]
+            for contrast in contrasts:
+                avg_contrast = np.mean(
+                    X_subject[y_subject == contrast], axis=0
+                )
+                img = self.masker.inverse_transform(avg_contrast)
+                fig = plot_surf_img(
+                    img,
+                    colorbar=True,
+                    cmap="coolwarm",
+                )
+                fig.suptitle(
+                    f"Subject {subject} - {solver_name} - contrast {contrast}"
+                )
+                output_dir = (
+                    Path(__file__).parent
+                    / "figures/aligned_datasets"
+                    / dataset_name
+                    / solver_name
+                    / f"{subject}"
+                )
+                output_dir.mkdir(parents=True, exist_ok=True)
+                fig.savefig(output_dir / f"{contrast}.pdf")
+                plt.close(fig)
+
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
@@ -98,6 +128,8 @@ class Objective(BaseObjective):
                 for i, subject in enumerate(self.dict_decoding.keys())
             ]
         )
+
+        self.plot_aligned_dataset(X, y, groups, solver_name, self.dataset_name)
 
         pipeline_svc = make_pipeline(
             StandardScaler(), LinearSVC(max_iter=int(self.max_iter))
