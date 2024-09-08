@@ -104,7 +104,8 @@ class Objective(BaseObjective):
                 )
                 output_dir = (
                     Path(__file__).parent
-                    / "figures/aligned_datasets"
+                    / "figures"
+                    / "aligned_datasets"
                     / dataset_name
                     / solver_name
                     / f"{subject}"
