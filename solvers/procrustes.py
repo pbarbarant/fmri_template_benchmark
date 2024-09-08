@@ -329,7 +329,9 @@ class Solver(BaseSolver):
 
         fig = plot_surf_img(img_labels, cmap="tab20")
         fig.suptitle(f"Parcellation of the brain in {self.n_parcels} parcels")
-        fig.savefig(f"figures/parcellation_{self.n_parcels}.pdf")
+        fig.savefig(
+            f"figures/parcellation_{self.clustering}_{self.n_parcels}.pdf"
+        )
 
         self.X = np.concatenate(
             [

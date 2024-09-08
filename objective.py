@@ -86,6 +86,7 @@ class Objective(BaseObjective):
     def plot_aligned_dataset(self, X, y, groups, solver_name, dataset_name):
         contrasts = np.unique(y)
         subjects = np.unique(groups)
+        subjects_names = list(self.dict_decoding.keys())
         for subject in subjects:
             X_subject = X[groups == subject]
             y_subject = y[groups == subject]
@@ -100,7 +101,7 @@ class Objective(BaseObjective):
                     cmap="coolwarm",
                 )
                 fig.suptitle(
-                    f"Subject {subject} - {solver_name} - contrast {contrast}"
+                    f"Subject {subjects_names[subject]} - {solver_name} - contrast {contrast}"
                 )
                 output_dir = (
                     Path(__file__).parent
@@ -108,7 +109,7 @@ class Objective(BaseObjective):
                     / "aligned_datasets"
                     / dataset_name
                     / solver_name
-                    / f"{subject}"
+                    / f"{subjects_names[subject]}"
                 )
                 output_dir.mkdir(parents=True, exist_ok=True)
                 fig.savefig(output_dir / f"{contrast}.pdf")
