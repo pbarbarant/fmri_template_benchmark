@@ -11,6 +11,7 @@ with safe_import_context() as import_ctx:
     from nilearn.surface import load_surf_mesh
     from scipy import linalg
     from sklearn.cluster import AgglomerativeClustering, KMeans
+    from pathlib import Path
 
     from benchmark_utils.solver_utils import (
         mesh_connectivity_matrix,
@@ -329,9 +330,14 @@ class Solver(BaseSolver):
 
         fig = plot_surf_img(img_labels, cmap="tab20")
         fig.suptitle(f"Parcellation of the brain in {self.n_parcels} parcels")
-        fig.savefig(
-            f"figures/parcellation_{self.clustering}_{self.n_parcels}.pdf"
+        output_dir = (
+            Path(__file__).parent.parent
+            / "figures"
+            / "parcellations"
+            / f"{self.clustering}"
         )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir / f"{self.n_parcels}.pdf")
 
         self.X = np.concatenate(
             [
