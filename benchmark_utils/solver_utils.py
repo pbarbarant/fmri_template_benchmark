@@ -20,6 +20,7 @@ def plot_surf_img(
         plotting.plot_surf(
             mesh.parts[mesh_part],
             img.data.parts[mesh_part],
+            hemi=mesh_part,
             axes=ax,
             title=mesh_part,
             **kwargs,
