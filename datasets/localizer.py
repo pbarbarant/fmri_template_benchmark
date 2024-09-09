@@ -8,8 +8,6 @@ with safe_import_context() as import_ctx:
     from nilearn import datasets
     from nilearn.image import load_img
     from nilearn.experimental import surface
-    from nilearn.experimental.surface._datasets import load_fsaverage
-    from nilearn.experimental.surface._surface_image import SurfaceImage
 
     from benchmark_utils.datasets_utils import project_on_surf
 
