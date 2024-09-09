@@ -29,15 +29,15 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "n_iter": [10],
-        "n_parcels": [300],
-        "clustering": ["ward"],
+        "n_iter": [1, 10, 100],
+        "n_parcels": [4, 10, 20, 30],
+        "clustering": ["ward", "kmeans"],
     }
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
     install_pip = "pip"
-    requirements = ["pip:fmralign", "joblib"]
+    requirements = ["numpy", "nilearn", "joblib"]
 
     stopping_criterion = SingleRunCriterion()
 
