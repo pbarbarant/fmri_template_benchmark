@@ -77,7 +77,9 @@ class Dataset(BaseDataset):
                 n_samples=self.n_samples_decoding
             )
 
-        masker = surface.SurfaceMasker().fit(dict_alignment["sub-01"])
+        masker = surface.SurfaceMasker().fit(
+            next(iter(dict_alignment.values()))
+        )
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
