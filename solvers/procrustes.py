@@ -30,8 +30,8 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "n_iter": [10],
-        "n_parcels": [100, 200, 300, 400, 500],
-        "clustering": ["ward", "kmeans"],
+        "n_parcels": [300],
+        "clustering": ["ward"],
     }
 
     # List of packages needed to run the solver. See the corresponding

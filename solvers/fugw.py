@@ -25,7 +25,7 @@ class Solver(BaseSolver):
     parameters = {
         "alpha": [0.5],
         "rho": [float("inf")],
-        "eps": [1e-2, 1.0, 1e2, 1e4],
+        "eps": [1e-4],
     }
 
     # List of packages needed to run the solver. See the corresponding
