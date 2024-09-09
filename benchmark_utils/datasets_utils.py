@@ -1,5 +1,7 @@
 import joblib
 import pandas as pd
+import numpy as np
+
 from nilearn import maskers, masking, surface
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
@@ -33,11 +35,13 @@ def project_on_surf(data, mesh_name="fsaverage3"):
     mesh = load_fsaverage(mesh_name)["pial"]
     left_data = surface.vol_to_surf(data, mesh.parts["left"]).T
     right_data = surface.vol_to_surf(data, mesh.parts["right"]).T
+    left_data_sanitized = np.nan_to_num(left_data)
+    right_data_sanitized = np.nan_to_num(right_data)
     return SurfaceImage(
         mesh=mesh,
         data={
-            "left": left_data,
-            "right": right_data,
+            "left": left_data_sanitized,
+            "right": right_data_sanitized,
         },
     )
 
