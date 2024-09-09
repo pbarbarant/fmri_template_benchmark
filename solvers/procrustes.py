@@ -29,8 +29,8 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "n_iter": [1, 10, 100],
-        "n_parcels": [4, 10, 20, 30],
+        "n_iter": [10],
+        "n_parcels": [100, 200, 300],
         "clustering": ["ward", "kmeans"],
     }
 
@@ -361,6 +361,10 @@ class Solver(BaseSolver):
         # keyword arguments for `Objective.evaluate_result`
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
+        solver_name = (
+            self.name
+            + f"_niter_{self.n_iter}_{self.clustering}_{self.n_parcels}"
+        )
         return dict(
-            aligned_dataset=(self.X, self.y, self.name),
+            aligned_dataset=(self.X, self.y, solver_name),
         )
