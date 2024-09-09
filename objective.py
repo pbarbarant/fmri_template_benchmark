@@ -7,7 +7,6 @@ with safe_import_context() as import_ctx:
     # import warnings
     from pathlib import Path
 
-    import joblib
     import numpy as np
     import matplotlib.pyplot as plt
     from sklearn.dummy import DummyClassifier
