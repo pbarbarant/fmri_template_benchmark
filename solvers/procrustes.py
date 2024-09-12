@@ -30,7 +30,7 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "n_iter": [10],
-        "n_parcels": [100, 200, 300],
+        "n_parcels": [50, 100, 150],
         "clustering": ["ward", "kmeans"],
     }
 
