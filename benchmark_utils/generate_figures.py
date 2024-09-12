@@ -2,6 +2,7 @@
 import glob
 import os
 from pathlib import Path
+from PyPDF2 import PdfMerger
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -187,3 +188,52 @@ plt.savefig(
     dpi=500,
     bbox_inches="tight",
 )
+
+
+# %%
+# Concatenate pdfs per dataset and solver
+aligned_dataset_paths = figures_path / "aligned_datasets"
+# Get the list of folders
+aligned_datasets = [
+    folder for folder in aligned_dataset_paths.iterdir() if folder.is_dir()
+]
+# Get the subfolders in one list
+solvers_paths = [
+    solver
+    for dataset in aligned_datasets
+    for solver in dataset.iterdir()
+    if solver.is_dir()
+]
+
+
+def concat_pdf(folder):
+    subject_paths = [
+        subject for subject in folder.iterdir() if subject.is_dir()
+    ]
+    # Get the list of contrast_names
+    contrasts_paths = glob.glob(str(subject_paths[0] / "*.pdf"))
+    # Keep only the contrast names
+    contrast_names = [
+        Path(contrast_path).stem for contrast_path in contrasts_paths
+    ]
+    for contrast in contrast_names:
+        pdf_files = []
+        for subject_path in subject_paths:
+            pdf_files.append(
+                *glob.glob(str(subject_path / f"*{contrast}.pdf"))
+            )
+        # Sort the pdf_files
+        pdf_files.sort()
+        # Concatenate the pdf_files
+        merger = PdfMerger()
+        for pdf_file in pdf_files:
+            merger.append(pdf_file)
+        output_filename = folder / f"{contrast}.pdf"
+        merger.write(output_filename)
+        # Close the PdfMerger object
+        merger.close()
+
+
+for solver_path in solvers_paths:
+    print(f"Concatenating pdfs for {solver_path}")
+    concat_pdf(solver_path)
