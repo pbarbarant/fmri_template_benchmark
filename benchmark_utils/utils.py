@@ -28,7 +28,7 @@ def plot_surf_img(
         plotting.plot_surf(
             mesh.parts[mesh_part],
             img.data.parts[mesh_part],
-            bg_map=bg_map[mesh_part],
+            bg_map=bg_map[mesh_part] if bg_map is not None else None,
             hemi=mesh_part,
             axes=ax,
             title=mesh_part,
@@ -182,7 +182,7 @@ def plot_aligned_dataset(
                 colorbar=True,
                 cmap="hot",
                 # Keep only the significant weights
-                threshold=1e-3,
+                threshold=1e-6,
             )
             fig.suptitle(
                 f"Subject {subjects_list[subject]} - {solver_name} - contrast {contrast}"
