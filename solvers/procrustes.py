@@ -9,11 +9,12 @@ with safe_import_context() as import_ctx:
     from joblib import Parallel, delayed
     from nilearn.experimental.surface._surface_image import SurfaceImage
     from nilearn.surface import load_surf_mesh
+    from nilearn import datasets
     from scipy import linalg
     from sklearn.cluster import AgglomerativeClustering, KMeans
     from pathlib import Path
 
-    from benchmark_utils.solver_utils import (
+    from benchmark_utils.utils import (
         mesh_connectivity_matrix,
         plot_surf_img,
     )
@@ -30,8 +31,8 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "n_iter": [10],
-        "n_parcels": [50, 100, 150],
-        "clustering": ["ward", "kmeans"],
+        "n_parcels": [76],
+        "clustering": ["destrieux"],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -272,9 +273,14 @@ class Solver(BaseSolver):
             )
 
             return np.concatenate([labels_left, labels_right])
+        elif clustering.lower() == "destrieux":
+            destrieux = datasets.fetch_atlas_surf_destrieux()
+            labels_left = destrieux["map_left"]
+            labels_right = destrieux["map_right"]
+            return np.concatenate([labels_left, labels_right])
         else:
             raise ValueError(
-                "Unsupported clustering method. Choose 'kmeans' or 'ward'."
+                "Unsupported clustering method. Choose 'kmeans', 'ward' or 'destrieux'."
             )
 
     def _project(self, X, labels, R_list, sc_list, n_sub):
