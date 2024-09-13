@@ -41,7 +41,7 @@ class Dataset(BaseDataset):
         ]
 
         # Number of contrasts used for alignment
-        n_training_contrasts = 2
+        n_decoding_contrasts = 3
 
         subject_data = datasets.fetch_localizer_contrasts(
             contrasts=contrasts,
@@ -51,10 +51,10 @@ class Dataset(BaseDataset):
 
         # Load the data in volumetric form
         alignment_contrasts_vol = load_img(
-            subject_data.cmaps[0:n_training_contrasts]
+            subject_data.cmaps[:-n_decoding_contrasts]
         )
         decoding_contrasts_vol = load_img(
-            subject_data.cmaps[n_training_contrasts:]
+            subject_data.cmaps[-n_decoding_contrasts:]
         )
 
         # Create a SurfaceImage object for the alignment and decoding contrasts
@@ -66,7 +66,7 @@ class Dataset(BaseDataset):
         )
 
         # Load labels
-        labels = np.array(contrasts[n_training_contrasts:])
+        labels = np.array(contrasts[-n_decoding_contrasts:])
 
         return alignment_contrasts_surf, decoding_contrasts_surf, labels
 
