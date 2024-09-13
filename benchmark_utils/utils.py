@@ -1,14 +1,13 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from nilearn import plotting
-from scipy.sparse import coo_matrix
-import joblib
-import pandas as pd
 from pathlib import Path
 
-from nilearn import maskers, masking, surface, datasets
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from nilearn import datasets, maskers, masking, plotting, surface
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
+from scipy.sparse import coo_matrix
 
 
 def plot_surf_img(

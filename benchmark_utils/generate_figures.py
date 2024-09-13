@@ -2,12 +2,12 @@
 import glob
 import os
 from pathlib import Path
-from PyPDF2 import PdfMerger
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
+from PyPDF2 import PdfMerger
 
 plt.rcParams["figure.dpi"] = 500
 
