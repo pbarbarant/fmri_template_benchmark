@@ -49,7 +49,7 @@ class Dataset(BaseDataset):
         )
 
     def _sample_labels(self, n_samples):
-        return np.random.randint(10, size=n_samples)
+        return np.random.randint(3, size=n_samples)
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
