@@ -10,7 +10,11 @@ with safe_import_context() as import_ctx:
     import numpy as np
     import matplotlib.pyplot as plt
     from sklearn.dummy import DummyClassifier
-    from sklearn.model_selection import LeaveOneGroupOut, cross_val_score
+    from sklearn.model_selection import (
+        LeaveOneGroupOut,
+        cross_val_score,
+        cross_validate,
+    )
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
@@ -82,14 +86,26 @@ class Objective(BaseObjective):
 
         print(f"Running on: {dataset_name}")
 
-    def plot_aligned_dataset(self, X, y, groups, solver_name, dataset_name):
+    def plot_aligned_dataset(
+        self,
+        X,
+        y,
+        groups,
+        fitted_estimators,
+        solver_name,
+        dataset_name,
+    ):
         contrasts = np.unique(y)
         subjects = np.unique(groups)
         subjects_names = list(self.dict_decoding.keys())
-        for subject in subjects:
+        for i, subject in enumerate(subjects):
             X_subject = X[groups == subject]
             y_subject = y[groups == subject]
-            for contrast in contrasts:
+            estimator = fitted_estimators[i]
+            # Get the coefficients of the SVC
+            coefs = estimator[-1].coef_
+            for contrast_index, contrast in enumerate(contrasts):
+                # Plot the average contrast
                 avg_contrast = np.mean(
                     X_subject[y_subject == contrast], axis=0
                 )
@@ -114,6 +130,23 @@ class Objective(BaseObjective):
                 fig.savefig(output_dir / f"{contrast}.pdf")
                 plt.close(fig)
 
+                # Plot the weights
+                # Get the contrast index
+                print(coefs.shape)
+                img_coefs = self.masker.inverse_transform(
+                    coefs[contrast_index]
+                )
+                fig = plot_surf_img(
+                    img_coefs,
+                    colorbar=True,
+                    cmap="hot",
+                )
+                fig.suptitle(
+                    f"Subject {subjects_names[subject]} - {solver_name} - contrast {contrast}"
+                )
+                fig.savefig(output_dir / f"coefs_{contrast}.pdf")
+                plt.close(fig)
+
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
@@ -130,20 +163,32 @@ class Objective(BaseObjective):
             ]
         )
 
-        self.plot_aligned_dataset(X, y, groups, solver_name, self.dataset_name)
-
         pipeline_svc = make_pipeline(
-            StandardScaler(), LinearSVC(max_iter=int(self.max_iter))
+            StandardScaler(),
+            LinearSVC(max_iter=int(self.max_iter), penalty="l1"),
         )
 
-        cv_scores_svc = cross_val_score(
+        cv_results_svc = cross_validate(
             pipeline_svc,
             X,
             y,
             groups=groups,
             cv=LeaveOneGroupOut(),
             n_jobs=10,
+            return_estimator=True,  # This option will return the fitted estimators
         )
+        cv_scores_svc = cv_results_svc["test_score"]
+        fitted_estimators = cv_results_svc["estimator"]
+
+        self.plot_aligned_dataset(
+            X,
+            y,
+            groups,
+            fitted_estimators,
+            solver_name,
+            self.dataset_name,
+        )
+
         cv_scores_dummy = cross_val_score(
             DummyClassifier(strategy="most_frequent"),
             X,
