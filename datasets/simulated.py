@@ -14,7 +14,7 @@ with safe_import_context() as import_ctx:
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
     name = "Simulated"
-    mesh_name = "fsaverage3"
+    mesh_name = "fsaverage5"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py

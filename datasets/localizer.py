@@ -9,14 +9,14 @@ with safe_import_context() as import_ctx:
     from nilearn.image import load_img
     from nilearn.experimental import surface
 
-    from benchmark_utils.datasets_utils import project_on_surf
+    from benchmark_utils.utils import project_on_surf
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
     name = "Localizer"
-    mesh_name = "fsaverage3"
+    mesh_name = "fsaverage5"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -41,7 +41,7 @@ class Dataset(BaseDataset):
         ]
 
         # Number of contrasts used for alignment
-        n_training_contrasts = 3
+        n_training_contrasts = 2
 
         subject_data = datasets.fetch_localizer_contrasts(
             contrasts=contrasts,
