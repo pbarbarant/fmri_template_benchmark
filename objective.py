@@ -19,7 +19,7 @@ with safe_import_context() as import_ctx:
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
 
-    from benchmark_utils.solver_utils import plot_surf_img
+    from benchmark_utils.utils import plot_surf_img
 
 
 # The benchmark objective must be named `Objective` and
@@ -132,7 +132,6 @@ class Objective(BaseObjective):
 
                 # Plot the weights
                 # Get the contrast index
-                print(coefs.shape)
                 img_coefs = self.masker.inverse_transform(
                     coefs[contrast_index]
                 )
@@ -140,6 +139,8 @@ class Objective(BaseObjective):
                     img_coefs,
                     colorbar=True,
                     cmap="hot",
+                    # Keep only the significant weights
+                    threshold=1e-3,
                 )
                 fig.suptitle(
                     f"Subject {subjects_names[subject]} - {solver_name} - contrast {contrast}"
