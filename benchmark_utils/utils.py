@@ -4,14 +4,16 @@ from nilearn import plotting
 from scipy.sparse import coo_matrix
 import joblib
 import pandas as pd
+from pathlib import Path
 
-from nilearn import maskers, masking, surface
+from nilearn import maskers, masking, surface, datasets
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
 
 
 def plot_surf_img(
     img,
+    bg_map=None,
     **kwargs,
 ):
     mesh = img.mesh
@@ -26,9 +28,11 @@ def plot_surf_img(
         plotting.plot_surf(
             mesh.parts[mesh_part],
             img.data.parts[mesh_part],
+            bg_map=bg_map[mesh_part],
             hemi=mesh_part,
             axes=ax,
             title=mesh_part,
+            bg_on_data=True,
             **kwargs,
         )
     assert isinstance(fig, plt.Figure)
@@ -119,3 +123,69 @@ def load_dataset_surf(subject, data_path, mask, mesh_name):
     data_alignment_surf = project_on_surf(data_alignment, mesh_name)
     data_decoding_surf = project_on_surf(data_decoding, mesh_name)
     return data_alignment_surf, data_decoding_surf, labels_decoding
+
+
+def plot_aligned_dataset(
+    X,
+    y,
+    groups,
+    labels,
+    fitted_estimators,
+    solver_name,
+    dataset_name,
+    subjects_list,
+    masker,
+):
+    fs5 = datasets.fetch_surf_fsaverage("fsaverage5")
+    bg_map = {"left": fs5["sulc_left"], "right": fs5["sulc_right"]}
+    subjects = np.unique(groups)
+    for i, subject in enumerate(subjects):
+        X_subject = X[groups == subject]
+        y_subject = y[groups == subject]
+        estimator = fitted_estimators[i]
+        # Get the coefficients of the SVC
+        coefs = estimator[-1].coef_
+        for contrast_index, contrast in enumerate(labels):
+            print(
+                f"Plotting subject {subjects_list[subject]} - contrast {contrast}"
+            )
+            output_dir = (
+                Path(__file__).parent.parent
+                / "figures"
+                / "aligned_datasets"
+                / dataset_name
+                / solver_name
+                / f"{subjects_list[subject]}"
+            )
+            # Plot the average contrast
+            avg_contrast = np.mean(X_subject[y_subject == contrast], axis=0)
+            img = masker.inverse_transform(avg_contrast)
+            fig = plot_surf_img(
+                img,
+                bg_map=bg_map,
+                colorbar=True,
+                cmap="coolwarm",
+            )
+            fig.suptitle(
+                f"Subject {subjects_list[subject]} - {solver_name} - contrast {contrast}"
+            )
+            output_dir.mkdir(parents=True, exist_ok=True)
+            fig.savefig(output_dir / f"{contrast}.pdf")
+            plt.close(fig)
+
+            # Plot the weights
+            # Get the contrast index
+            img_coefs = masker.inverse_transform(coefs[contrast_index])
+            fig = plot_surf_img(
+                img_coefs,
+                bg_map=bg_map,
+                colorbar=True,
+                cmap="hot",
+                # Keep only the significant weights
+                threshold=1e-3,
+            )
+            fig.suptitle(
+                f"Subject {subjects_list[subject]} - {solver_name} - contrast {contrast}"
+            )
+            fig.savefig(output_dir / f"coefs_{contrast}.pdf")
+            plt.close(fig)
