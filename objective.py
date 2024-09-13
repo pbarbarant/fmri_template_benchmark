@@ -4,11 +4,7 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    # import warnings
-    from pathlib import Path
-
     import numpy as np
-    import matplotlib.pyplot as plt
     from sklearn.dummy import DummyClassifier
     from sklearn.model_selection import (
         LeaveOneGroupOut,
@@ -19,7 +15,7 @@ with safe_import_context() as import_ctx:
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
 
-    from benchmark_utils.utils import plot_surf_img
+    from benchmark_utils.utils import plot_aligned_dataset
 
 
 # The benchmark objective must be named `Objective` and
@@ -83,70 +79,9 @@ class Objective(BaseObjective):
         self.dict_labels = dict_labels
         self.masker = masker
         self.mesh_name = mesh_name
+        self.labels = dict_labels[list(dict_labels.keys())[0]]
 
         print(f"Running on: {dataset_name}")
-
-    def plot_aligned_dataset(
-        self,
-        X,
-        y,
-        groups,
-        fitted_estimators,
-        solver_name,
-        dataset_name,
-    ):
-        contrasts = np.unique(y)
-        subjects = np.unique(groups)
-        subjects_names = list(self.dict_decoding.keys())
-        for i, subject in enumerate(subjects):
-            X_subject = X[groups == subject]
-            y_subject = y[groups == subject]
-            estimator = fitted_estimators[i]
-            # Get the coefficients of the SVC
-            coefs = estimator[-1].coef_
-            for contrast_index, contrast in enumerate(contrasts):
-                # Plot the average contrast
-                avg_contrast = np.mean(
-                    X_subject[y_subject == contrast], axis=0
-                )
-                img = self.masker.inverse_transform(avg_contrast)
-                fig = plot_surf_img(
-                    img,
-                    colorbar=True,
-                    cmap="coolwarm",
-                )
-                fig.suptitle(
-                    f"Subject {subjects_names[subject]} - {solver_name} - contrast {contrast}"
-                )
-                output_dir = (
-                    Path(__file__).parent
-                    / "figures"
-                    / "aligned_datasets"
-                    / dataset_name
-                    / solver_name
-                    / f"{subjects_names[subject]}"
-                )
-                output_dir.mkdir(parents=True, exist_ok=True)
-                fig.savefig(output_dir / f"{contrast}.pdf")
-                plt.close(fig)
-
-                # Plot the weights
-                # Get the contrast index
-                img_coefs = self.masker.inverse_transform(
-                    coefs[contrast_index]
-                )
-                fig = plot_surf_img(
-                    img_coefs,
-                    colorbar=True,
-                    cmap="hot",
-                    # Keep only the significant weights
-                    threshold=1e-3,
-                )
-                fig.suptitle(
-                    f"Subject {subjects_names[subject]} - {solver_name} - contrast {contrast}"
-                )
-                fig.savefig(output_dir / f"coefs_{contrast}.pdf")
-                plt.close(fig)
 
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
@@ -181,13 +116,16 @@ class Objective(BaseObjective):
         cv_scores_svc = cv_results_svc["test_score"]
         fitted_estimators = cv_results_svc["estimator"]
 
-        self.plot_aligned_dataset(
-            X,
-            y,
-            groups,
-            fitted_estimators,
-            solver_name,
-            self.dataset_name,
+        plot_aligned_dataset(
+            X=X,
+            y=y,
+            labels=self.labels,
+            groups=groups,
+            fitted_estimators=fitted_estimators,
+            solver_name=solver_name,
+            dataset_name=self.dataset_name,
+            subjects_list=list(self.dict_decoding.keys()),
+            masker=self.masker,
         )
 
         cv_scores_dummy = cross_val_score(
@@ -199,21 +137,6 @@ class Objective(BaseObjective):
         )
 
         avg_score = np.mean(cv_scores_svc)
-        # for hemi in ["left", "right"]:
-        #     self._plot_searchlight_scores(
-        #         svc_estimator,
-        #         X,
-        #         y,
-        #         cv,
-        #         hemi=hemi,
-        #         mesh=self.mesh,
-        #         threshold=chance,
-        #         solver_name=solver_name,
-        #         output_dir=Path(__file__).parent
-        #         / "figures"
-        #         / self.dataset_name
-        #         / solver_name,
-        #     )
 
         print(f"Average decoding accuracy: {avg_score:.2f}")
         print(f"Chance level: {np.mean(cv_scores_dummy):.2f}")
