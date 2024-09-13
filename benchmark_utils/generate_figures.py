@@ -219,9 +219,7 @@ def concat_pdf(folder):
     for contrast in contrast_names:
         pdf_files = []
         for subject_path in subject_paths:
-            pdf_files.append(
-                *glob.glob(str(subject_path / f"*{contrast}.pdf"))
-            )
+            pdf_files.append(*glob.glob(str(subject_path / f"{contrast}.pdf")))
         # Sort the pdf_files
         pdf_files.sort()
         # Concatenate the pdf_files
