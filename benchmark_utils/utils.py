@@ -144,7 +144,7 @@ def plot_aligned_dataset(
         estimator = fitted_estimators[i]
         # Get the coefficients of the SVC
         coefs = estimator[-1].coef_
-        for contrast_index, contrast in enumerate(labels):
+        for contrast_index, contrast in enumerate(labels[: len(coefs)]):
             print(
                 f"Plotting subject {subjects_list[subject]} - contrast {contrast}"
             )
@@ -174,7 +174,9 @@ def plot_aligned_dataset(
 
             # Plot the weights
             # Get the contrast index
-            img_coefs = masker.inverse_transform(coefs[contrast_index])
+            img_coefs = masker.inverse_transform(
+                coefs[contrast_index % len(coefs)]
+            )
             fig = plot_surf_img(
                 img_coefs,
                 bg_map=bg_map,
