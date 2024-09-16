@@ -111,7 +111,7 @@ class Objective(BaseObjective):
             groups=groups,
             cv=LeaveOneGroupOut(),
             n_jobs=10,
-            return_estimator=True,  # This option will return the fitted estimators
+            return_estimator=True,  # This option will return the estimators
         )
         cv_scores_svc = cv_results_svc["test_score"]
         fitted_estimators = cv_results_svc["estimator"]

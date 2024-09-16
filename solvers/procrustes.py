@@ -71,7 +71,8 @@ class Solver(BaseSolver):
         Y: (n_samples, n_features) nd array
             target data
         scaling: bool
-            If scaling is true, computes a floating scaling parameter sc such that:
+            If scaling is true, computes a floating scaling parameter
+            sc such that:
             ||sc * RX - Y||^2 is minimized and
             - R is an orthogonal matrix
             - sc is a scalar
@@ -126,7 +127,8 @@ class Solver(BaseSolver):
         n_iter: int, optional
             number of iterations
         scaling: bool, optional
-            If scaling is true, computes a floating scaling parameter sc such that:
+            If scaling is true, computes a floating scaling parameter
+            sc such that:
             ||sc * RX - Y||^2 is minimized and
             - R is an orthogonal matrix
             - sc is a scalar
@@ -161,8 +163,8 @@ class Solver(BaseSolver):
 
     def _compute_alignments(self, subject_list, n_jobs=10):
         """
-        Compute the template and the transformation matrices in parceled fashion
-        for a set of subjects
+        Compute the template and the transformation matrices
+        in parceled fashion for a set of subjects
 
         Parameters
         ----------
@@ -278,7 +280,10 @@ class Solver(BaseSolver):
             return np.concatenate([labels_left, labels_right])
         else:
             raise ValueError(
-                "Unsupported clustering method. Choose 'kmeans', 'ward' or 'destrieux'."
+                (
+                    "Unsupported clustering method. Choose 'kmeans',"
+                    "'ward' or 'destrieux'."
+                )
             )
 
     def _project(self, X, labels, R_list, sc_list, n_sub):
