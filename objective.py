@@ -6,8 +6,11 @@ from benchopt import BaseObjective, safe_import_context
 with safe_import_context() as import_ctx:
     import numpy as np
     from sklearn.dummy import DummyClassifier
-    from sklearn.model_selection import (LeaveOneGroupOut, cross_val_score,
-                                         cross_validate)
+    from sklearn.model_selection import (
+        LeaveOneGroupOut,
+        cross_val_score,
+        cross_validate,
+    )
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC

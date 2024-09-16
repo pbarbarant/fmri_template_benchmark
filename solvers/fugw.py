@@ -9,8 +9,6 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fugw.datasets import fetch_surf_geometry
     from fugw.mappings import FUGWBarycenter
-    from nilearn import plotting, surface
-    from nilearn.datasets import fetch_surf_fsaverage
 
 
 # The benchmark solvers must be named `Solver` and
