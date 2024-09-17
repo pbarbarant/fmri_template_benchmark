@@ -170,11 +170,8 @@ def plot_barycenter_features(
 
 
 def plot_aligned_dataset(
-    X,
-    y,
-    groups,
-    labels,
-    fitted_estimators,
+    dict_aligned,
+    dict_estimators,
     solver_name,
     dataset_name,
     subjects_list,
@@ -182,27 +179,31 @@ def plot_aligned_dataset(
 ):
     fs5 = datasets.fetch_surf_fsaverage("fsaverage5")
     bg_map = {"left": fs5["sulc_left"], "right": fs5["sulc_right"]}
-    subjects = np.unique(groups)
-    for i, subject in enumerate(subjects):
-        X_subject = X[groups == subject]
-        y_subject = y[groups == subject]
-        estimator = fitted_estimators[i]
+    subjects_list = list(dict_aligned.keys())
+    for subject in subjects_list:
+        # Get the labels
+        labels = dict_aligned[subject].labels
+        # Get the data
+        X_subject = masker.transform(dict_aligned[subject].img)
+        # Get the estimator
+        estimator = dict_estimators[subject]
         # Get the coefficients of the SVC
         coefs = estimator[-1].coef_
-        for contrast_index, contrast in enumerate(labels[: len(coefs)]):
-            print(
-                f"Plotting subject {subjects_list[subject]} - contrast {contrast}"
-            )
+        # Get unsorted unique labels
+        labels_idx_unique = np.unique(labels, return_index=True)[1]
+        unique_labels = [labels[index] for index in sorted(labels_idx_unique)]
+        for contrast_index, contrast in enumerate(unique_labels):
+            print(f"Plotting subject {subject} - contrast {contrast}")
             output_dir = (
                 Path(__file__).parent.parent
                 / "figures"
                 / "aligned_datasets"
                 / dataset_name
                 / solver_name
-                / f"{subjects_list[subject]}"
+                / f"{subject}"
             )
             # Plot the average contrast
-            avg_contrast = np.mean(X_subject[y_subject == contrast], axis=0)
+            avg_contrast = np.mean(X_subject[labels == contrast], axis=0)
             img = masker.inverse_transform(avg_contrast)
             fig = plot_surf_img(
                 img,
@@ -211,7 +212,7 @@ def plot_aligned_dataset(
                 cmap="coolwarm",
             )
             fig.suptitle(
-                f"Subject {subjects_list[subject]} - {solver_name} - contrast {contrast}"
+                f"Subject {subject} - {solver_name} - contrast {contrast}"
             )
             output_dir.mkdir(parents=True, exist_ok=True)
             fig.savefig(output_dir / f"{contrast}.pdf")
@@ -231,7 +232,7 @@ def plot_aligned_dataset(
                 threshold=1e-6,
             )
             fig.suptitle(
-                f"Subject {subjects_list[subject]} - {solver_name} - contrast {contrast}"
+                f"Subject {subject} - {solver_name} - contrast {contrast}"
             )
             fig.savefig(output_dir / f"coefs_{contrast}.pdf")
             plt.close(fig)
