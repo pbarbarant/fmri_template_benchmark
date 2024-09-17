@@ -9,7 +9,7 @@ with safe_import_context() as import_ctx:
     from nilearn.experimental import surface
     from nilearn.image import load_img
 
-    from benchmark_utils.utils import project_on_surf
+    from benchmark_utils.utils import project_on_surf, LabeledImage
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -68,7 +68,17 @@ class Dataset(BaseDataset):
         # Load labels
         labels = np.array(contrasts[-n_decoding_contrasts:])
 
-        return alignment_contrasts_surf, decoding_contrasts_surf, labels
+        alignment_labeled = LabeledImage(
+            img=alignment_contrasts_surf,
+            labels=None,
+        )
+
+        decoding_labeled = LabeledImage(
+            img=decoding_contrasts_surf,
+            labels=labels,
+        )
+
+        return alignment_labeled, decoding_labeled
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -78,28 +88,24 @@ class Dataset(BaseDataset):
         # Create a masker to extract the data from the brain volume.
         dict_alignment = dict()
         dict_decoding = dict()
-        dict_labels = dict()
 
         for subject in self.subjects:
             (
                 data_alignment,
                 data_decoding,
-                labels,
             ) = self.load_localizer_surf(subject, self.mesh_name)
             dict_alignment[subject] = data_alignment
             dict_decoding[subject] = data_decoding
-            dict_labels[subject] = labels
 
-        masker = surface.SurfaceMasker().fit(
-            next(iter(dict_alignment.values()))
-        )
+        # Get the first image to create the masker
+        masker_img = next(iter(dict_alignment.values())).img
+        masker = surface.SurfaceMasker().fit(masker_img)
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
             dataset_name=self.name,
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
-            dict_labels=dict_labels,
             masker=masker,
             mesh_name=self.mesh_name,
         )
