@@ -6,6 +6,7 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     import numpy as np
     from benchopt.stopping_criterion import SingleRunCriterion
+    from benchmark_utils.utils import LabeledImage
 
 
 # The benchmark solvers must be named `Solver` and
@@ -30,7 +31,6 @@ class Solver(BaseSolver):
         self,
         dict_alignment,
         dict_decoding,
-        dict_labels,
         masker,
         mesh_name,
     ):
@@ -41,7 +41,6 @@ class Solver(BaseSolver):
         # It is customizable for each benchmark.
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
-        self.dict_labels = dict_labels
         self.masker = masker
         self.mesh_name = mesh_name
 
@@ -51,15 +50,24 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        self.X = np.concatenate(
-            [
-                self.masker.transform(self.dict_decoding[subject])
-                for subject in self.dict_decoding.keys()
-            ]
+        subject_list = list(self.dict_decoding.keys())
+        barycenter_img = self.masker.inverse_transform(
+            np.mean(
+                [
+                    self.masker.transform(self.dict_decoding[subject].img)
+                    for subject in subject_list
+                ],
+                axis=0,
+            )
         )
-        self.y = np.concatenate(
-            np.array(list(self.dict_labels.values())), axis=0
+        labels = self.dict_decoding[subject_list[0]].labels
+
+        self.barycenter = LabeledImage(
+            img=barycenter_img,
+            labels=labels,
         )
+
+        self.dict_aligned = self.dict_decoding.copy()
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -68,5 +76,9 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         return dict(
-            aligned_dataset=(self.X, self.y, self.name),
+            aligned_dataset=(
+                self.barycenter,
+                self.dict_aligned,
+                self.name,
+            ),
         )
