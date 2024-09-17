@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import dataclass
 
 import joblib
 import matplotlib.pyplot as plt
@@ -8,6 +9,12 @@ from nilearn import datasets, maskers, masking, plotting, surface
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
 from scipy.sparse import coo_matrix
+
+
+@dataclass
+class LabeledImage:
+    labels: np.ndarray
+    img: SurfaceImage
 
 
 def plot_surf_img(
@@ -122,6 +129,44 @@ def load_dataset_surf(subject, data_path, mask, mesh_name):
     data_alignment_surf = project_on_surf(data_alignment, mesh_name)
     data_decoding_surf = project_on_surf(data_decoding, mesh_name)
     return data_alignment_surf, data_decoding_surf, labels_decoding
+
+
+def plot_barycenter_features(
+    barycenter_features,
+    y,
+    groups,
+    labels,
+    solver_name,
+    dataset_name,
+    subjects_list,
+    masker,
+):
+    fs5 = datasets.fetch_surf_fsaverage("fsaverage5")
+    bg_map = {"left": fs5["sulc_left"], "right": fs5["sulc_right"]}
+    contrasts = np.unique(y)
+    for contrast in contrasts:
+        output_dir = (
+            Path(__file__).parent.parent
+            / "figures"
+            / "aligned_datasets"
+            / dataset_name
+            / solver_name
+            / "template"
+        )
+        # Plot the average contrast
+        contrast_idx = y == contrast
+        avg_contrast = np.mean(barycenter_features[contrast_idx], axis=0)
+        img = masker.inverse_transform(avg_contrast)
+        fig = plot_surf_img(
+            img,
+            bg_map=bg_map,
+            colorbar=True,
+            cmap="coolwarm",
+        )
+        fig.suptitle(f"Subject template - {solver_name} - contrast {contrast}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir / f"{contrast}.pdf")
+        plt.close(fig)
 
 
 def plot_aligned_dataset(
