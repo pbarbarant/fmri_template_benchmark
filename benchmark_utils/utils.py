@@ -108,7 +108,7 @@ def load_mask(data_path, memory):
 
 
 def project_on_surf(data, mesh_name="fsaverage3"):
-    mesh = load_fsaverage(mesh_name)["pial"]
+    mesh = load_fsaverage(mesh_name)["inflated"]
     left_data = surface.vol_to_surf(data, mesh.parts["left"]).T
     right_data = surface.vol_to_surf(data, mesh.parts["right"]).T
     left_data_sanitized = np.nan_to_num(left_data)

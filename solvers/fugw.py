@@ -104,7 +104,7 @@ class Solver(BaseSolver):
 
         print(f"Computing geometry for {hemi} hemisphere")
         geometry, d_max = fetch_surf_geometry(
-            f"pial_{hemi}",
+            f"infl_{hemi}",
             method="euclidean",
             resolution=self.mesh_name,
         )
