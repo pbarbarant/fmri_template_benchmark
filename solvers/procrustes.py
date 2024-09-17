@@ -15,7 +15,11 @@ with safe_import_context() as import_ctx:
     from scipy import linalg
     from sklearn.cluster import AgglomerativeClustering, KMeans
 
-    from benchmark_utils.utils import mesh_connectivity_matrix, plot_surf_img
+    from benchmark_utils.utils import (
+        mesh_connectivity_matrix,
+        plot_surf_img,
+        LabeledImage,
+    )
 
 
 # The benchmark solvers must be named `Solver` and
@@ -44,7 +48,6 @@ class Solver(BaseSolver):
         self,
         dict_alignment,
         dict_decoding,
-        dict_labels,
         masker,
         mesh_name,
     ):
@@ -55,7 +58,6 @@ class Solver(BaseSolver):
         # It is customizable for each benchmark.
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
-        self.dict_labels = dict_labels
         self.masker = masker
         self.mesh_name = mesh_name
 
@@ -184,7 +186,7 @@ class Solver(BaseSolver):
         """
         imgs = np.stack(
             [
-                self.masker.transform(self.dict_alignment[subject])
+                self.masker.transform(self.dict_alignment[subject].img)
                 for subject in subject_list
             ]
         )
@@ -193,7 +195,7 @@ class Solver(BaseSolver):
             imgs[0],
             clustering=self.clustering,
             n_parcels=self.n_parcels,
-            mesh=next(iter(self.dict_alignment.values())).mesh,
+            mesh=next(iter(self.dict_alignment.values())).img.mesh,
         )
         unique_labels = np.unique(labels)
         # Compute the template and the transformation matrices for each label
@@ -201,9 +203,14 @@ class Solver(BaseSolver):
             delayed(self._template_procrustes)(imgs[..., labels == label])
             for label in unique_labels
         )
-        template = [output[0] for output in outputs]
+        template_parcelled = [output[0] for output in outputs]
         R_list_parcelled = [output[1] for output in outputs]
         sc_list_parcelled = [output[2] for output in outputs]
+
+        # Reconstruct the template
+        template = np.zeros_like(imgs[0])
+        for i, label in enumerate(unique_labels):
+            template[:, labels == label] = template_parcelled[i]
 
         return labels, template, R_list_parcelled, sc_list_parcelled
 
@@ -286,7 +293,15 @@ class Solver(BaseSolver):
                 )
             )
 
-    def _project(self, X, labels, R_list, sc_list, n_sub):
+    def _project(
+        self,
+        X,
+        labels,
+        R_list,
+        sc_list,
+        n_sub,
+        classes,
+    ):
         """Project the data of a subject onto the template
 
         Parameters
@@ -301,11 +316,13 @@ class Solver(BaseSolver):
             List of list of scaling parameters for each parcel and each subject
         n_sub : int
             Subject index
+        classes : ndarray of shape (n_samples,)
+            Array containing the class of each sample
 
         Returns
         -------
-        X_transform : ndarray of shape (n_samples, n_vertices)
-            Transformed data
+        projected_data : LabeledImage
+            Projected data
         """
         # Decompose X into parcels
         X_transform = np.zeros_like(X)
@@ -317,20 +334,18 @@ class Solver(BaseSolver):
             X_transform[:, labels == label] = (
                 X_reduced.dot(R_list[i][n_sub].T) * sc_list[i][n_sub]
             )
-        return X_transform
 
-    def run(self, n_iter):
-        # This is the function that is called to evaluate the solver.
-        # It runs the algorithm for a given a number of iterations `n_iter`.
-        # You can also use a `tolerance` or a `callback`, as described in
-        # https://benchopt.github.io/performance_curves.html
-
-        labels, template, R_list, sc_list = self._compute_alignments(
-            list(self.dict_alignment.keys()), n_jobs=10
+        projected_img = self.masker.inverse_transform(X_transform)
+        projected_data = LabeledImage(
+            img=projected_img,
+            labels=classes,
         )
 
+        return projected_data
+
+    def _plot_parcellation(self, labels):
         img_labels = SurfaceImage(
-            mesh=next(iter(self.dict_alignment.values())).mesh,
+            mesh=next(iter(self.dict_alignment.values())).img.mesh,
             data={
                 "left": labels[: len(labels) // 2],
                 "right": labels[len(labels) // 2 :],
@@ -348,21 +363,47 @@ class Solver(BaseSolver):
         output_dir.mkdir(parents=True, exist_ok=True)
         fig.savefig(output_dir / f"{self.n_parcels}.pdf")
 
-        self.X = np.concatenate(
-            [
-                self._project(
-                    self.masker.transform(self.dict_decoding[subject]),
-                    labels,
-                    R_list,
-                    sc_list,
-                    i,
-                )
-                for i, subject in enumerate(self.dict_decoding.keys())
-            ]
+    def run(self, n_iter):
+        # This is the function that is called to evaluate the solver.
+        # It runs the algorithm for a given a number of iterations `n_iter`.
+        # You can also use a `tolerance` or a `callback`, as described in
+        # https://benchopt.github.io/performance_curves.html
+
+        # Get the list of subjects
+        subject_list = list(self.dict_alignment.keys())
+
+        # Compute the Procrustes alignment
+        parcellation_labels, template, R_list, sc_list = (
+            self._compute_alignments(
+                list(self.dict_alignment.keys()), n_jobs=10
+            )
         )
-        self.y = np.concatenate(
-            np.array(list(self.dict_labels.values())), axis=0
+
+        # Plot the parcellation
+        self._plot_parcellation(parcellation_labels)
+
+        # Get the list of subjects
+        subject_list = list(self.dict_alignment.keys())
+
+        # Compute the barycenter
+        barycenter_img = self.masker.inverse_transform(template)
+        self.barycenter = LabeledImage(
+            img=barycenter_img,
+            labels=self.dict_decoding[subject_list[0]].labels,
         )
+
+        # Align the data
+        self.dict_aligned = {
+            subject: self._project(
+                self.masker.transform(self.dict_decoding[subject].img),
+                parcellation_labels,
+                R_list,
+                sc_list,
+                i,
+                self.dict_decoding[subject].labels,
+            )
+            for i, subject in enumerate(subject_list)
+        }
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -375,5 +416,9 @@ class Solver(BaseSolver):
             + f"_niter_{self.n_iter}_{self.clustering}_{self.n_parcels}"
         )
         return dict(
-            aligned_dataset=(self.X, self.y, solver_name),
+            aligned_dataset=(
+                self.barycenter,
+                self.dict_aligned,
+                solver_name,
+            ),
         )
