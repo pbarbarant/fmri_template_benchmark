@@ -187,12 +187,10 @@ def plot_aligned_dataset(
         X_subject = masker.transform(dict_aligned[subject].img)
         # Get the estimator
         estimator = dict_estimators[subject]
-        # Get the coefficients of the SVC
+        # Get the coefficients and the associated classes for the SVC
         coefs = estimator[-1].coef_
-        # Get unsorted unique labels
-        labels_idx_unique = np.unique(labels, return_index=True)[1]
-        unique_labels = [labels[index] for index in sorted(labels_idx_unique)]
-        for contrast_index, contrast in enumerate(unique_labels):
+        class_labels = estimator[-1].classes_
+        for contrast_index, contrast in enumerate(class_labels):
             print(f"Plotting subject {subject} - contrast {contrast}")
             output_dir = (
                 Path(__file__).parent.parent
@@ -220,9 +218,7 @@ def plot_aligned_dataset(
 
             # Plot the weights
             # Get the contrast index
-            img_coefs = masker.inverse_transform(
-                coefs[contrast_index % len(coefs)]
-            )
+            img_coefs = masker.inverse_transform(coefs[contrast_index])
             fig = plot_surf_img(
                 img_coefs,
                 bg_map=bg_map,
