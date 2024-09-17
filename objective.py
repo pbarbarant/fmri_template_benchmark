@@ -15,7 +15,7 @@ with safe_import_context() as import_ctx:
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
 
-    from benchmark_utils.utils import plot_aligned_dataset
+    from benchmark_utils.utils import plot_aligned_dataset, plot_template
 
 
 # The benchmark objective must be named `Objective` and
@@ -106,7 +106,7 @@ class Objective(BaseObjective):
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
 
-        barycenter, dict_aligned, solver_name = aligned_dataset
+        template, dict_aligned, solver_name = aligned_dataset
 
         # Create cross-validation object on each subject
         groups = self._compute_groups(self.dict_decoding)
@@ -136,6 +136,10 @@ class Objective(BaseObjective):
             )
         }
 
+        # Plot the template
+        plot_template(template, self.masker, solver_name, self.dataset_name)
+
+        # Plot the aligned features
         plot_aligned_dataset(
             dict_aligned=dict_aligned,
             dict_estimators=dict_estimators,
