@@ -8,6 +8,7 @@ with safe_import_context() as import_ctx:
     from nilearn.experimental import surface
     from nilearn.experimental.surface._datasets import load_fsaverage
     from nilearn.experimental.surface._surface_image import SurfaceImage
+    from benchmark_utils.utils import LabeledImage
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -56,6 +57,14 @@ class Dataset(BaseDataset):
             .flatten()
         )
 
+    def _sample_labeled_image(self, mesh, n_samples, n_vertices):
+        img = self._sample_surface_image(mesh, n_samples, n_vertices)
+        labels = self._sample_labels(n_samples)
+        return LabeledImage(
+            img=img,
+            labels=labels,
+        )
+
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
         # to `Objective.set_data`. This defines the benchmark's
@@ -67,31 +76,25 @@ class Dataset(BaseDataset):
 
         dict_alignment = dict()
         dict_decoding = dict()
-        dict_labels = dict()
 
         for subject in self.subjects:
             # Generate random surface images for each subject.
-            dict_alignment[subject] = self._sample_surface_image(
+            dict_alignment[subject] = self._sample_labeled_image(
                 mesh, self.n_samples_alignement, n_vertices
             )
-            dict_decoding[subject] = self._sample_surface_image(
+            dict_decoding[subject] = self._sample_labeled_image(
                 mesh, self.n_samples_decoding, n_vertices
             )
-            # Generate random labels using for each subject.
-            dict_labels[subject] = self._sample_labels(
-                n_samples=self.n_samples_decoding
-            )
 
-        masker = surface.SurfaceMasker().fit(
-            next(iter(dict_alignment.values()))
-        )
+        # Get the first image to create the masker
+        masker_img = next(iter(dict_alignment.values())).img
+        masker = surface.SurfaceMasker().fit(masker_img)
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
             dataset_name=self.name,
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
-            dict_labels=dict_labels,
             masker=masker,
             mesh_name=self.mesh_name,
         )
