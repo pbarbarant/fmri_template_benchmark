@@ -50,7 +50,10 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
 
-        subject_list = list(self.dict_decoding.keys())
+        # Get the list of subjects
+        subject_list = list(self.dict_alignment.keys())
+
+        # Compute the barycenter
         barycenter_img = self.masker.inverse_transform(
             np.mean(
                 [
@@ -67,6 +70,7 @@ class Solver(BaseSolver):
             labels=labels,
         )
 
+        # Align the data
         self.dict_aligned = self.dict_decoding.copy()
 
     def get_result(self):
