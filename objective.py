@@ -45,8 +45,6 @@ class Objective(BaseObjective):
     # Example syntax: requirements = ['numpy', 'pip:jax', 'pytorch:pytorch']
     install_pip = "pip"
     requirements = [
-        "pip:fmralign",
-        "pip:fastsrm",
         "scikit-learn",
         "numpy",
         "joblib",
@@ -66,7 +64,6 @@ class Objective(BaseObjective):
         dataset_name,
         dict_alignment,
         dict_decoding,
-        dict_labels,
         masker,
         mesh_name,
     ):
@@ -76,12 +73,32 @@ class Objective(BaseObjective):
         self.dataset_name = dataset_name
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
-        self.dict_labels = dict_labels
         self.masker = masker
         self.mesh_name = mesh_name
-        self.labels = dict_labels[list(dict_labels.keys())[0]]
 
         print(f"Running on: {dataset_name}")
+
+    def _compute_groups(self, subject_dict):
+        groups = np.concatenate(
+            [
+                np.repeat(i, subject_dict[subject].img.data.shape[0])
+                for i, subject in enumerate(subject_dict.keys())
+            ]
+        )
+        return groups
+
+    def _compute_X_y(self, subject_dict):
+        subject_list = list(subject_dict.keys())
+        X = np.concatenate(
+            [
+                self.masker.transform(subject_dict[subject].img)
+                for subject in subject_list
+            ]
+        )
+        y = np.concatenate(
+            [subject_dict[subject].labels for subject in subject_list]
+        )
+        return X, y
 
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
@@ -89,20 +106,17 @@ class Objective(BaseObjective):
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
 
-        X, y, solver_name = aligned_dataset
+        barycenter, dict_aligned, solver_name = aligned_dataset
 
         # Create cross-validation object on each subject
-        groups = np.concatenate(
-            [
-                np.repeat(i, self.dict_decoding[subject].data.shape[0])
-                for i, subject in enumerate(self.dict_decoding.keys())
-            ]
-        )
+        groups = self._compute_groups(self.dict_decoding)
 
         pipeline_svc = make_pipeline(
             StandardScaler(),
             LinearSVC(max_iter=int(self.max_iter), penalty="l1"),
         )
+
+        X, y = self._compute_X_y(dict_aligned)
 
         cv_results_svc = cross_validate(
             pipeline_svc,
@@ -115,13 +129,16 @@ class Objective(BaseObjective):
         )
         cv_scores_svc = cv_results_svc["test_score"]
         fitted_estimators = cv_results_svc["estimator"]
+        dict_estimators = {
+            subject: estimator
+            for subject, estimator in zip(
+                list(dict_aligned.keys()), fitted_estimators
+            )
+        }
 
         plot_aligned_dataset(
-            X=X,
-            y=y,
-            labels=self.labels,
-            groups=groups,
-            fitted_estimators=fitted_estimators,
+            dict_aligned=dict_aligned,
+            dict_estimators=dict_estimators,
             solver_name=solver_name,
             dataset_name=self.dataset_name,
             subjects_list=list(self.dict_decoding.keys()),
@@ -168,7 +185,6 @@ class Objective(BaseObjective):
         return dict(
             dict_alignment=self.dict_alignment,
             dict_decoding=self.dict_decoding,
-            dict_labels=self.dict_labels,
             masker=self.masker,
             mesh_name=self.mesh_name,
         )
