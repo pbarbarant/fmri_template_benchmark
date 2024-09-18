@@ -28,9 +28,9 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "nits": [10],
-        "n_parcels": [70],
+        "n_parcels": [100],
         "clustering": ["ward"],
-        "scaling": [False],
+        "scaling": [False, True],
     }
 
     # List of packages needed to run the solver. See the corresponding
