@@ -136,7 +136,13 @@ class Objective(BaseObjective):
         }
 
         # Plot the template
-        plot_template(template, self.masker, solver_name, self.dataset_name)
+        plot_template(
+            template,
+            self.masker,
+            solver_name,
+            self.dataset_name,
+            self.mesh_name,
+        )
 
         # Plot the aligned features
         plot_aligned_dataset(
@@ -146,6 +152,7 @@ class Objective(BaseObjective):
             dataset_name=self.dataset_name,
             subjects_list=list(self.dict_decoding.keys()),
             masker=self.masker,
+            mesh_name=self.mesh_name,
         )
 
         cv_scores_dummy = cross_val_score(
