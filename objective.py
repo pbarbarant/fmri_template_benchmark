@@ -33,7 +33,6 @@ class Objective(BaseObjective):
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
         "max_iter": [1e2],
-        "mesh": ["fsaverage5"],
     }
 
     # List of packages needed to run the benchmark.
