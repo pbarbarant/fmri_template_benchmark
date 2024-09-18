@@ -344,6 +344,56 @@ class Solver(BaseSolver):
 
         return projected_data
 
+    def _compute_template(
+        self,
+        dict_subjects,
+        parcellation_labels,
+        R_list,
+        sc_list,
+    ):
+        """Compute the template of a set of subjects from given
+        parcellation labels, rotation matrices and scaling parameters
+
+        Parameters
+        ----------
+        dict_subjects : Dict[str, LabeledImage]
+            Dictionary containing the data of the subjects
+        parcellation_labels : ndarray of shape (n_vertices,)
+            Array containing the parcel labels of each vertex
+        R_list : List
+            List of list of rotation matrices for each parcel
+            and each subject
+        sc_list : List
+            List of list of scaling parameters for each parcel
+            and each subject
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        subject_list = list(dict_subjects.keys())
+        template_data = np.zeros_like(
+            self.masker.transform(self.dict_decoding[subject_list[0]].img)
+        )
+        print(f"Computing the template with shape {template_data.shape}")
+        for i, subject in enumerate(subject_list):
+            projected_img = self._project(
+                self.masker.transform(self.dict_decoding[subject].img),
+                parcellation_labels,
+                R_list,
+                sc_list,
+                i,
+                None,
+            ).img
+            projected_data = self.masker.transform(projected_img)
+            template_data += projected_data / len(subject_list)
+
+        template_img = self.masker.inverse_transform(template_data)
+        template_labels = self.dict_decoding[subject_list[0]].labels
+        template = LabeledImage(img=template_img, labels=template_labels)
+        return template
+
     def _plot_parcellation(self, labels):
         img_labels = SurfaceImage(
             mesh=next(iter(self.dict_alignment.values())).img.mesh,
@@ -375,10 +425,8 @@ class Solver(BaseSolver):
         subject_list = list(self.dict_alignment.keys())
 
         # Compute the Procrustes alignment
-        parcellation_labels, template, R_list, sc_list = (
-            self._compute_alignments(
-                list(self.dict_alignment.keys()), n_jobs=10
-            )
+        parcellation_labels, R_list, sc_list = self._compute_alignments(
+            list(self.dict_alignment.keys()), n_jobs=10
         )
 
         # Plot the parcellation
@@ -388,10 +436,11 @@ class Solver(BaseSolver):
         subject_list = list(self.dict_alignment.keys())
 
         # Compute the barycenter
-        barycenter_img = self.masker.inverse_transform(template)
-        self.barycenter = LabeledImage(
-            img=barycenter_img,
-            labels=self.dict_decoding[subject_list[0]].labels,
+        self.template = self._compute_template(
+            self.dict_decoding,
+            parcellation_labels,
+            R_list,
+            sc_list,
         )
 
         # Align the data
@@ -419,7 +468,7 @@ class Solver(BaseSolver):
         )
         return dict(
             aligned_dataset=(
-                self.barycenter,
+                self.template,
                 self.dict_aligned,
                 solver_name,
             ),
