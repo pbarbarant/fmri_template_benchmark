@@ -16,7 +16,7 @@ with safe_import_context() as import_ctx:
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
     name = "Localizer"
-    mesh_name = "fsaverage5"
+    mesh_name = "fsaverage4"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -26,17 +26,44 @@ class Dataset(BaseDataset):
     def __init__(
         self,
     ):
-        self.subjects = [f"{i}" for i in range(1, 10)]
+        self.subjects = [f"{i}" for i in range(1, 6)]
 
     def load_localizer_surf(self, subject, mesh_name):
         print(f"Loading subject {subject}")
 
         # List of contrasts to fetch
         contrasts = [
-            "calculation vs sentences",
-            "left vs right button press",
-            "checkerboard",
+            "horizontal checkerboard",
+            "vertical checkerboard",
+            "horizontal vs vertical checkerboard",
+            "vertical vs horizontal checkerboard",
             "sentence reading",
+            "sentence listening and reading",
+            "sentence reading vs checkerboard",
+            "calculation (auditory cue)",
+            "calculation (visual cue)",
+            "calculation (auditory and visual cue)",
+            "calculation (auditory cue) vs sentence listening",
+            "calculation (visual cue) vs sentence reading",
+            "calculation vs sentences",
+            "calculation (auditory cue) and sentence listening",
+            "calculation (visual cue) and sentence reading",
+            "calculation (visual cue) and sentence reading",
+            "calculation (visual cue) and sentence reading vs checkerboard",
+            "calculation and sentence listening/reading vs button press",
+            "left button press (auditory cue)",
+            "left button press (visual cue)",
+            "left button press",
+            "right button press (auditory cue)",
+            "right button press (visual cue)",
+            "right button press",
+            "right vs left button press",
+            "button press (auditory cue) vs sentence listening",
+            "button press (visual cue) vs sentence reading",
+            "button press vs calculation and sentence listening/reading",
+            # Decoding contrasts
+            "checkerboard",
+            "left vs right button press",
             "sentence listening",
         ]
 
