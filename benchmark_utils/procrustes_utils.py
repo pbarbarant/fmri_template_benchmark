@@ -1,13 +1,11 @@
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from joblib import Parallel, delayed
 from nilearn import datasets
 from nilearn.experimental.surface._surface_image import SurfaceImage
 from nilearn.surface import load_surf_mesh
 from scipy import linalg
 from sklearn.cluster import AgglomerativeClustering, KMeans
-from functools import partial
 
 from benchmark_utils.utils import (
     mesh_connectivity_matrix,
@@ -147,115 +145,6 @@ def scaled_procrustes(X, Y, scaling=False, primal=None):
     else:
         sc = 1
     return R.T, sc
-
-
-def template_procrustes(imgs, n_iter=10, scaling=False, primal=None):
-    """
-    Compute the template of a set of images using Procrustes analysis
-
-
-    Parameters
-    ----------
-    imgs: (n_subjects, n_features, n_vertices) nd array
-        set of images
-    n_iter: int, optional
-        number of iterations
-    scaling: bool, optional
-        If scaling is true, computes a floating scaling parameter
-        sc such that:
-        ||sc * RX - Y||^2 is minimized and
-        - R is an orthogonal matrix
-        - sc is a scalar
-        If scaling is false sc is set to 1
-    primal: bool or None, optional,
-        Whether the SVD is done on the YX^T (primal) or Y^TX (dual)
-        if None primal is used iff n_features <= n_timeframes
-
-    Returns
-    ----------
-    X: (n_features, n_vertices) nd array
-        template
-    R_list: list of (n_features, n_features) nd array
-        list of transformation matrices
-    sc_list: list of int
-        list of scaling parameters
-    """
-    n_sub, _, n_vertices = imgs.shape
-    # Initialize the template as the mean of the images
-    X = np.mean(imgs, axis=0)
-    R_list = [np.eye(n_vertices) for _ in range(n_sub)]
-    sc_list = [1 for _ in range(n_sub)]
-    for _ in range(n_iter):
-        for i, Y in enumerate(imgs):
-            R, sc = scaled_procrustes(X, Y, scaling=scaling, primal=primal)
-            X = X.dot(R.T) * sc
-            R_list[i] = R
-            sc_list[i] = sc
-    return X, R_list, sc_list
-
-
-def compute_alignments(
-    dict_subjects,
-    parcellation_labels,
-    masker,
-    scaling=False,
-    n_iter=10,
-    n_jobs=10,
-):
-    """
-    Compute the template and the transformation matrices
-    in parceled fashion for a set of subjects
-
-    Parameters
-    ----------
-    Dict_subjects: Dict[str, LabeledImage]
-        Dictionary containing the data of the subjects
-    masker: NiftiMasker
-        Masker used to transform the data
-    parcellation_labels: ndarray of shape (n_vertices,)
-        Array containing the parcel labels of each vertex
-    scaling: bool, optional
-        Compute a scaling parameter, by default False
-    n_iter: int, optional
-        Number of iterations, by default 10
-    n_jobs: int, optional
-        Number of jobs to run in parallel, by default 10
-
-    Returns
-    -------
-    R_list_parcelled: list of list of rotation matrices
-        for each parcel and each subject
-    sc_list_parcelled: list of list of scaling parameters
-        for each parcel and each subject
-    """
-    subject_list = list(dict_subjects.keys())
-    imgs = np.stack(
-        [
-            masker.transform(dict_subjects[subject].img)
-            for subject in subject_list
-        ],
-    )
-    unique_labels = np.unique(parcellation_labels)
-    # Compute the template and the transformation matrices for each label
-    template_procrustes_partial = partial(
-        template_procrustes,
-        n_iter=n_iter,
-        scaling=scaling,
-        primal=None,
-    )
-    outputs = Parallel(n_jobs=n_jobs)(
-        delayed(test_scaled_procrustes)(
-            imgs[..., parcellation_labels == label]
-        )
-        for label in unique_labels
-    )
-    R_list_parcelled = [output[1] for output in outputs]
-    sc_list_parcelled = [output[2] for output in outputs]
-    return R_list_parcelled, sc_list_parcelled
-
-
-def test_scaled_procrustes(imgs):
-    return True, False
 
 
 def project(
