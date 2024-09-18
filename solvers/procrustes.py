@@ -178,8 +178,6 @@ class Solver(BaseSolver):
         -------
         labels: (n_vertices,) nd array
             parcellation
-        template: (n_features, n_vertices) nd array
-            template
         R_list_parcelled: list of list of rotation matrices
             for each parcel and each subject
         sc_list_parcelled: list of list of scaling parameters
@@ -204,16 +202,10 @@ class Solver(BaseSolver):
             delayed(self._template_procrustes)(imgs[..., labels == label])
             for label in unique_labels
         )
-        template_parcelled = [output[0] for output in outputs]
         R_list_parcelled = [output[1] for output in outputs]
         sc_list_parcelled = [output[2] for output in outputs]
 
-        # Reconstruct the template
-        template = np.zeros_like(imgs[0])
-        for i, label in enumerate(unique_labels):
-            template[:, labels == label] = template_parcelled[i]
-
-        return labels, template, R_list_parcelled, sc_list_parcelled
+        return labels, R_list_parcelled, sc_list_parcelled
 
     def _compute_parcellation(
         self, data, mesh=None, clustering="kmeans", n_parcels=10
