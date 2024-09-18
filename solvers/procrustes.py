@@ -34,8 +34,8 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "n_iter": [10],
-        "n_parcels": [76],
-        "clustering": ["destrieux"],
+        "n_parcels": [100],
+        "clustering": ["ward"],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -235,17 +235,13 @@ class Solver(BaseSolver):
             ndarray of shape (n_vertices,) containing the parcel labels of each
             vertex
         """
-        if n_parcels % 2 != 0:
-            raise ValueError("The number of parcels must be even.")
-        n_parcels_hemi = n_parcels // 2
-
         # Reshape the data to 2D (n_vertices, n_samples)
         n_vertices = data.shape[1]
         data_2d = data.reshape(n_vertices, -1)
 
         # Choose the clustering method
         if clustering.lower() == "kmeans":
-            clusterer = KMeans(n_clusters=n_parcels_hemi, random_state=42)
+            clusterer = KMeans(n_clusters=n_parcels, random_state=42)
             # Fit the clustering
             labels = clusterer.fit_predict(data_2d).reshape(data.shape[1])
 
@@ -264,24 +260,33 @@ class Solver(BaseSolver):
                 coordinates_right, faces_right
             )
             clusterer_left = AgglomerativeClustering(
-                n_clusters=n_parcels_hemi,
+                n_clusters=n_parcels,
                 connectivity=connectivity_left,
                 linkage="ward",
             )
             clusterer_right = AgglomerativeClustering(
-                n_clusters=n_parcels_hemi,
+                n_clusters=n_parcels,
                 connectivity=connectivity_right,
                 linkage="ward",
             )
-            labels_left = clusterer_left.fit_predict(
-                np.ones(n_vertices // 2).reshape(-1, 1)
+            X_left = np.mean(data_2d[: n_vertices // 2, :], axis=1).reshape(
+                -1, 1
             )
-            labels_right = clusterer_right.fit_predict(
-                np.ones(n_vertices // 2).reshape(-1, 1)
+            X_right = np.mean(data_2d[n_vertices // 2 :, :], axis=1).reshape(
+                -1, 1
             )
+            labels_left = clusterer_left.fit_predict(X_left)
+            labels_right = clusterer_right.fit_predict(X_right)
 
             return np.concatenate([labels_left, labels_right])
         elif clustering.lower() == "destrieux":
+            if data_2d.shape[0] != 20484:
+                raise ValueError(
+                    (
+                        "The Destrieux parcellation is only available "
+                        "for the fsaverage5 mesh."
+                    )
+                )
             destrieux = datasets.fetch_atlas_surf_destrieux()
             labels_left = destrieux["map_left"]
             labels_right = destrieux["map_right"]
