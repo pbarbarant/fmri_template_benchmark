@@ -7,6 +7,7 @@ with safe_import_context() as import_ctx:
     from pathlib import Path
 
     import numpy as np
+    import matplotlib.pyplot as plt
     from benchopt.stopping_criterion import SingleRunCriterion
     from joblib import Parallel, delayed
     from nilearn import datasets
@@ -362,6 +363,7 @@ class Solver(BaseSolver):
         )
         output_dir.mkdir(parents=True, exist_ok=True)
         fig.savefig(output_dir / f"{self.n_parcels}.pdf")
+        plt.close(fig)
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
