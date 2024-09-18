@@ -5,10 +5,12 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     import numpy as np
+    from joblib import Parallel, delayed
+    from functools import partial
     from benchopt.stopping_criterion import SingleRunCriterion
     from benchmark_utils.procrustes_utils import (
         compute_parcellation,
-        compute_alignments,
+        scaled_procrustes,
         compute_template,
         plot_parcellation,
         project,
@@ -26,7 +28,7 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "nits": [10],
-        "n_parcels": [200],
+        "n_parcels": [70],
         "clustering": ["ward"],
         "scaling": [False],
     }
@@ -54,6 +56,110 @@ class Solver(BaseSolver):
         self.dict_decoding = dict_decoding
         self.masker = masker
         self.mesh_name = mesh_name
+
+    def template_procrustes(self, imgs, n_iter=10, scaling=False, primal=None):
+        """
+        Compute the template of a set of images using Procrustes analysis
+
+
+        Parameters
+        ----------
+        imgs: (n_subjects, n_features, n_vertices) nd array
+            set of images
+        n_iter: int, optional
+            number of iterations
+        scaling: bool, optional
+            If scaling is true, computes a floating scaling parameter
+            sc such that:
+            ||sc * RX - Y||^2 is minimized and
+            - R is an orthogonal matrix
+            - sc is a scalar
+            If scaling is false sc is set to 1
+        primal: bool or None, optional,
+            Whether the SVD is done on the YX^T (primal) or Y^TX (dual)
+            if None primal is used iff n_features <= n_timeframes
+
+        Returns
+        ----------
+        X: (n_features, n_vertices) nd array
+            template
+        R_list: list of (n_features, n_features) nd array
+            list of transformation matrices
+        sc_list: list of int
+            list of scaling parameters
+        """
+        n_sub, _, n_vertices = imgs.shape
+        # Initialize the template as the mean of the images
+        X = np.mean(imgs, axis=0)
+        R_list = [np.eye(n_vertices) for _ in range(n_sub)]
+        sc_list = [1 for _ in range(n_sub)]
+        for _ in range(n_iter):
+            for i, Y in enumerate(imgs):
+                R, sc = scaled_procrustes(X, Y, scaling=scaling, primal=primal)
+                X = X.dot(R.T) * sc
+                R_list[i] = R
+                sc_list[i] = sc
+        return X, R_list, sc_list
+
+    def compute_alignments(
+        self,
+        dict_subjects,
+        parcellation_labels,
+        masker,
+        scaling=False,
+        n_iter=10,
+        n_jobs=10,
+    ):
+        """
+        Compute the template and the transformation matrices
+        in parceled fashion for a set of subjects
+
+        Parameters
+        ----------
+        Dict_subjects: Dict[str, LabeledImage]
+            Dictionary containing the data of the subjects
+        masker: NiftiMasker
+            Masker used to transform the data
+        parcellation_labels: ndarray of shape (n_vertices,)
+            Array containing the parcel labels of each vertex
+        scaling: bool, optional
+            Compute a scaling parameter, by default False
+        n_iter: int, optional
+            Number of iterations, by default 10
+        n_jobs: int, optional
+            Number of jobs to run in parallel, by default 10
+
+        Returns
+        -------
+        R_list_parcelled: list of list of rotation matrices
+            for each parcel and each subject
+        sc_list_parcelled: list of list of scaling parameters
+            for each parcel and each subject
+        """
+        subject_list = list(dict_subjects.keys())
+        imgs = np.stack(
+            [
+                masker.transform(dict_subjects[subject].img)
+                for subject in subject_list
+            ],
+        )
+        unique_labels = np.unique(parcellation_labels)
+        # Compute the template and the transformation matrices for each label
+        template_procrustes_partial = partial(
+            self.template_procrustes,
+            n_iter=n_iter,
+            scaling=scaling,
+            primal=None,
+        )
+        outputs = Parallel(n_jobs=n_jobs)(
+            delayed(template_procrustes_partial)(
+                imgs[..., parcellation_labels == label]
+            )
+            for label in unique_labels
+        )
+        R_list_parcelled = [output[1] for output in outputs]
+        sc_list_parcelled = [output[2] for output in outputs]
+        return R_list_parcelled, sc_list_parcelled
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -89,8 +195,8 @@ class Solver(BaseSolver):
         )
 
         # Compute the Procrustes alignment
-        R_list, sc_list = compute_alignments(
-            self.dict_alignment,
+        R_list, sc_list = self.compute_alignments(
+            dict_subjects=self.dict_alignment,
             parcellation_labels=parcellation_labels,
             masker=self.masker,
             scaling=self.scaling,
