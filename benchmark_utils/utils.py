@@ -136,9 +136,10 @@ def plot_template(
     masker,
     solver_name,
     dataset_name,
+    mesh_name,
 ):
-    fs5 = datasets.fetch_surf_fsaverage("fsaverage5")
-    bg_map = {"left": fs5["sulc_left"], "right": fs5["sulc_right"]}
+    fsaverage = datasets.fetch_surf_fsaverage(mesh_name)
+    bg_map = {"left": fsaverage["sulc_left"], "right": fsaverage["sulc_right"]}
     labels = template.labels
     for contrast in np.unique(labels):
         print(f"Plotting template - contrast {contrast}")
@@ -172,9 +173,10 @@ def plot_aligned_dataset(
     dataset_name,
     subjects_list,
     masker,
+    mesh_name,
 ):
-    fs5 = datasets.fetch_surf_fsaverage("fsaverage5")
-    bg_map = {"left": fs5["sulc_left"], "right": fs5["sulc_right"]}
+    fsaverage = datasets.fetch_surf_fsaverage(mesh_name)
+    bg_map = {"left": fsaverage["sulc_left"], "right": fsaverage["sulc_right"]}
     subjects_list = list(dict_aligned.keys())
     for subject in subjects_list:
         # Get the labels
