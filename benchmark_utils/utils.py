@@ -128,7 +128,16 @@ def load_dataset_surf(subject, data_path, mask, mesh_name):
     )
     data_alignment_surf = project_on_surf(data_alignment, mesh_name)
     data_decoding_surf = project_on_surf(data_decoding, mesh_name)
-    return data_alignment_surf, data_decoding_surf, labels_decoding
+    alignment_labeled = LabeledImage(
+        img=data_alignment_surf,
+        labels=None,
+    )
+
+    decoding_labeled = LabeledImage(
+        img=data_decoding_surf,
+        labels=labels_decoding,
+    )
+    return alignment_labeled, decoding_labeled
 
 
 def plot_template(
