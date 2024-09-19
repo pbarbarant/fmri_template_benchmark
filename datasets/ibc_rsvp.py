@@ -48,29 +48,25 @@ class Dataset(BaseDataset):
 
         dict_alignment = dict()
         dict_decoding = dict()
-        dict_labels = dict()
         for subject in self.subjects:
             print(f"Loading data for subject {subject}")
             (
                 data_alignment,
                 data_decoding,
-                labels,
             ) = load_dataset_surf(subject, data_path, mask, self.mesh_name)
-
             dict_alignment[subject] = data_alignment
             dict_decoding[subject] = data_decoding
-            dict_labels[subject] = labels
 
-        masker = surface.SurfaceMasker().fit(
-            next(iter(dict_alignment.values()))
-        )
+        # Get the first image to create the masker
+        masker_img = next(iter(dict_alignment.values())).img
+        masker = surface.SurfaceMasker().fit(masker_img)
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
             dataset_name=self.name,
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
-            dict_labels=dict_labels,
             masker=masker,
             mesh_name=self.mesh_name,
         )
+        
