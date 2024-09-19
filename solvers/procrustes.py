@@ -28,8 +28,8 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "nits": [10],
-        "n_parcels": [100],
-        "clustering": ["ward"],
+        "n_parcels": [50, 100, 200],
+        "clustering": ["ward", "destrieux"],
         "scaling": [False, True],
     }
 
