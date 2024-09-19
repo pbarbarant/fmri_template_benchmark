@@ -107,7 +107,7 @@ def load_mask(data_path, memory):
     return mask
 
 
-def project_on_surf(data, mesh_name="fsaverage3"):
+def project_on_surf(data, mesh_name="fsaverage5"):
     mesh = load_fsaverage(mesh_name)["inflated"]
     left_data = surface.vol_to_surf(data, mesh.parts["left"]).T
     right_data = surface.vol_to_surf(data, mesh.parts["right"]).T
