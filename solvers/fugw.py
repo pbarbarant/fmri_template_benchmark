@@ -9,6 +9,7 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fugw.datasets import fetch_surf_geometry
     from fugw.mappings import FUGWBarycenter
+    from benchmark_utils.utils import LabeledImage
 
 
 # The benchmark solvers must be named `Solver` and
@@ -37,7 +38,6 @@ class Solver(BaseSolver):
         self,
         dict_alignment,
         dict_decoding,
-        dict_labels,
         masker,
         mesh_name,
     ):
@@ -48,7 +48,6 @@ class Solver(BaseSolver):
         # It is customizable for each benchmark.
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
-        self.dict_labels = dict_labels
         self.masker = masker
         self.mesh_name = mesh_name
 
@@ -97,7 +96,9 @@ class Solver(BaseSolver):
         print(f"Computing features for {hemi} hemisphere")
         features_list = [
             self._normalize(
-                np.nan_to_num(self.dict_alignment[subject].data.parts[hemi])
+                np.nan_to_num(
+                    self.dict_alignment[subject].img.data.parts[hemi]
+                )
             )
             for subject in subject_list
         ]
@@ -120,7 +121,7 @@ class Solver(BaseSolver):
             rho=self.rho,
             eps=self.eps,
         )
-        _, barycenter_features, _, plans, _, _ = fugw_barycenter.fit(
+        _, barycenter_features_hemi, _, plans, _, _ = fugw_barycenter.fit(
             weights_list,
             features_list,
             [geometry],
@@ -137,19 +138,20 @@ class Solver(BaseSolver):
 
         # Generate a dictionary of plans for each subject
         plans_hemi = dict(zip(subject_list, plans))
-        return plans_hemi
+        return plans_hemi, barycenter_features_hemi
 
     def _compute_plans(
         self,
         subject_list,
+        masker,
         device,
     ):
-        plans_left = self._compute_plans_hemi(
+        plans_left, barycenter_features_left = self._compute_plans_hemi(
             subject_list,
             device,
             "left",
         )
-        plans_right = self._compute_plans_hemi(
+        plans_right, barycenter_features_right = self._compute_plans_hemi(
             subject_list,
             device,
             "right",
@@ -162,7 +164,24 @@ class Solver(BaseSolver):
                 "right": plans_right[subject],
             }
 
-        return plans
+        # Send to cpu and numpy
+        barycenter_features_left = (
+            barycenter_features_left.detach().cpu().numpy()
+        )
+        barycenter_features_right = (
+            barycenter_features_right.detach().cpu().numpy()
+        )
+        barycenter_features = masker.inverse_transform(
+            np.concatenate(
+                [barycenter_features_left, barycenter_features_right], axis=1
+            )
+        )
+        barycenter = LabeledImage(
+            img=barycenter_features,
+            labels=self.dict_alignment[subject_list[0]].labels,
+        )
+
+        return plans, barycenter
 
     def _project(self, features, plan):
         """Project features using the given transport plan
@@ -194,12 +213,40 @@ class Solver(BaseSolver):
         )
         return transformed_data.numpy()
 
-    def _project_img(self, img, plan):
+    def _project_img(self, subject_data, masker, plan):
+        labels = subject_data.labels
+        img = subject_data.img
         features = []
         for hemi in ["left", "right"]:
             features_hemi = img.data.parts[hemi]
             features.append(self._project(features_hemi, plan[hemi]))
-        return np.concatenate(features, axis=1)
+        projected_data = np.concatenate(features, axis=1)
+        return LabeledImage(
+            img=masker.inverse_transform(projected_data),
+            labels=labels,
+        )
+
+    def _compute_template(self, dict_subjects, masker, plans):
+        subject_list = list(dict_subjects.keys())
+        first_subject_data = masker.transform(dict_subjects[subject_list[0]].img)
+        features = np.zeros_like(first_subject_data)
+        for subject in subject_list:
+            subject_data = dict_subjects[subject]
+            subject_img = subject_data.img
+            features_left = self._project(
+                subject_img.data.parts["left"], plans[subject]["left"]
+            )
+            features_right = self._project(
+                subject_img.data.parts["right"], plans[subject]["right"]
+            )
+            fused_features = np.concatenate(
+                [features_left, features_right], axis=1
+            )
+            features += fused_features / len(subject_list)
+
+        template_img = masker.inverse_transform(features)
+        template_labels = dict_subjects[subject_list[0]].labels
+        return LabeledImage(img=template_img, labels=template_labels)
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -208,22 +255,32 @@ class Solver(BaseSolver):
         # https://benchopt.github.io/performance_curves.html
 
         # List of source subjects
+        subject_list = list(self.dict_alignment.keys())
 
-        plans = self._compute_plans(
-            list(self.dict_alignment.keys()),
-            self.device,
+        # Compute the transport plans and the barycenter
+        plans, barycenter = self._compute_plans(
+            subject_list=subject_list,
+            masker=self.masker,
+            device=self.device,
+        )
+        self.barycenter = barycenter # TODO: do smth with it
+
+        # Compute the decoding template using the transport plans
+        self.decoding_template = self._compute_template(
+            dict_subjects=self.dict_decoding,
+            masker=self.masker,
+            plans=plans,
         )
 
-        self.X = np.concatenate(
-            [
-                self._project_img(self.dict_decoding[subject], plans[subject])
-                for subject in self.dict_decoding.keys()
-            ]
-        )
-
-        self.y = np.concatenate(
-            np.array(list(self.dict_labels.values())), axis=0
-        )
+        # Align the data
+        self.dict_aligned = {
+            subject: self._project_img(
+                subject_data=self.dict_decoding[subject],
+                masker=self.masker,
+                plan=plans[subject],
+            )
+            for subject in subject_list
+        }
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -235,5 +292,9 @@ class Solver(BaseSolver):
             self.name + f"_alpha_{self.alpha}_rho_{self.rho}_eps_{self.eps}"
         )
         return dict(
-            aligned_dataset=(self.X, self.y, solver_name),
+            aligned_dataset=(
+                self.decoding_template,
+                self.dict_aligned,
+                self.name,
+            ),
         )
