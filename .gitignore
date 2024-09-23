@@ -18,4 +18,4 @@ benchopt.ini
 .DS_Store
 coverage.xml
 
-figures/aligned_datasets/*
+figures/*
