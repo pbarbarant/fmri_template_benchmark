@@ -30,7 +30,7 @@ class Solver(BaseSolver):
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
     install_pip = "pip"
-    requirements = ["pip:fmralign", "joblib"]
+    requirements = []
 
     stopping_criterion = SingleRunCriterion()
 

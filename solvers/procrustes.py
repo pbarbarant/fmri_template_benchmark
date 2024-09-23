@@ -30,13 +30,13 @@ class Solver(BaseSolver):
         "nits": [10],
         "n_parcels": [50, 100, 200],
         "clustering": ["ward", "destrieux"],
-        "scaling": [False, True],
+        "scaling": [True],
     }
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
     install_pip = "pip"
-    requirements = ["numpy", "nilearn", "joblib"]
+    requirements = []
 
     stopping_criterion = SingleRunCriterion()
 
