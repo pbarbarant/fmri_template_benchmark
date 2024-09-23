@@ -21,7 +21,7 @@ class Dataset(BaseDataset):
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
     install_pip = "pip"
-    requirements = ["nilearn", "pandas"]
+    requirements = []
 
     def __init__(self):
         self.subjects = [

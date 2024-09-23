@@ -43,16 +43,7 @@ class Objective(BaseObjective):
     # simulated.py and python-gd.py).
     # Example syntax: requirements = ['numpy', 'pip:jax', 'pytorch:pytorch']
     install_pip = "pip"
-    requirements = [
-        "scikit-learn",
-        "numpy",
-        "joblib",
-    ]
-
-    # warnings.filterwarnings("ignore", category=FutureWarning)
-    # warnings.filterwarnings("ignore", category=UserWarning)
-    # warnings.filterwarnings("ignore", category=ConvergenceWarning)
-    # warnings.filterwarnings("ignore", category=RuntimeWarning)
+    requirements = []
 
     # Minimal version of benchopt required to run this benchmark.
     # Bump it up if the benchmark depends on a new feature of benchopt.
