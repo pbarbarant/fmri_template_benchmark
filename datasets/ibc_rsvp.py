@@ -43,9 +43,6 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
         data_path = Path(DATA_PATH_IBC_RSVP)
 
-        # Load the masker object
-        mask = load_mask(data_path, MEMORY)
-
         dict_alignment = dict()
         dict_decoding = dict()
         for subject in self.subjects:
@@ -53,7 +50,7 @@ class Dataset(BaseDataset):
             (
                 data_alignment,
                 data_decoding,
-            ) = load_dataset_surf(subject, data_path, mask, self.mesh_name)
+            ) = load_dataset_surf(subject, data_path, self.mesh_name)
             dict_alignment[subject] = data_alignment
             dict_decoding[subject] = data_decoding
 
