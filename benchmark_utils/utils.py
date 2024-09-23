@@ -83,7 +83,7 @@ def mesh_connectivity_matrix(coordinates, triangles):
     return connectivity
 
 
-def load_dataset(subject, data_path, mask):
+def load_dataset_vol(subject, data_path, mask):
     data_alignment = mask.inverse_transform(
         joblib.load(data_path / "alignment" / f"{subject}.pkl")
     )
@@ -122,19 +122,47 @@ def project_on_surf(data, mesh_name="fsaverage5"):
     )
 
 
-def load_dataset_surf(subject, data_path, mask, mesh_name):
-    data_alignment, data_decoding, labels_decoding = load_dataset(
-        subject, data_path, mask
+def load_dataset_surf(subject, data_path, mesh_name):
+    data_alignment_left = joblib.load(
+        data_path / "alignment" / f"{subject}_left.pkl"
+    ).T
+    data_alignment_right = joblib.load(
+        data_path / "alignment" / f"{subject}_right.pkl"
+    ).T
+    data_alignment_img = SurfaceImage(
+        mesh=load_fsaverage(mesh_name)["inflated"],
+        data={
+            "left": data_alignment_left,
+            "right": data_alignment_right,
+        },
     )
-    data_alignment_surf = project_on_surf(data_alignment, mesh_name)
-    data_decoding_surf = project_on_surf(data_decoding, mesh_name)
+    
+    data_decoding_left = joblib.load(
+        data_path / "decoding" / f"{subject}_left.pkl"
+    ).T
+    data_decoding_right = joblib.load(
+        data_path / "decoding" / f"{subject}_right.pkl"
+    ).T
+    data_decoding_img = SurfaceImage(
+        mesh=load_fsaverage(mesh_name)["inflated"],
+        data={
+            "left": data_decoding_left,
+            "right": data_decoding_right,
+        },
+    )
+    
+    labels_decoding = pd.read_csv(
+        data_path / "labels" / f"{subject}.csv",
+        header=None,
+    ).values.ravel()
+    
     alignment_labeled = LabeledImage(
-        img=data_alignment_surf,
+        img=data_alignment_img,
         labels=None,
     )
 
     decoding_labeled = LabeledImage(
-        img=data_decoding_surf,
+        img=data_decoding_img,
         labels=labels_decoding,
     )
     return alignment_labeled, decoding_labeled
@@ -225,6 +253,9 @@ def plot_aligned_dataset(
 
             # Plot the weights
             # Get the contrast index
+            if len(coefs) == 1: # binary classification
+                contrast_index = 0
+                coefs *= -1
             img_coefs = masker.inverse_transform(coefs[contrast_index])
             fig = plot_surf_img(
                 img_coefs,
