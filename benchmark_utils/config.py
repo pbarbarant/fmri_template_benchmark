@@ -5,13 +5,13 @@ root = Path(
 )
 
 # path to IBC RSVP data
-DATA_PATH_IBC_RSVP = root / "IBC_RSVP"
+DATA_PATH_IBC_RSVP = root / "IBC_RSVPLanguage_fsaverage5"
 
 # path to IBC Sound data
 DATA_PATH_IBC_SOUND = root / "IBC_Sound"
 
 # path to IBC Mathlang data
-DATA_PATH_IBC_MATHLANG_AUDIO = root / "IBC_MathLangAudio"
+DATA_PATH_IBC_MATHLANG = root / "IBC_MathLanguage_fsaverage5"
 
 # path to Neuromod data
 DATA_PATH_NEUROMOD = root / "Neuromod"
@@ -19,8 +19,8 @@ DATA_PATH_NEUROMOD = root / "Neuromod"
 # path to Forrest data
 DATA_PATH_FORREST = root / "Forrest"
 
-# path to BOLD5000 data
-DATA_PATH_BOLD5000 = root / "BOLD5000_3mm"
+# path to IBC FacesBody data
+DATA_PATH_IBC_FACEBODY = root / "IBC_FaceBody_fsaverage5"
 
 # path to memory
 MEMORY = "/data/parietal/store3/work/pbarbara/tmp"
