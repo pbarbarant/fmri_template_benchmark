@@ -15,7 +15,10 @@ with safe_import_context() as import_ctx:
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
 
-    from benchmark_utils.utils import plot_aligned_dataset, plot_template
+    from benchmark_utils.utils import (
+        generate_aligned_dataset_gii,
+        generate_template_gii,
+    )
 
 
 # The benchmark objective must be named `Objective` and
@@ -127,23 +130,21 @@ class Objective(BaseObjective):
         }
 
         # Plot the template
-        plot_template(
-            template,
-            self.masker,
-            solver_name,
-            self.dataset_name,
-            self.mesh_name,
+        generate_template_gii(
+            template=template,
+            masker=self.masker,
+            solver_name=solver_name,
+            dataset_name=self.dataset_name,
         )
 
         # Plot the aligned features
-        plot_aligned_dataset(
+        generate_aligned_dataset_gii(
             dict_aligned=dict_aligned,
             dict_estimators=dict_estimators,
             solver_name=solver_name,
             dataset_name=self.dataset_name,
             subjects_list=list(self.dict_decoding.keys()),
             masker=self.masker,
-            mesh_name=self.mesh_name,
         )
 
         cv_scores_dummy = cross_val_score(
