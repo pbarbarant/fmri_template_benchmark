@@ -5,6 +5,8 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import nibabel as nib
+
 from nilearn import datasets, maskers, masking, plotting, surface
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
@@ -136,7 +138,7 @@ def load_dataset_surf(subject, data_path, mesh_name):
             "right": data_alignment_right,
         },
     )
-    
+
     data_decoding_left = joblib.load(
         data_path / "decoding" / f"{subject}_left.pkl"
     ).T
@@ -150,12 +152,12 @@ def load_dataset_surf(subject, data_path, mesh_name):
             "right": data_decoding_right,
         },
     )
-    
+
     labels_decoding = pd.read_csv(
         data_path / "labels" / f"{subject}.csv",
         header=None,
     ).values.ravel()
-    
+
     alignment_labeled = LabeledImage(
         img=data_alignment_img,
         labels=None,
@@ -253,7 +255,7 @@ def plot_aligned_dataset(
 
             # Plot the weights
             # Get the contrast index
-            if len(coefs) == 1: # binary classification
+            if len(coefs) == 1:  # binary classification
                 contrast_index = 0
                 coefs *= -1
             img_coefs = masker.inverse_transform(coefs[contrast_index])
@@ -270,3 +272,97 @@ def plot_aligned_dataset(
             )
             fig.savefig(output_dir / f"coefs_{contrast}.pdf")
             plt.close(fig)
+
+
+def generate_template_gii(
+    template,
+    masker,
+    solver_name,
+    dataset_name,
+):
+    labels = template.labels
+    for contrast in np.unique(labels):
+        print(f"Saving template - contrast {contrast}")
+        output_dir = (
+            Path(__file__).parent.parent
+            / "figures"
+            / "aligned_datasets"
+            / dataset_name
+            / solver_name
+            / "template"
+        )
+        template_data = masker.transform(template.img)
+        avg_contrast = np.mean(template_data[labels == contrast], axis=0)
+        img = masker.inverse_transform(avg_contrast)
+
+        img_to_gifti(
+            img,
+            img_name=f"{contrast}",
+            output_dir=output_dir,
+        )
+
+
+def generate_aligned_dataset_gii(
+    dict_aligned,
+    dict_estimators,
+    solver_name,
+    dataset_name,
+    subjects_list,
+    masker,
+):
+    subjects_list = list(dict_aligned.keys())
+    for subject in subjects_list:
+        # Get the labels
+        labels = dict_aligned[subject].labels
+        # Get the data
+        X_subject = masker.transform(dict_aligned[subject].img)
+        # Get the estimator
+        estimator = dict_estimators[subject]
+        # Get the coefficients and the associated classes for the SVC
+        coefs = estimator[-1].coef_
+        class_labels = estimator[-1].classes_
+        for contrast_index, contrast in enumerate(class_labels):
+            print(f"Plotting subject {subject} - contrast {contrast}")
+            output_dir = (
+                Path(__file__).parent.parent
+                / "figures"
+                / "aligned_datasets"
+                / dataset_name
+                / solver_name
+                / f"{subject}"
+            )
+            # Save the average contrast
+            avg_contrast = np.mean(X_subject[labels == contrast], axis=0)
+            img = masker.inverse_transform(avg_contrast)
+            img_to_gifti(
+                img,
+                img_name=f"{contrast}",
+                output_dir=output_dir,
+            )
+
+            # Save the weights
+            # Get the contrast index
+            if len(coefs) == 1:  # binary classification
+                contrast_index = 0
+                coefs *= -1
+            img_coefs = masker.inverse_transform(coefs[contrast_index])
+            img_to_gifti(
+                img_coefs,
+                img_name=f"coefs_{contrast}",
+                output_dir=output_dir,
+            )
+
+
+def img_to_gifti(
+    img,
+    img_name,
+    output_dir,
+):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for hemi in ["left", "right"]:
+        gifti = nib.gifti.GiftiImage()
+        data_array = nib.gifti.GiftiDataArray(
+            img.data.parts[hemi].astype(np.float32)
+        )
+        gifti.add_gifti_data_array(data_array)
+        nib.save(gifti, output_dir / f"{img_name}_{hemi}.gii")
