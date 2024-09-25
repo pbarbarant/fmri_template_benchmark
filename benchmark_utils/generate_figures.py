@@ -3,10 +3,15 @@ import glob
 import os
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
+
+from nilearn import surface, plotting, datasets
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 plt.rcParams["figure.dpi"] = 500
 
@@ -106,11 +111,6 @@ aligned_dataset_paths = figures_path / "aligned_datasets"
 aligned_datasets = [
     folder for folder in aligned_dataset_paths.iterdir() if folder.is_dir()
 ]
-
-import matplotlib.gridspec as gridspec
-import matplotlib as mpl
-from nilearn import surface, plotting, datasets
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def plot_contrast(
