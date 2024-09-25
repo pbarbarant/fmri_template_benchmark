@@ -184,6 +184,7 @@ def plot_template(
         print(f"Plotting template - contrast {contrast}")
         output_dir = (
             Path(__file__).parent.parent
+            / "outputs"
             / "figures"
             / "aligned_datasets"
             / dataset_name
@@ -231,6 +232,7 @@ def plot_aligned_dataset(
             print(f"Plotting subject {subject} - contrast {contrast}")
             output_dir = (
                 Path(__file__).parent.parent
+                / "outputs"
                 / "figures"
                 / "aligned_datasets"
                 / dataset_name
@@ -285,6 +287,7 @@ def generate_template_gii(
         print(f"Saving template - contrast {contrast}")
         output_dir = (
             Path(__file__).parent.parent
+            / "outputs"
             / "figures"
             / "aligned_datasets"
             / dataset_name
@@ -325,6 +328,7 @@ def generate_aligned_dataset_gii(
             print(f"Plotting subject {subject} - contrast {contrast}")
             output_dir = (
                 Path(__file__).parent.parent
+                / "outputs"
                 / "figures"
                 / "aligned_datasets"
                 / dataset_name

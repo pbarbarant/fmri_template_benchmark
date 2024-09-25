@@ -280,6 +280,7 @@ def plot_parcellation(mesh, labels, n_parcels, clustering):
     fig.suptitle(f"Parcellation of the brain in {n_parcels} parcels")
     output_dir = (
         Path(__file__).parent.parent
+        / "outputs"
         / "figures"
         / "parcellations"
         / f"{clustering}"

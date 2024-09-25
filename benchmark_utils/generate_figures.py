@@ -12,7 +12,7 @@ from PyPDF2 import PdfMerger
 plt.rcParams["figure.dpi"] = 500
 
 data_path = Path(__file__).parent.parent / "outputs"
-figures_path = data_path.parent / "figures"
+figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 # Parse the latest file
 file_list = glob.glob(os.path.join(data_path, "*.parquet"))
