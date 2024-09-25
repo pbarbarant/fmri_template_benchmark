@@ -297,6 +297,6 @@ class Solver(BaseSolver):
             aligned_dataset=(
                 self.decoding_template,
                 self.dict_aligned,
-                self.name,
+                solver_name,
             ),
         )
