@@ -27,9 +27,8 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "nits": [10],
-        "n_parcels": [50, 100, 200],
-        "clustering": ["ward", "destrieux"],
+        "n_parcels": [100],
+        "clustering": ["ward"],
         "scaling": [True],
     }
 
@@ -57,7 +56,73 @@ class Solver(BaseSolver):
         self.masker = masker
         self.mesh_name = mesh_name
 
-    def template_procrustes(self, imgs, n_iter=10, scaling=False, primal=None):
+    def _rescaled_euclidean_mean(self, imgs, scale_average=False):
+        """
+        Make the Euclidian average of images.
+
+        Parameters
+        ----------
+        imgs: list of Niimgs
+            Each img is 3D by default, but can also be 4D.
+        masker: instance of NiftiMasker or MultiNiftiMasker
+            Masker to be used on the data.
+        scale_average: boolean
+            If true, the returned average is scaled to have the average norm of imgs
+            If false, it will usually have a smaller norm than initial average
+            because noise will cancel across images
+
+        Returns
+        -------
+        average_img: Niimg
+            Average of imgs, with same shape as one img
+        """
+        average_img = np.mean(imgs, axis=0)
+        scale = 1
+        if scale_average:
+            X_norm = 0
+            for img in imgs:
+                X_norm += np.linalg.norm(img)
+            X_norm /= len(imgs)
+            scale = X_norm / np.linalg.norm(average_img)
+        average_img *= scale
+
+        return average_img
+
+    def _align_images_to_template(self, imgs, template):
+        """
+        Align images to a template using Procrustes analysis
+
+        Parameters
+        ----------
+        imgs: (n_subjects, n_features, n_vertices) nd array
+            set of images
+        template: (n_features, n_vertices) nd array
+            template
+
+        Returns
+        ----------
+        aligned_imgs: (n_subjects, n_features, n_vertices) nd array
+            set of aligned images
+        R_list: list of (n_features, n_features) nd array
+            list of transformation matrices
+        sc_list: list of int
+            list of scaling parameters
+        """
+        n_sub, n_features, n_vertices = imgs.shape
+        aligned_imgs = np.zeros((n_sub, n_features, n_vertices))
+        R_list = []
+        sc_list = []
+        for i in range(n_sub):
+            R, sc = scaled_procrustes(
+                imgs[i],
+                template,
+            )
+            aligned_imgs[i, :, :] = sc * imgs[i, :, :] @ R
+            R_list.append(R)
+            sc_list.append(sc)
+        return aligned_imgs, R_list, sc_list
+
+    def template_procrustes(self, imgs, n_iter=2, scaling=False, primal=None):
         """
         Compute the template of a set of images using Procrustes analysis
 
@@ -88,18 +153,14 @@ class Solver(BaseSolver):
         sc_list: list of int
             list of scaling parameters
         """
-        n_sub, _, n_vertices = imgs.shape
-        # Initialize the template as the mean of the images
-        X = np.mean(imgs, axis=0)
-        R_list = [np.eye(n_vertices) for _ in range(n_sub)]
-        sc_list = [1 for _ in range(n_sub)]
+        aligned_imgs = imgs
         for _ in range(n_iter):
-            for i, Y in enumerate(imgs):
-                R, sc = scaled_procrustes(X, Y, scaling=scaling, primal=primal)
-                X = X.dot(R.T) * sc
-                R_list[i] = R
-                sc_list[i] = sc
-        return X, R_list, sc_list
+            template = self._rescaled_euclidean_mean(aligned_imgs, scaling)
+            aligned_imgs, R_list, sc_list = self._align_images_to_template(
+                imgs,
+                template,
+            )
+        return template, R_list, sc_list
 
     def compute_alignments(
         self,
@@ -107,7 +168,7 @@ class Solver(BaseSolver):
         parcellation_labels,
         masker,
         scaling=False,
-        n_iter=10,
+        n_iter=2,
         n_jobs=10,
     ):
         """
@@ -200,7 +261,6 @@ class Solver(BaseSolver):
             parcellation_labels=parcellation_labels,
             masker=self.masker,
             scaling=self.scaling,
-            n_iter=self.nits,
             n_jobs=10,
         )
 
@@ -235,7 +295,7 @@ class Solver(BaseSolver):
         # it is customizable for each benchmark.
         solver_name = (
             self.name
-            + f"_niter_{self.nits}_{self.clustering}_{self.n_parcels}_sc_{self.scaling}"
+            + f"_{self.clustering}_{self.n_parcels}_sc_{self.scaling}"
         )
         return dict(
             aligned_dataset=(
