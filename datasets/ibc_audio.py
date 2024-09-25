@@ -8,14 +8,14 @@ with safe_import_context() as import_ctx:
 
     from nilearn.experimental import surface
 
-    from benchmark_utils.config import DATA_PATH_IBC_SOUND, MEMORY
-    from benchmark_utils.utils import load_dataset_surf, load_mask
+    from benchmark_utils.config import DATA_PATH_IBC_AUDIO
+    from benchmark_utils.utils import load_dataset_surf
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
-    name = "IBC_Sound"
+    name = "IBC_Audio"
     mesh_name = "fsaverage5"
 
     # List of packages needed to run the dataset. See the corresponding
@@ -25,6 +25,7 @@ class Dataset(BaseDataset):
 
     def __init__(self):
         self.subjects = [
+            "sub-01",
             "sub-04",
             "sub-05",
             "sub-06",
@@ -40,10 +41,7 @@ class Dataset(BaseDataset):
         # The return arguments of this function are passed as keyword arguments
         # to `Objective.set_data`. This defines the benchmark's
         # API to pass data. It is customizable for each benchmark.
-        data_path = Path(DATA_PATH_IBC_SOUND)
-
-        # Load the masker object
-        mask = load_mask(data_path, MEMORY)
+        data_path = Path(DATA_PATH_IBC_AUDIO)
 
         dict_alignment = dict()
         dict_decoding = dict()
@@ -52,7 +50,7 @@ class Dataset(BaseDataset):
             (
                 data_alignment,
                 data_decoding,
-            ) = load_dataset_surf(subject, data_path, mask, self.mesh_name)
+            ) = load_dataset_surf(subject, data_path, self.mesh_name)
             dict_alignment[subject] = data_alignment
             dict_decoding[subject] = data_decoding
 
