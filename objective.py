@@ -169,14 +169,13 @@ class Objective(BaseObjective):
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
         # with `self.evaluate_result`. This is mainly for testing purposes.
-        result = dict(
+        return dict(
             aligned_dataset=(
-                np.random.randn(100, 10),
-                np.random.randint(2, size=100),
-                "random",
-            )
+                None,
+                None,
+                "Test",
+            ),
         )
-        return result
 
     def get_objective(self):
         # Define the information to pass to each solver to run the benchmark.
