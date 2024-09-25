@@ -66,4 +66,3 @@ class Dataset(BaseDataset):
             masker=masker,
             mesh_name=self.mesh_name,
         )
-        

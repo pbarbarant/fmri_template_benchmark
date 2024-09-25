@@ -228,7 +228,9 @@ class Solver(BaseSolver):
 
     def _compute_template(self, dict_subjects, masker, plans):
         subject_list = list(dict_subjects.keys())
-        first_subject_data = masker.transform(dict_subjects[subject_list[0]].img)
+        first_subject_data = masker.transform(
+            dict_subjects[subject_list[0]].img
+        )
         features = np.zeros_like(first_subject_data)
         for subject in subject_list:
             subject_data = dict_subjects[subject]
@@ -263,7 +265,7 @@ class Solver(BaseSolver):
             masker=self.masker,
             device=self.device,
         )
-        self.barycenter = barycenter # TODO: do smth with it
+        self.barycenter = barycenter  # TODO: do smth with it
 
         # Compute the decoding template using the transport plans
         self.decoding_template = self._compute_template(
