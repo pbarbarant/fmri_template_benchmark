@@ -189,7 +189,7 @@ def project(
         label = unique_labels[i]
         X_reduced = X[:, labels == label]
         X_transform[:, labels == label] = (
-            X_reduced.dot(R_list[i][n_sub].T) * sc_list[i][n_sub]
+            X_reduced.dot(R_list[i][n_sub]) * sc_list[i][n_sub]
         )
 
     projected_img = masker.inverse_transform(X_transform)
