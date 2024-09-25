@@ -8,8 +8,8 @@ with safe_import_context() as import_ctx:
 
     from nilearn.experimental import surface
 
-    from benchmark_utils.config import DATA_PATH_IBC_FACEBODY, MEMORY
-    from benchmark_utils.utils import load_dataset_surf, load_mask
+    from benchmark_utils.config import DATA_PATH_IBC_FACEBODY
+    from benchmark_utils.utils import load_dataset_surf
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
