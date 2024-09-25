@@ -146,8 +146,10 @@ def generate_tiling_figure(dataset_path, vmin=-10, vmax=10):
         for contrast in (solvers[0] / "template").iterdir()
         if contrast.is_file()
     ]
-    # Get the contrast names without the hemisphere
-    contrast_names = [contrast.stem.split("_")[0] for contrast in contrasts]
+    # Split on the last underscore to get the contrast name
+    contrast_names = [
+        contrast.stem.rsplit("_", 1)[0] for contrast in contrasts
+    ]
     contrast_names = list(set(contrast_names))
 
     # Create the figure and axes with a specific size
