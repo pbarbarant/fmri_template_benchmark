@@ -25,16 +25,17 @@ class Dataset(BaseDataset):
 
     def __init__(self):
         self.subjects = [
-            "sub-01",
             "sub-04",
             "sub-05",
             "sub-06",
             "sub-07",
+            "sub-08",
             "sub-09",
             "sub-11",
             "sub-12",
             "sub-13",
             "sub-14",
+            "sub-15",
         ]
 
     def get_data(self):
