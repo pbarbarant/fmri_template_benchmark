@@ -92,6 +92,74 @@ def compute_parcellation(data, mesh=None, clustering="kmeans", n_parcels=10):
         )
 
 
+def rescaled_euclidean_mean(imgs, scale_average=False):
+    """
+    Make the Euclidian average of images.
+
+    Parameters
+    ----------
+    imgs: list of Niimgs
+        Each img is 3D by default, but can also be 4D.
+    masker: instance of NiftiMasker or MultiNiftiMasker
+        Masker to be used on the data.
+    scale_average: boolean
+        If true, the returned average is scaled to have the average norm of imgs
+        If false, it will usually have a smaller norm than initial average
+        because noise will cancel across images
+
+    Returns
+    -------
+    average_img: Niimg
+        Average of imgs, with same shape as one img
+    """
+    average_img = np.mean(imgs, axis=0)
+    scale = 1
+    if scale_average:
+        X_norm = 0
+        for img in imgs:
+            X_norm += np.linalg.norm(img)
+        X_norm /= len(imgs)
+        scale = X_norm / np.linalg.norm(average_img)
+    average_img *= scale
+
+    return average_img
+
+
+def align_images_to_template(imgs, template):
+    """
+    Align images to a template using Procrustes analysis
+
+    Parameters
+    ----------
+    imgs: (n_subjects, n_features, n_vertices) nd array
+        set of images
+    template: (n_features, n_vertices) nd array
+        template
+
+    Returns
+    ----------
+    aligned_imgs: (n_subjects, n_features, n_vertices) nd array
+        set of aligned images
+    R_list: list of (n_features, n_features) nd array
+        list of transformation matrices
+    sc_list: list of int
+        list of scaling parameters
+    """
+    n_sub, n_features, n_vertices = imgs.shape
+    aligned_imgs = np.zeros((n_sub, n_features, n_vertices))
+    R_list = []
+    sc_list = []
+    for i in range(n_sub):
+        R, sc = scaled_procrustes(
+            imgs[i],
+            template,
+        )
+        aligned_imgs[i, :, :] = sc * imgs[i, :, :] @ R
+        R_list.append(R)
+        sc_list.append(sc)
+    return aligned_imgs, R_list, sc_list
+
+
 def scaled_procrustes(X, Y, scaling=False, primal=None):
     """
     Compute a mixing matrix R and a scaling sc such that Frobenius norm
