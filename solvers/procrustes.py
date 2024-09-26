@@ -9,8 +9,9 @@ with safe_import_context() as import_ctx:
     from functools import partial
     from benchopt.stopping_criterion import SingleRunCriterion
     from benchmark_utils.procrustes_utils import (
+        rescaled_euclidean_mean,
+        align_images_to_template,
         compute_parcellation,
-        scaled_procrustes,
         compute_template,
         plot_parcellation,
         project,
@@ -56,72 +57,6 @@ class Solver(BaseSolver):
         self.masker = masker
         self.mesh_name = mesh_name
 
-    def _rescaled_euclidean_mean(self, imgs, scale_average=False):
-        """
-        Make the Euclidian average of images.
-
-        Parameters
-        ----------
-        imgs: list of Niimgs
-            Each img is 3D by default, but can also be 4D.
-        masker: instance of NiftiMasker or MultiNiftiMasker
-            Masker to be used on the data.
-        scale_average: boolean
-            If true, the returned average is scaled to have the average norm of imgs
-            If false, it will usually have a smaller norm than initial average
-            because noise will cancel across images
-
-        Returns
-        -------
-        average_img: Niimg
-            Average of imgs, with same shape as one img
-        """
-        average_img = np.mean(imgs, axis=0)
-        scale = 1
-        if scale_average:
-            X_norm = 0
-            for img in imgs:
-                X_norm += np.linalg.norm(img)
-            X_norm /= len(imgs)
-            scale = X_norm / np.linalg.norm(average_img)
-        average_img *= scale
-
-        return average_img
-
-    def _align_images_to_template(self, imgs, template):
-        """
-        Align images to a template using Procrustes analysis
-
-        Parameters
-        ----------
-        imgs: (n_subjects, n_features, n_vertices) nd array
-            set of images
-        template: (n_features, n_vertices) nd array
-            template
-
-        Returns
-        ----------
-        aligned_imgs: (n_subjects, n_features, n_vertices) nd array
-            set of aligned images
-        R_list: list of (n_features, n_features) nd array
-            list of transformation matrices
-        sc_list: list of int
-            list of scaling parameters
-        """
-        n_sub, n_features, n_vertices = imgs.shape
-        aligned_imgs = np.zeros((n_sub, n_features, n_vertices))
-        R_list = []
-        sc_list = []
-        for i in range(n_sub):
-            R, sc = scaled_procrustes(
-                imgs[i],
-                template,
-            )
-            aligned_imgs[i, :, :] = sc * imgs[i, :, :] @ R
-            R_list.append(R)
-            sc_list.append(sc)
-        return aligned_imgs, R_list, sc_list
-
     def template_procrustes(self, imgs, n_iter=2, scaling=False, primal=None):
         """
         Compute the template of a set of images using Procrustes analysis
@@ -155,8 +90,8 @@ class Solver(BaseSolver):
         """
         aligned_imgs = imgs
         for _ in range(n_iter):
-            template = self._rescaled_euclidean_mean(aligned_imgs, scaling)
-            aligned_imgs, R_list, sc_list = self._align_images_to_template(
+            template = rescaled_euclidean_mean(aligned_imgs, scaling)
+            aligned_imgs, R_list, sc_list = align_images_to_template(
                 imgs,
                 template,
             )
