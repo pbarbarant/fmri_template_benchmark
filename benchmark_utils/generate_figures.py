@@ -9,6 +9,7 @@ import matplotlib.gridspec as gridspec
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
+import numpy as np
 
 from nilearn import surface, plotting, datasets
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -137,7 +138,35 @@ def plot_contrast(
     )
 
 
-def generate_tiling_figure(dataset_path, vmin=-10, vmax=10):
+def plot_weights(
+    ax,
+    weights_list,
+    hemi="left",
+    cmap="coolwarm",
+    **kwargs,
+):
+    # Load all the weights
+    surface_maps = np.stack(
+        [surface.load_surf_data(str(weights)) for weights in weights_list],
+    )
+    mean_map = surface_maps.mean(axis=0)
+    normalized_map = mean_map / np.abs(mean_map).max()
+    fsaverage = datasets.fetch_surf_fsaverage()
+    plotting.plot_surf(
+        fsaverage.infl_left,
+        normalized_map,
+        cmap=cmap,
+        hemi="left",
+        axes=ax,
+        colorbar=False,
+        bg_map=fsaverage.sulc_left,
+        bg_on_data=True,
+        threshold=1e-6,
+        **kwargs,
+    )
+
+
+def generate_template_figure(dataset_path, vmin=-10, vmax=10):
     # Grab the available solvers
     solvers = [solver for solver in dataset_path.iterdir() if solver.is_dir()]
     # List the contrasts for the first solver in the template folder
@@ -195,6 +224,74 @@ def generate_tiling_figure(dataset_path, vmin=-10, vmax=10):
     fig.savefig(dataset_path / "templates.pdf", dpi=500, bbox_inches="tight")
 
 
+def generate_weights_figure(dataset_path, vmin=-1, vmax=1):
+    # Grab the available solvers
+    solvers = [solver for solver in dataset_path.iterdir() if solver.is_dir()]
+    # List the contrasts for the first solver in the template folder
+    contrasts = [
+        contrast
+        for contrast in (solvers[0] / "template").iterdir()
+        if contrast.is_file()
+    ]
+    # Split on the last underscore to get the contrast name
+    contrast_names = [
+        contrast.stem.rsplit("_", 1)[0] for contrast in contrasts
+    ]
+    contrast_names = list(set(contrast_names))
+
+    # Create the figure and axes with a specific size
+    fig = plt.figure(figsize=(3 * len(solvers), 3 * len(contrast_names)))
+    grid_spec = gridspec.GridSpec(
+        len(contrast_names), len(solvers), figure=fig
+    )
+    for i, contrast_name in enumerate(contrast_names):
+        for j, solver in enumerate(solvers):
+            ax = fig.add_subplot(grid_spec[i, j], projection="3d")
+            # Glob all files recursively that start with coefs_contrast_name
+            weights_list = list(
+                solver.glob(f"**/coefs_{contrast_name}_*left.gii")
+            )
+            plot_weights(
+                ax,
+                weights_list,
+                cmap="cold_white_hot",
+                vmin=vmin,
+                vmax=vmax,
+            )
+            if i == 0:
+                ax.set_title(solver.name)
+            if j == 0:
+                # Add the contrast name in a separate column
+                ax.text2D(
+                    0.0,
+                    0.3,
+                    contrast_name,
+                    transform=ax.transAxes,
+                    fontsize=12,
+                    fontweight="bold",
+                    rotation=90,
+                )
+    # Add colorbar
+    ax = fig.add_subplot(grid_spec[len(contrast_names) // 2, :])
+    ax.axis("off")
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="2%")
+    fig.add_axes(cax)
+    fig.colorbar(
+        mpl.cm.ScalarMappable(
+            norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax),
+            cmap="cold_white_hot",
+        ),
+        cax=cax,
+    )
+    fig.savefig(dataset_path / "weights.pdf", dpi=500, bbox_inches="tight")
+
+
 for dataset_path in aligned_datasets:
+    print(f"Generating weights figure for {dataset_path.name}")
+    generate_weights_figure(dataset_path)
     print(f"Generating template figure for {dataset_path.name}")
-    generate_tiling_figure(dataset_path)
+    if dataset_path.name == "IBC_Audio":
+        generate_template_figure(dataset_path, vmin=-1, vmax=1)
+    else:
+        generate_template_figure(dataset_path)
