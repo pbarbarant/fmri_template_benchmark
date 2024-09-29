@@ -106,7 +106,7 @@ class Objective(BaseObjective):
 
         pipeline_svc = make_pipeline(
             StandardScaler(),
-            LinearSVC(max_iter=int(self.max_iter), penalty="l1"),
+            LinearSVC(max_iter=int(self.max_iter), penalty="l2"),
         )
 
         X, y = self._compute_X_y(dict_aligned)
