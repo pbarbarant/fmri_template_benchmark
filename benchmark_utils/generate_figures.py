@@ -161,7 +161,7 @@ def plot_weights(
         colorbar=False,
         bg_map=fsaverage.sulc_left,
         bg_on_data=True,
-        threshold=1e-6,
+        threshold=.5,
         **kwargs,
     )
 
