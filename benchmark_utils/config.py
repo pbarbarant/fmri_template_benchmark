@@ -8,7 +8,7 @@ root = Path(
 DATA_PATH_IBC_RSVP = root / "IBC_RSVPLanguage_fsaverage5"
 
 # path to IBC Audio data
-DATA_PATH_IBC_AUDIO = root / "IBC_Audio_Surf"
+DATA_PATH_IBC_AUDIO = root / "IBC_Audio_fsaverage5"
 
 # path to IBC Mathlang data
 DATA_PATH_IBC_MATHLANG = root / "IBC_MathLanguage_fsaverage5"
