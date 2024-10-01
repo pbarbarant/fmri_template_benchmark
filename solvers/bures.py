@@ -7,12 +7,12 @@ with safe_import_context() as import_ctx:
     import numpy as np
     import ot
     from joblib import Parallel, delayed
-    from functools import partial
     from benchopt.stopping_criterion import SingleRunCriterion
     from benchmark_utils.procrustes_utils import (
         compute_parcellation,
         plot_parcellation,
     )
+    from tqdm import tqdm
     from benchmark_utils.utils import LabeledImage
 
 
@@ -28,7 +28,6 @@ class Solver(BaseSolver):
     parameters = {
         "n_parcels": [100],
         "clustering": ["ward"],
-        "scaling": [True],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -55,7 +54,7 @@ class Solver(BaseSolver):
         self.masker = masker
         self.mesh_name = mesh_name
 
-    def template_procrustes(self, imgs, n_iter=2, scaling=False, primal=None):
+    def template_procrustes(self, imgs):
         """
         Compute the template of a set of images using Procrustes analysis
 
@@ -67,27 +66,18 @@ class Solver(BaseSolver):
         n_iter: int, optional
             number of iterations
         scaling: bool, optional
-            If scaling is true, computes a floating scaling parameter
-            sc such that:
-            ||sc * RX - Y||^2 is minimized and
-            - R is an orthogonal matrix
-            - sc is a scalar
-            If scaling is false sc is set to 1
-        primal: bool or None, optional,
-            Whether the SVD is done on the YX^T (primal) or Y^TX (dual)
-            if None primal is used iff n_features <= n_timeframes
 
         Returns
         ----------
-        X: (n_features, n_vertices) nd array
-            template
-        R_list: list of (n_features, n_features) nd array
-            list of transformation matrices
-        sc_list: list of int
-            list of scaling parameters
+        mb: (n_features, n_vertices) nd array
+            mean features of the template
+        Cb: (n_features, n_features) nd array
+            covariance of the template
         """
         X = [imgs[i, ...] for i in range(imgs.shape[0])]
-        mb, Cb = ot.gaussian.empirical_bures_wasserstein_barycenter(X)
+        mb, Cb = ot.gaussian.empirical_bures_wasserstein_barycenter(
+            X, num_iter=1
+        )
         mb = mb.mean(axis=0)  # POT bug
         return mb, Cb
 
@@ -96,7 +86,6 @@ class Solver(BaseSolver):
         dict_subjects,
         parcellation_labels,
         masker,
-        scaling=False,
         n_iter=2,
         n_jobs=10,
     ):
@@ -112,8 +101,6 @@ class Solver(BaseSolver):
             Masker used to transform the data
         parcellation_labels: ndarray of shape (n_vertices,)
             Array containing the parcel labels of each vertex
-        scaling: bool, optional
-            Compute a scaling parameter, by default False
         n_iter: int, optional
             Number of iterations, by default 10
         n_jobs: int, optional
@@ -135,17 +122,11 @@ class Solver(BaseSolver):
         )
         unique_labels = np.unique(parcellation_labels)
         # Compute the template and the transformation matrices for each label
-        template_procrustes_partial = partial(
-            self.template_procrustes,
-            n_iter=n_iter,
-            scaling=scaling,
-            primal=None,
-        )
         outputs = Parallel(n_jobs=n_jobs)(
-            delayed(template_procrustes_partial)(
+            delayed(self.template_procrustes)(
                 imgs[..., parcellation_labels == label]
             )
-            for label in unique_labels
+            for label in tqdm(unique_labels)
         )
         mb_parcelled = [output[0] for output in outputs]
         Cb_parcelled = [output[1] for output in outputs]
@@ -168,19 +149,19 @@ class Solver(BaseSolver):
         X_transform = np.zeros_like(X_decoding)
         unique_labels = np.unique(labels)
 
-        for i in range(len(unique_labels)):
-            label = unique_labels[i]
-            X_alignment_i = X_alignment[:, labels == label]
-            X_decoding_i = X_decoding[:, labels == label]
-            # Get the mean and covariance of X_alignment_i
-            ms = np.mean(X_alignment_i, axis=0)
-            Cs = np.cov(X_alignment_i, rowvar=False)
-            Cs_reg = Cs + 1e-5 * np.eye(len(Cs))
-            Ct_reg = Cb_parcelled[i] + 1e-5 * np.eye(len(Cb_parcelled[i]))
-            A, b = ot.gaussian.bures_wasserstein_mapping(
-                ms, mb_parcelled[i], Cs_reg, Ct_reg
+        output = Parallel(n_jobs=10)(
+            delayed(self.project_parcel)(
+                X_alignment[:, labels == label],
+                X_decoding[:, labels == label],
+                mb_parcelled,
+                Cb_parcelled,
+                parcel_idx,
             )
-            X_transform[:, labels == label] = X_decoding_i.dot(A) + b
+            for parcel_idx, label in tqdm(enumerate(unique_labels))
+        )
+
+        X_transform = np.concatenate(output, axis=1)
+        print(X_transform.shape)
 
         projected_img = masker.inverse_transform(X_transform)
         projected_data = LabeledImage(
@@ -189,6 +170,21 @@ class Solver(BaseSolver):
         )
 
         return projected_data
+
+    def project_parcel(
+        self, X_alignment, X_decoding, mb_parcelled, Cb_parcelled, parcel_idx
+    ):
+        # Get the mean and covariance of X_alignment_i
+        ms = np.mean(X_alignment, axis=0)
+        Cs = X_alignment.T.dot(X_alignment) / len(X_alignment)
+        Cs_reg = Cs + 1e-5 * np.eye(len(Cs))
+        Ct_reg = Cb_parcelled[parcel_idx] + 1e-5 * np.eye(
+            len(Cb_parcelled[parcel_idx])
+        )
+        A, b = ot.gaussian.bures_wasserstein_mapping(
+            ms, mb_parcelled[parcel_idx], Cs_reg, Ct_reg
+        )
+        return X_decoding.dot(A) + b
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -228,7 +224,6 @@ class Solver(BaseSolver):
             dict_subjects=self.dict_alignment,
             parcellation_labels=parcellation_labels,
             masker=self.masker,
-            scaling=self.scaling,
             n_jobs=10,
         )
 
@@ -243,7 +238,7 @@ class Solver(BaseSolver):
                 labels=parcellation_labels,
                 classes=self.dict_decoding[subject].labels,
             )
-            for i, subject in enumerate(subject_list)
+            for subject in subject_list
         }
 
         template = np.zeros(self.dict_aligned[subject_list[0]].img.data.shape)
@@ -263,10 +258,7 @@ class Solver(BaseSolver):
         # keyword arguments for `Objective.evaluate_result`
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
-        solver_name = (
-            self.name
-            + f"_{self.clustering}_{self.n_parcels}_sc_{self.scaling}"
-        )
+        solver_name = self.name + f"_{self.clustering}_{self.n_parcels}"
         return dict(
             aligned_dataset=(
                 self.template,
