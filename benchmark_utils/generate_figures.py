@@ -161,12 +161,12 @@ def plot_weights(
         colorbar=False,
         bg_map=fsaverage.sulc_left,
         bg_on_data=True,
-        threshold=.5,
+        threshold=0.5,
         **kwargs,
     )
 
 
-def generate_template_figure(dataset_path, vmin=-10, vmax=10):
+def generate_template_figure(dataset_path, vmin=-1, vmax=1):
     # Grab the available solvers
     solvers = [solver for solver in dataset_path.iterdir() if solver.is_dir()]
     # List the contrasts for the first solver in the template folder
@@ -291,7 +291,4 @@ for dataset_path in aligned_datasets:
     print(f"Generating weights figure for {dataset_path.name}")
     generate_weights_figure(dataset_path)
     print(f"Generating template figure for {dataset_path.name}")
-    if dataset_path.name == "IBC_Audio":
-        generate_template_figure(dataset_path, vmin=-1, vmax=1)
-    else:
-        generate_template_figure(dataset_path)
+    generate_template_figure(dataset_path)
