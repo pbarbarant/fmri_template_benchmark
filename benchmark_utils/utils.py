@@ -110,7 +110,7 @@ def load_mask(data_path, memory):
 
 
 def project_on_surf(data, mesh_name="fsaverage5"):
-    mesh = load_fsaverage(mesh_name)["inflated"]
+    mesh = load_fsaverage(mesh_name)["pial"]
     left_data = surface.vol_to_surf(data, mesh.parts["left"]).T
     right_data = surface.vol_to_surf(data, mesh.parts["right"]).T
     left_data_sanitized = np.nan_to_num(left_data)
@@ -132,7 +132,7 @@ def load_dataset_surf(subject, data_path, mesh_name):
         data_path / "alignment" / f"{subject}_right.pkl"
     ).T
     data_alignment_img = SurfaceImage(
-        mesh=load_fsaverage(mesh_name)["inflated"],
+        mesh=load_fsaverage(mesh_name)["pial"],
         data={
             "left": data_alignment_left,
             "right": data_alignment_right,
@@ -146,7 +146,7 @@ def load_dataset_surf(subject, data_path, mesh_name):
         data_path / "decoding" / f"{subject}_right.pkl"
     ).T
     data_decoding_img = SurfaceImage(
-        mesh=load_fsaverage(mesh_name)["inflated"],
+        mesh=load_fsaverage(mesh_name)["pial"],
         data={
             "left": data_decoding_left,
             "right": data_decoding_right,
