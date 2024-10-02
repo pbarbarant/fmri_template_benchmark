@@ -291,7 +291,7 @@ class Solver(BaseSolver):
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
         solver_name = (
-            self.name + f"_alpha_{self.alpha}_rho_{self.rho}_eps_{self.eps}"
+            self.name + f"_alpha_{self.alpha}_eps_{self.eps}"
         )
         return dict(
             aligned_dataset=(
