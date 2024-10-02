@@ -71,7 +71,7 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # Create a masker to extract the data from the brain volume.
-        mesh = load_fsaverage(self.mesh_name)["inflated"]
+        mesh = load_fsaverage(self.mesh_name)["pial"]
         n_vertices = mesh.n_vertices // 2
 
         dict_alignment = dict()
