@@ -105,7 +105,7 @@ class Solver(BaseSolver):
 
         print(f"Computing geometry for {hemi} hemisphere")
         geometry, d_max = fetch_surf_geometry(
-            f"infl_{hemi}",
+            f"pial_{hemi}",
             method="euclidean",
             resolution=self.mesh_name,
         )
@@ -118,7 +118,7 @@ class Solver(BaseSolver):
         euclidean_mean = np.mean(features_list, axis=0)
         fugw_barycenter = FUGWBarycenter(
             alpha=self.alpha,
-            rho=self.rho,
+            rho=float("inf"),
             eps=self.eps,
         )
         _, barycenter_features_hemi, _, plans, _, _ = fugw_barycenter.fit(
