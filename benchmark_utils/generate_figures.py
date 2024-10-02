@@ -125,7 +125,7 @@ def plot_contrast(
     surface_map = surface.load_surf_data(str(contrast_path) + f"_{hemi}.gii")
     fsaverage = datasets.fetch_surf_fsaverage()
     plotting.plot_surf(
-        fsaverage.infl_left,
+        fsaverage.pial_left,
         surface_map,
         cmap=cmap,
         hemi="left",
@@ -153,7 +153,7 @@ def plot_weights(
     normalized_map = mean_map / np.abs(mean_map).max()
     fsaverage = datasets.fetch_surf_fsaverage()
     plotting.plot_surf(
-        fsaverage.infl_left,
+        fsaverage.pial_left,
         normalized_map,
         cmap=cmap,
         hemi="left",
