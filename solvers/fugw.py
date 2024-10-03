@@ -23,7 +23,6 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "alpha": [0.5],
-        "rho": [float("inf")],
         "eps": [1e-4],
     }
 
