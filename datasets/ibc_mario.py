@@ -27,7 +27,7 @@ class Dataset(BaseDataset):
         self.subjects = [
             "sub-04",
             "sub-06",
-            "sub-08",
+            # "sub-08",
             "sub-09",
             "sub-11",
             "sub-12",

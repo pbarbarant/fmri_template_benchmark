@@ -29,7 +29,7 @@ class Dataset(BaseDataset):
             "sub-05",
             "sub-06",
             "sub-07",
-            "sub-08",
+            # "sub-08",
             "sub-09",
             "sub-11",
             "sub-12",
@@ -54,6 +54,7 @@ class Dataset(BaseDataset):
             ) = load_dataset_surf(subject, data_path, self.mesh_name)
             dict_alignment[subject] = data_alignment
             dict_decoding[subject] = data_decoding
+            print(f"data_alignment: {data_alignment.img.shape}")
 
         # Get the first image to create the masker
         masker_img = next(iter(dict_alignment.values())).img

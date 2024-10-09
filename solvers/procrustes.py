@@ -28,7 +28,7 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "n_parcels": [100],
+        "n_parcels": [100,],
         "clustering": ["ward"],
         "scaling": [True],
     }

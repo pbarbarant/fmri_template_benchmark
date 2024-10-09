@@ -93,6 +93,26 @@ class Objective(BaseObjective):
         )
         return X, y
 
+    def compute_pearson_corr(self, template, dict_aligned, masker):
+        template = masker.transform(template.img)
+        n_vertices = template.shape[1]
+        dict_aligned = {
+            subject: masker.transform(dict_aligned[subject].img)
+            for subject in dict_aligned
+        }
+        pearson_corrs = [
+            np.array(
+                [
+                    np.corrcoef(template[:, i], dict_aligned[subject][:, i])[
+                        0, 1
+                    ]
+                    for i in range(n_vertices)
+                ]
+            ).mean()
+            for subject in dict_aligned
+        ]
+        return pearson_corrs
+
     def evaluate_result(self, aligned_dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
@@ -100,6 +120,12 @@ class Objective(BaseObjective):
         # each benchmark.
 
         template, dict_aligned, solver_name = aligned_dataset
+
+        # Compute the voxel-wise pearson correlation between all subjects
+        # and the template
+        pearson_corrs = self.compute_pearson_corr(
+            template, dict_aligned, self.masker
+        )
 
         # Create cross-validation object on each subject
         groups = self._compute_groups(self.dict_decoding)
@@ -164,6 +190,7 @@ class Objective(BaseObjective):
         return dict(
             value=avg_score,
             cv_scores=cv_scores_svc,
+            pearson_corrs=pearson_corrs,
         )
 
     def get_one_result(self):
