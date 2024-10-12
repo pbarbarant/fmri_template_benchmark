@@ -23,7 +23,7 @@ class Solver(BaseSolver):
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
         "alpha": [0.5],
-        "eps": [1e-4],
+        "eps": [1e-6],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -126,6 +126,7 @@ class Solver(BaseSolver):
             [geometry],
             nits_barycenter=self.nits_barycenter,
             device=device,
+            init_barycenter_geometry=geometry,
             init_barycenter_features=euclidean_mean,
             solver="mm",
             solver_params={
@@ -289,9 +290,7 @@ class Solver(BaseSolver):
         # keyword arguments for `Objective.evaluate_result`
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
-        solver_name = (
-            self.name + f"_alpha_{self.alpha}_eps_{self.eps}"
-        )
+        solver_name = self.name + f"_alpha_{self.alpha}_eps_{self.eps}"
         return dict(
             aligned_dataset=(
                 self.decoding_template,
