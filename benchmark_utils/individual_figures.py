@@ -2,7 +2,6 @@
 import glob
 import os
 from pathlib import Path
-from itertools import product
 from joblib import Parallel, delayed
 
 import matplotlib as mpl
