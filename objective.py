@@ -15,7 +15,7 @@ with safe_import_context() as import_ctx:
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
 
-    from benchmark_utils.utils import (
+    from benchmark_utils.plotting_utils import (
         generate_aligned_dataset_gii,
         generate_template_gii,
     )
