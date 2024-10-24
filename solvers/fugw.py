@@ -22,7 +22,7 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "alpha": [0.5],
+        "alpha": [0.0, 0.25, 0.5, 0.75, 1.0],
         "eps": [1e-6],
     }
 
@@ -53,7 +53,7 @@ class Solver(BaseSolver):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
-        self.nits_barycenter = 10
+        self.nits_barycenter = 2
         self.nits_bcd = 5
         self.nits_uot = 100
         print("Device:", self.device)
