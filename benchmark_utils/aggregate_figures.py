@@ -12,7 +12,7 @@ import numpy as np
 from nilearn import surface, plotting, datasets
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-plt.rcParams["figure.dpi"] = 500
+plt.rcParams["figure.dpi"] = 300
 
 data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
