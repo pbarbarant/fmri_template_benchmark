@@ -3,16 +3,11 @@ import glob
 import os
 from pathlib import Path
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
-import numpy as np
 
-from nilearn import surface, plotting, datasets
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 plt.rcParams["figure.dpi"] = 500
 
