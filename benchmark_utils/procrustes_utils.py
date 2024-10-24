@@ -9,9 +9,9 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 
 from benchmark_utils.utils import (
     mesh_connectivity_matrix,
-    plot_surf_img,
     LabeledImage,
 )
+from benchmark_utils.plotting_utils import plot_surf_img
 
 
 def compute_parcellation(data, mesh=None, clustering="kmeans", n_parcels=10):
