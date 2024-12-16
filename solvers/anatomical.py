@@ -7,6 +7,7 @@ with safe_import_context() as import_ctx:
     import numpy as np
     from benchopt.stopping_criterion import SingleRunCriterion
     from benchmark_utils.utils import LabeledImage
+    from fmralign.template_alignment import TemplateAlignment
 
 
 # The benchmark solvers must be named `Solver` and
@@ -31,8 +32,6 @@ class Solver(BaseSolver):
         self,
         dict_alignment,
         dict_decoding,
-        masker,
-        mesh_name,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
@@ -41,8 +40,7 @@ class Solver(BaseSolver):
         # It is customizable for each benchmark.
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
-        self.masker = masker
-        self.mesh_name = mesh_name
+        self.dict_aligned = dict()
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
@@ -53,25 +51,24 @@ class Solver(BaseSolver):
         # Get the list of subjects
         subject_list = list(self.dict_alignment.keys())
 
-        # Compute the barycenter
-        barycenter_img = self.masker.inverse_transform(
-            np.mean(
-                [
-                    self.masker.transform(self.dict_decoding[subject].img)
-                    for subject in subject_list
-                ],
-                axis=0,
+        # Get the list of images
+        imgs = [self.dict_alignment[subject].img for subject in subject_list]
+
+        # Align the images
+        algo = TemplateAlignment(alignment_method="identity")
+        algo.fit(imgs)
+
+        # Retrieve the parcellation
+        self.labels, self.parcellation_img = algo.get_parcellation()
+
+        # Align the images
+        for i, subject in enumerate(subject_list):
+            self.dict_aligned[subject] = LabeledImage(
+                img=algo.transform(
+                    self.dict_decoding[subject].img, subject_index=i
+                ),
+                y=self.dict_decoding[subject].y,
             )
-        )
-        labels = self.dict_decoding[subject_list[0]].labels
-
-        self.barycenter = LabeledImage(
-            img=barycenter_img,
-            labels=labels,
-        )
-
-        # Align the data
-        self.dict_aligned = self.dict_decoding.copy()
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -81,7 +78,9 @@ class Solver(BaseSolver):
         # it is customizable for each benchmark.
         return dict(
             aligned_dataset=(
-                self.barycenter,
+                self.parcellation_img,
+                self.labels,
+                self.template,
                 self.dict_aligned,
                 self.name,
             ),
