@@ -12,7 +12,7 @@ with safe_import_context() as import_ctx:
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
-    dataset_name = "Simulated"
+    name = "Simulated"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -35,7 +35,7 @@ class Dataset(BaseDataset):
         )
 
     def _sample_labeled_image(self, n_samples):
-        img = generate_random_img((8, 7, 6, n_samples))
+        img, _ = generate_random_img((8, 7, 6, n_samples))
         y = self._sample_labels(n_samples)
         return LabeledImage(
             img=img,
@@ -60,7 +60,7 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(
-            dataset_name=self.dataset_name,
+            dataset_name=self.name,
             dict_alignment=dict_alignment,
             dict_decoding=dict_decoding,
         )
