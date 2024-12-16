@@ -25,7 +25,7 @@ with safe_import_context() as import_ctx:
 # inherit from `BaseObjective` for `benchopt` to work properly.
 class Objective(BaseObjective):
     # Name to select the objective in the CLI and to display the results.
-    name = "fMRI decoding"
+    name = "fMRI template decoding"
 
     # URL of the main repo for this benchmark.
     url = "https://github.com/pbarbarant/fmri_alignment_benchmark"
@@ -57,8 +57,6 @@ class Objective(BaseObjective):
         dataset_name,
         dict_alignment,
         dict_decoding,
-        masker,
-        mesh_name,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
@@ -66,36 +64,32 @@ class Objective(BaseObjective):
         self.dataset_name = dataset_name
         self.dict_alignment = dict_alignment
         self.dict_decoding = dict_decoding
-        self.masker = masker
-        self.mesh_name = mesh_name
 
         print(f"Running on: {dataset_name}")
 
     def _compute_groups(self, subject_dict):
+        n_samples = next(iter(subject_dict.values())).img.shape[-1]
         groups = np.concatenate(
-            [
-                np.repeat(i, subject_dict[subject].img.data.shape[0])
-                for i, subject in enumerate(subject_dict.keys())
-            ]
+            [np.repeat(i, n_samples) for i in range(len(subject_dict.keys()))]
         )
         return groups
 
-    def _compute_X_y(self, subject_dict):
+    def _compute_X_y(self, subject_dict, masker):
         subject_list = list(subject_dict.keys())
         X = np.concatenate(
             [
-                self.masker.transform(subject_dict[subject].img)
+                masker.transform(subject_dict[subject].img)
                 for subject in subject_list
             ]
         )
         y = np.concatenate(
-            [subject_dict[subject].labels for subject in subject_list]
+            [subject_dict[subject].y for subject in subject_list]
         )
         return X, y
 
     def compute_pearson_corr(self, template, dict_aligned, masker):
-        template = masker.transform(template.img)
-        n_vertices = template.shape[1]
+        template_data = masker.transform(template.img)
+        n_vertices = template_data.shape[1]
         dict_aligned = {
             subject: masker.transform(dict_aligned[subject].img)
             for subject in dict_aligned
@@ -103,9 +97,9 @@ class Objective(BaseObjective):
         pearson_corrs = [
             np.array(
                 [
-                    np.corrcoef(template[:, i], dict_aligned[subject][:, i])[
-                        0, 1
-                    ]
+                    np.corrcoef(
+                        template_data[:, i], dict_aligned[subject][:, i]
+                    )[0, 1]
                     for i in range(n_vertices)
                 ]
             ).mean()
@@ -118,13 +112,19 @@ class Objective(BaseObjective):
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
         # each benchmark.
-
-        template, dict_aligned, solver_name = aligned_dataset
+        (
+            parcellation_img,
+            labels,
+            masker,
+            template,
+            dict_aligned,
+            solver_name,
+        ) = aligned_dataset
 
         # Compute the voxel-wise pearson correlation between all subjects
         # and the template
         pearson_corrs = self.compute_pearson_corr(
-            template, dict_aligned, self.masker
+            template, dict_aligned, masker
         )
 
         # Create cross-validation object on each subject
@@ -135,7 +135,7 @@ class Objective(BaseObjective):
             LinearSVC(max_iter=int(self.max_iter), penalty="l2"),
         )
 
-        X, y = self._compute_X_y(dict_aligned)
+        X, y = self._compute_X_y(dict_aligned, masker)
 
         cv_results_svc = cross_validate(
             pipeline_svc,
@@ -156,22 +156,22 @@ class Objective(BaseObjective):
         }
 
         # Plot the template
-        generate_template_gii(
-            template=template,
-            masker=self.masker,
-            solver_name=solver_name,
-            dataset_name=self.dataset_name,
-        )
+        # generate_template_gii(
+        #     template=template,
+        #     masker=self.masker,
+        #     solver_name=solver_name,
+        #     dataset_name=self.dataset_name,
+        # )
 
         # Plot the aligned features
-        generate_aligned_dataset_gii(
-            dict_aligned=dict_aligned,
-            dict_estimators=dict_estimators,
-            solver_name=solver_name,
-            dataset_name=self.dataset_name,
-            subjects_list=list(self.dict_decoding.keys()),
-            masker=self.masker,
-        )
+        # generate_aligned_dataset_gii(
+        #     dict_aligned=dict_aligned,
+        #     dict_estimators=dict_estimators,
+        #     solver_name=solver_name,
+        #     dataset_name=self.dataset_name,
+        #     subjects_list=list(self.dict_decoding.keys()),
+        #     masker=self.masker,
+        # )
 
         cv_scores_dummy = cross_val_score(
             DummyClassifier(strategy="most_frequent"),
@@ -200,6 +200,8 @@ class Objective(BaseObjective):
             aligned_dataset=(
                 None,
                 None,
+                None,
+                None,
                 "Test",
             ),
         )
@@ -213,6 +215,4 @@ class Objective(BaseObjective):
         return dict(
             dict_alignment=self.dict_alignment,
             dict_decoding=self.dict_decoding,
-            masker=self.masker,
-            mesh_name=self.mesh_name,
         )
