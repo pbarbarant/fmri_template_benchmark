@@ -58,17 +58,31 @@ class Solver(BaseSolver):
         algo = TemplateAlignment(alignment_method="identity")
         algo.fit(imgs)
 
-        # Retrieve the parcellation
+        # Retrieve the parcellation, masker
         self.labels, self.parcellation_img = algo.get_parcellation()
+        self.masker = algo.masker
 
         # Align the images
+        template_data = np.zeros_like(
+            self.masker.transform(self.dict_decoding[subject_list[0]].img)
+        )
         for i, subject in enumerate(subject_list):
+            transformed_img = algo.transform(
+                self.dict_decoding[subject].img, subject_index=i
+            )
             self.dict_aligned[subject] = LabeledImage(
-                img=algo.transform(
-                    self.dict_decoding[subject].img, subject_index=i
-                ),
+                img=transformed_img,
                 y=self.dict_decoding[subject].y,
             )
+            template_data += self.masker.transform(transformed_img) / len(
+                subject_list
+            )
+
+        # Generate the template
+        self.template = LabeledImage(
+            img=self.masker.inverse_transform(template_data),
+            y=self.dict_decoding[subject_list[0]].y,
+        )
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -80,6 +94,7 @@ class Solver(BaseSolver):
             aligned_dataset=(
                 self.parcellation_img,
                 self.labels,
+                self.masker,
                 self.template,
                 self.dict_aligned,
                 self.name,
