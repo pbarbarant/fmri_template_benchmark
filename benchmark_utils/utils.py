@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from nilearn import maskers, masking, surface
+from nibabel.nifti1 import Nifti1Image
 from nilearn.experimental.surface._datasets import load_fsaverage
 from nilearn.experimental.surface._surface_image import SurfaceImage
 from scipy.sparse import coo_matrix
@@ -12,8 +13,8 @@ from scipy.sparse import coo_matrix
 
 @dataclass
 class LabeledImage:
-    labels: np.ndarray
-    img: SurfaceImage
+    img: Nifti1Image
+    y: np.ndarray
 
 
 def mesh_connectivity_matrix(coordinates, triangles):
