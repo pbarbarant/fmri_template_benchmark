@@ -10,6 +10,47 @@ with safe_import_context() as import_ctx:
     from fmralign.template_alignment import TemplateAlignment
 
 
+def _compute_template_one_fold(
+    dict_alignment, dict_decoding, masker, clustering_img
+):
+    # Get the list of subjects
+    subject_list = list(dict_alignment.keys())
+
+    # Get the list of images
+    imgs = [dict_alignment[subject].img for subject in subject_list]
+
+    # Align the images
+    algo = TemplateAlignment(
+        alignment_method="identity",
+        mask=masker,
+        clustering=clustering_img,
+    )
+    algo.fit(imgs)
+
+    # Align the images
+    template_data = np.zeros_like(
+        masker.transform(dict_decoding[subject_list[0]].img)
+    )
+    dict_aligned = dict()
+    for i, subject in enumerate(subject_list):
+        transformed_img = algo.transform(
+            dict_decoding[subject].img, subject_index=i
+        )
+        dict_aligned[subject] = LabeledImage(
+            img=transformed_img,
+            y=dict_decoding[subject].y,
+        )
+        template_data += masker.transform(transformed_img) / len(subject_list)
+
+    # Generate the template
+    template = LabeledImage(
+        img=masker.inverse_transform(template_data),
+        y=dict_decoding[subject_list[0]].y,
+    )
+
+    return template, dict_aligned
+
+
 # The benchmark solvers must be named `Solver` and
 # inherit from `BaseSolver` for `benchopt` to work properly.
 class Solver(BaseSolver):
@@ -43,48 +84,6 @@ class Solver(BaseSolver):
         self.masker = masker
         self.clustering_img = clustering_img
 
-    def _compute_template_one_fold(
-        self, dict_alignment, dict_decoding, masker, clustering_img
-    ):
-        # Get the list of subjects
-        subject_list = list(dict_alignment.keys())
-
-        # Get the list of images
-        imgs = [dict_alignment[subject].img for subject in subject_list]
-
-        # Align the images
-        algo = TemplateAlignment(
-            alignment_method="identity",
-            mask=masker,
-            clustering=clustering_img,
-        )
-        algo.fit(imgs)
-
-        # Align the images
-        template_data = np.zeros_like(
-            masker.transform(dict_decoding[subject_list[0]].img)
-        )
-        dict_aligned = dict()
-        for i, subject in enumerate(subject_list):
-            transformed_img = algo.transform(
-                dict_decoding[subject].img, subject_index=i
-            )
-            dict_aligned[subject] = LabeledImage(
-                img=transformed_img,
-                y=dict_decoding[subject].y,
-            )
-            template_data += masker.transform(transformed_img) / len(
-                subject_list
-            )
-
-        # Generate the template
-        template = LabeledImage(
-            img=masker.inverse_transform(template_data),
-            y=dict_decoding[subject_list[0]].y,
-        )
-
-        return template, dict_aligned
-
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
         # It runs the algorithm for a given a number of iterations `n_iter`.
@@ -93,7 +92,7 @@ class Solver(BaseSolver):
         decoding_folds = []
         for fold in self.folds:
             print(f"Running {self.name} solver on fold {fold.name}")
-            template, dict_aligned = self._compute_template_one_fold(
+            template, dict_aligned = _compute_template_one_fold(
                 fold.dict_alignment,
                 fold.dict_decoding,
                 self.masker,
