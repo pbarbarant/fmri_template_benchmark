@@ -5,6 +5,8 @@ from benchopt import BaseObjective, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     import numpy as np
+    import nilearn.image as image
+    from nilearn.datasets import fetch_atlas_schaefer_2018
     from sklearn.dummy import DummyClassifier
     from sklearn.model_selection import (
         LeaveOneGroupOut,
@@ -15,10 +17,19 @@ with safe_import_context() as import_ctx:
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
 
-    from benchmark_utils.plotting_utils import (
-        generate_aligned_dataset_gii,
-        generate_template_gii,
-    )
+
+def fetch_clustering_img(masker, n_rois=300, resolution_mm=1):
+    clustering_img = (
+        masker.transform(
+            fetch_atlas_schaefer_2018(
+                n_rois=n_rois,
+                resolution_mm=resolution_mm,
+            )["maps"]
+        )
+        # Add one to the clustering to avoid having a 0 label
+        + 1
+    ).astype(int)
+    return image.index_img(masker.inverse_transform(clustering_img), 0)
 
 
 # The benchmark objective must be named `Objective` and
@@ -55,15 +66,15 @@ class Objective(BaseObjective):
     def set_data(
         self,
         dataset_name,
-        dict_alignment,
-        dict_decoding,
+        folds,
+        masker,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
         self.dataset_name = dataset_name
-        self.dict_alignment = dict_alignment
-        self.dict_decoding = dict_decoding
+        self.folds = folds
+        self.masker = masker
 
         print(f"Running on: {dataset_name}")
 
@@ -107,28 +118,18 @@ class Objective(BaseObjective):
         ]
         return pearson_corrs
 
-    def evaluate_result(self, aligned_dataset):
-        # The keyword arguments of this function are the keys of the
-        # dictionary returned by `Solver.get_result`. This defines the
-        # benchmark's API to pass solvers' result. This is customizable for
-        # each benchmark.
-        (
-            parcellation_img,
-            labels,
-            masker,
-            template,
-            dict_aligned,
-            solver_name,
-        ) = aligned_dataset
-
+    def _evaluate_one_fold(self, decoding_fold, masker):
         # Compute the voxel-wise pearson correlation between all subjects
         # and the template
+        template = decoding_fold.template
+        dict_aligned = decoding_fold.dict_aligned
+
         pearson_corrs = self.compute_pearson_corr(
             template, dict_aligned, masker
         )
 
         # Create cross-validation object on each subject
-        groups = self._compute_groups(self.dict_decoding)
+        groups = self._compute_groups(dict_aligned)
 
         pipeline_svc = make_pipeline(
             StandardScaler(),
@@ -156,12 +157,7 @@ class Objective(BaseObjective):
         }
 
         # Plot the template
-        # generate_template_gii(
-        #     template=template,
-        #     masker=self.masker,
-        #     solver_name=solver_name,
-        #     dataset_name=self.dataset_name,
-        # )
+        # plot_template()
 
         # Plot the aligned features
         # generate_aligned_dataset_gii(
@@ -169,7 +165,7 @@ class Objective(BaseObjective):
         #     dict_estimators=dict_estimators,
         #     solver_name=solver_name,
         #     dataset_name=self.dataset_name,
-        #     subjects_list=list(self.dict_decoding.keys()),
+        #     subjects_list=list(dict_aligned.keys()),
         #     masker=self.masker,
         # )
 
@@ -185,26 +181,31 @@ class Objective(BaseObjective):
 
         print(f"Average decoding accuracy: {avg_score:.2f}")
         print(f"Chance level: {np.mean(cv_scores_dummy):.2f}")
+
+        return avg_score, cv_scores_svc, pearson_corrs
+
+    def evaluate_result(self, decoding_folds):
+        # The keyword arguments of this function are the keys of the
+        # dictionary returned by `Solver.get_result`. This defines the
+        # benchmark's API to pass solvers' result. This is customizable for
+        # each benchmark.
+
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
+        print("Evaluating decoding folds")
+        for decoding_fold in decoding_folds:
+            # avg_score, cv_scores_svc, pearson_corrs = self._evaluate_one_fold(
+            #     decoding_fold, self.masker
+            # )
+            avg_score = 0.5
         return dict(
             value=avg_score,
-            cv_scores=cv_scores_svc,
-            pearson_corrs=pearson_corrs,
         )
 
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
         # with `self.evaluate_result`. This is mainly for testing purposes.
-        return dict(
-            aligned_dataset=(
-                None,
-                None,
-                None,
-                None,
-                "Test",
-            ),
-        )
+        return None
 
     def get_objective(self):
         # Define the information to pass to each solver to run the benchmark.
@@ -212,7 +213,9 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
+        clustering_img = fetch_clustering_img(self.masker)
         return dict(
-            dict_alignment=self.dict_alignment,
-            dict_decoding=self.dict_decoding,
+            folds=self.folds,
+            masker=self.masker,
+            clustering_img=clustering_img,
         )
