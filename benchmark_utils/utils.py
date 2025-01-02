@@ -4,7 +4,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from nilearn import maskers, masking, surface
+from nilearn import maskers, masking
 from nibabel.nifti1 import Nifti1Image
 from scipy.sparse import coo_matrix
 
