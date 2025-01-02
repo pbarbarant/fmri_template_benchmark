@@ -6,8 +6,6 @@ import pandas as pd
 
 from nilearn import maskers, masking, surface
 from nibabel.nifti1 import Nifti1Image
-from nilearn.experimental.surface._datasets import load_fsaverage
-from nilearn.experimental.surface._surface_image import SurfaceImage
 from scipy.sparse import coo_matrix
 
 
@@ -15,6 +13,20 @@ from scipy.sparse import coo_matrix
 class LabeledImage:
     img: Nifti1Image
     y: np.ndarray
+
+
+@dataclass
+class Fold:
+    name: str
+    dict_alignment: dict
+    dict_decoding: dict
+
+
+@dataclass
+class DecodingFold:
+    name: str
+    template: LabeledImage
+    dict_aligned: dict
 
 
 def mesh_connectivity_matrix(coordinates, triangles):
@@ -77,64 +89,3 @@ def load_mask(data_path, memory):
     )
     mask = maskers.NiftiMasker(connected_mask, memory=memory).fit()
     return mask
-
-
-def project_on_surf(data, mesh_name="fsaverage5"):
-    mesh = load_fsaverage(mesh_name)["pial"]
-    left_data = surface.vol_to_surf(data, mesh.parts["left"]).T
-    right_data = surface.vol_to_surf(data, mesh.parts["right"]).T
-    left_data_sanitized = np.nan_to_num(left_data)
-    right_data_sanitized = np.nan_to_num(right_data)
-    return SurfaceImage(
-        mesh=mesh,
-        data={
-            "left": left_data_sanitized,
-            "right": right_data_sanitized,
-        },
-    )
-
-
-def load_dataset_surf(subject, data_path, mesh_name):
-    data_alignment_left = joblib.load(
-        data_path / "alignment" / f"{subject}_left.pkl"
-    ).T
-    data_alignment_right = joblib.load(
-        data_path / "alignment" / f"{subject}_right.pkl"
-    ).T
-    data_alignment_img = SurfaceImage(
-        mesh=load_fsaverage(mesh_name)["pial"],
-        data={
-            "left": data_alignment_left,
-            "right": data_alignment_right,
-        },
-    )
-
-    data_decoding_left = joblib.load(
-        data_path / "decoding" / f"{subject}_left.pkl"
-    ).T
-    data_decoding_right = joblib.load(
-        data_path / "decoding" / f"{subject}_right.pkl"
-    ).T
-    data_decoding_img = SurfaceImage(
-        mesh=load_fsaverage(mesh_name)["pial"],
-        data={
-            "left": data_decoding_left,
-            "right": data_decoding_right,
-        },
-    )
-
-    labels_decoding = pd.read_csv(
-        data_path / "labels" / f"{subject}.csv",
-        header=None,
-    ).values.ravel()
-
-    alignment_labeled = LabeledImage(
-        img=data_alignment_img,
-        labels=None,
-    )
-
-    decoding_labeled = LabeledImage(
-        img=data_decoding_img,
-        labels=labels_decoding,
-    )
-    return alignment_labeled, decoding_labeled
