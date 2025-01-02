@@ -52,7 +52,7 @@ def _sample_fold(
 
 
 def fetch_fitted_masker():
-    mask_img = load_mni152_brain_mask(resolution=1)
+    mask_img = load_mni152_brain_mask(resolution=2)
     return NiftiMasker(
         mask_img=mask_img, memory="nilearn_cache", memory_level=1
     ).fit()

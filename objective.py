@@ -18,7 +18,7 @@ with safe_import_context() as import_ctx:
     from sklearn.svm import LinearSVC
 
 
-def fetch_clustering_img(masker, n_rois=300, resolution_mm=1):
+def fetch_clustering_img(masker, n_rois=400, resolution_mm=2):
     clustering_img = (
         masker.transform(
             fetch_atlas_schaefer_2018(
