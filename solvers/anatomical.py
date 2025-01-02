@@ -56,7 +56,7 @@ class Solver(BaseSolver):
         algo = TemplateAlignment(
             alignment_method="identity",
             mask=masker,
-            # clustering=clustering_img,
+            clustering=clustering_img,
         )
         algo.fit(imgs)
 
