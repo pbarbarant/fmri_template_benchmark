@@ -4,51 +4,10 @@ from benchopt import BaseSolver, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    import numpy as np
     from benchopt.stopping_criterion import SingleRunCriterion
-    from benchmark_utils.utils import LabeledImage, DecodingFold
+    from benchmark_utils.utils import DecodingFold
+    from benchmark_utils.solver_utils import _compute_template_one_fold
     from fmralign.template_alignment import TemplateAlignment
-
-
-def _compute_template_one_fold(
-    dict_alignment, dict_decoding, masker, clustering_img
-):
-    # Get the list of subjects
-    subject_list = list(dict_alignment.keys())
-
-    # Get the list of images
-    imgs = [dict_alignment[subject].img for subject in subject_list]
-
-    # Align the images
-    algo = TemplateAlignment(
-        alignment_method="identity",
-        mask=masker,
-        clustering=clustering_img,
-    )
-    algo.fit(imgs)
-
-    # Align the images
-    template_data = np.zeros_like(
-        masker.transform(dict_decoding[subject_list[0]].img)
-    )
-    dict_aligned = dict()
-    for i, subject in enumerate(subject_list):
-        transformed_img = algo.transform(
-            dict_decoding[subject].img, subject_index=i
-        )
-        dict_aligned[subject] = LabeledImage(
-            img=transformed_img,
-            y=dict_decoding[subject].y,
-        )
-        template_data += masker.transform(transformed_img) / len(subject_list)
-
-    # Generate the template
-    template = LabeledImage(
-        img=masker.inverse_transform(template_data),
-        y=dict_decoding[subject_list[0]].y,
-    )
-
-    return template, dict_aligned
 
 
 # The benchmark solvers must be named `Solver` and
@@ -89,14 +48,20 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
+        algo = TemplateAlignment(
+            alignment_method="identity",
+            mask=self.masker,
+            clustering=self.clustering_img,
+        )
+        
         decoding_folds = []
         for fold in self.folds:
             print(f"Running {self.name} solver on fold {fold.name}")
             template, dict_aligned = _compute_template_one_fold(
+                algo,
                 fold.dict_alignment,
                 fold.dict_decoding,
                 self.masker,
-                self.clustering_img,
             )
 
             decoding_fold = DecodingFold(
