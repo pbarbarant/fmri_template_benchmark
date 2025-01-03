@@ -27,7 +27,6 @@ class Dataset(BaseDataset):
         self.subjects = ["sub-01", "sub-02", "sub-03"]
         self.n_samples_alignement = 20
         self.n_samples_decoding = 15
-        self.n_parcels = 400
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
