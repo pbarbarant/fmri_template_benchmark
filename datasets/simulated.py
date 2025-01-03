@@ -17,7 +17,9 @@ def _sample_labels(n_samples):
 
 def _sample_labeled_image(n_samples, masker):
     mask_img = masker.mask_img_
-    img = concat_imgs([mask_img] * n_samples)
+    n_voxels = masker.transform(mask_img).shape[1]
+    data = np.random.randn(n_samples, n_voxels)
+    img = masker.inverse_transform(data)
     y = _sample_labels(n_samples)
     return LabeledImage(
         img=img,
