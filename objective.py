@@ -37,7 +37,7 @@ class Objective(BaseObjective):
     name = "fMRI template decoding"
 
     # URL of the main repo for this benchmark.
-    url = "https://github.com/pbarbarant/fmri_alignment_benchmark"
+    url = "https://github.com/pbarbarant/fmri_template_benchmark"
 
     # List of parameters for the objective. The benchmark will consider
     # the cross product for each key in the dictionary.
@@ -45,6 +45,7 @@ class Objective(BaseObjective):
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
         "max_iter": [1e2],
+        "n_parcels": [400],
     }
 
     # List of packages needed to run the benchmark.
@@ -59,7 +60,7 @@ class Objective(BaseObjective):
 
     # Minimal version of benchopt required to run this benchmark.
     # Bump it up if the benchmark depends on a new feature of benchopt.
-    min_benchopt_version = "1.5"
+    min_benchopt_version = "1.6"
 
     def set_data(
         self,
@@ -211,7 +212,7 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
-        clustering_img = fetch_clustering_img(self.masker)
+        clustering_img = fetch_clustering_img(self.masker, n_rois=self.n_parcels)
         return dict(
             folds=self.folds,
             masker=self.masker,
