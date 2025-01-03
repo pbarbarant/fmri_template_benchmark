@@ -6,7 +6,7 @@ from benchopt import BaseDataset, safe_import_context
 with safe_import_context() as import_ctx:
     from benchmark_utils.datasets_utils import (
         fetch_clustering_img,
-        fetch_fitted_masker,
+        fit_mni152_masker,
         sample_fold,
     )
 
@@ -27,6 +27,7 @@ class Dataset(BaseDataset):
         self.subjects = ["sub-01", "sub-02", "sub-03"]
         self.n_samples_alignement = 20
         self.n_samples_decoding = 15
+        self.n_parcels = 400
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -34,7 +35,7 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        masker = fetch_fitted_masker()
+        masker = fit_mni152_masker()
         clustering_img = fetch_clustering_img(masker, n_rois=self.n_parcels)
 
         folds = [
