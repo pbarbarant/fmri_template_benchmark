@@ -7,7 +7,6 @@ with safe_import_context() as import_ctx:
     import numpy as np
     from nilearn.maskers import NiftiMasker
     from nilearn.datasets import load_mni152_brain_mask
-    from nilearn.image import concat_imgs
     from benchmark_utils.utils import LabeledImage, Fold
 
 
