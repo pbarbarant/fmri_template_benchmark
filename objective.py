@@ -26,8 +26,6 @@ def fetch_clustering_img(masker, n_rois=400, resolution_mm=2):
                 resolution_mm=resolution_mm,
             )["maps"]
         )
-        # Add one to the clustering to avoid having a 0 label
-        + 1
     ).astype(int)
     return image.index_img(masker.inverse_transform(clustering_img), 0)
 
