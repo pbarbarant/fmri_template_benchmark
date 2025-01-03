@@ -5,8 +5,6 @@ from benchopt import BaseObjective, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     import numpy as np
-    import nilearn.image as image
-    from nilearn.datasets import fetch_atlas_schaefer_2018
     from sklearn.dummy import DummyClassifier
     from sklearn.model_selection import (
         LeaveOneGroupOut,
@@ -16,19 +14,7 @@ with safe_import_context() as import_ctx:
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
-
-
-def fetch_clustering_img(masker, n_rois=400, resolution_mm=2):
-    clustering_img = (
-        masker.transform(
-            fetch_atlas_schaefer_2018(
-                n_rois=n_rois,
-                resolution_mm=resolution_mm,
-            )["maps"]
-        )
-    ).astype(int)
-    return image.index_img(masker.inverse_transform(clustering_img), 0)
-
+    from benchmark_utils.objective_utils import fetch_clustering_img
 
 # The benchmark objective must be named `Objective` and
 # inherit from `BaseObjective` for `benchopt` to work properly.
