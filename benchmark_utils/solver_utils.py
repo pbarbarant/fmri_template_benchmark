@@ -1,8 +1,12 @@
 import numpy as np
 from benchmark_utils.utils import LabeledImage
 
+
 def _compute_template_one_fold(
-    algo, dict_alignment, dict_decoding, masker,
+    algo,
+    dict_alignment,
+    dict_decoding,
+    masker,
 ):
     # Get the list of subjects
     subject_list = list(dict_alignment.keys())

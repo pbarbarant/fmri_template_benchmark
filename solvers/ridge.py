@@ -54,7 +54,7 @@ class Solver(BaseSolver):
             clustering=self.clustering_img,
             verbose=3,
         )
-        
+
         decoding_folds = []
         for fold in self.folds:
             print(f"Running {self.name} solver on fold {fold.name}")

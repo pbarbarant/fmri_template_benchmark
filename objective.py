@@ -16,6 +16,7 @@ with safe_import_context() as import_ctx:
     from sklearn.svm import LinearSVC
     from benchmark_utils.objective_utils import fetch_clustering_img
 
+
 # The benchmark objective must be named `Objective` and
 # inherit from `BaseObjective` for `benchopt` to work properly.
 class Objective(BaseObjective):
@@ -198,7 +199,9 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
-        clustering_img = fetch_clustering_img(self.masker, n_rois=self.n_parcels)
+        clustering_img = fetch_clustering_img(
+            self.masker, n_rois=self.n_parcels
+        )
         return dict(
             folds=self.folds,
             masker=self.masker,
