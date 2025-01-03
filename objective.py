@@ -14,7 +14,6 @@ with safe_import_context() as import_ctx:
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import LinearSVC
-    from benchmark_utils.objective_utils import fetch_clustering_img
 
 
 # The benchmark objective must be named `Objective` and
@@ -54,6 +53,7 @@ class Objective(BaseObjective):
         dataset_name,
         folds,
         masker,
+        clustering_img,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
@@ -61,6 +61,7 @@ class Objective(BaseObjective):
         self.dataset_name = dataset_name
         self.folds = folds
         self.masker = masker
+        self.clustering_img = clustering_img
 
         print(f"Running on: {dataset_name}")
 
@@ -199,11 +200,8 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
-        clustering_img = fetch_clustering_img(
-            self.masker, n_rois=self.n_parcels
-        )
         return dict(
             folds=self.folds,
             masker=self.masker,
-            clustering_img=clustering_img,
+            clustering_img=self.clustering_img,
         )
