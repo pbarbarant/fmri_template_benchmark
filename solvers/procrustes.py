@@ -4,10 +4,10 @@ from benchopt import BaseSolver, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    import numpy as np
-    from fmralign.template_alignment import TemplateAlignment
     from benchopt.stopping_criterion import SingleRunCriterion
-    from benchmark_utils.utils import LabeledImage
+    from benchmark_utils.utils import DecodingFold
+    from benchmark_utils.solver_utils import _compute_template_one_fold
+    from fmralign.template_alignment import TemplateAlignment
 
 
 # The benchmark solvers must be named `Solver` and
@@ -19,13 +19,7 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {
-        "n_parcels": [
-            3,
-        ],
-        "clustering": ["ward"],
-        "scaling": [True],
-    }
+    parameters = {}
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
@@ -36,64 +30,46 @@ class Solver(BaseSolver):
 
     def set_objective(
         self,
-        dict_alignment,
-        dict_decoding,
+        folds,
+        masker,
+        clustering_img,
     ):
         # Define the information received by each solver from the objective.
         # The arguments of this function are the results of the
         # `Objective.get_objective`. This defines the benchmark's API for
         # passing the objective to the solver.
         # It is customizable for each benchmark.
-        self.dict_alignment = dict_alignment
-        self.dict_decoding = dict_decoding
-        self.dict_aligned = dict()
+        self.folds = folds
+        self.masker = masker
+        self.clustering_img = clustering_img
 
     def run(self, n_iter):
         # This is the function that is called to evaluate the solver.
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
-
-        # Get the list of subjects
-        subject_list = list(self.dict_alignment.keys())
-
-        # Get the list of images
-        imgs = [self.dict_alignment[subject].img for subject in subject_list]
-
-        # Align the images
         algo = TemplateAlignment(
             alignment_method="scaled_orthogonal",
-            n_pieces=self.n_parcels,
-            clustering=self.clustering,
-            # scaling=self.scaling,
+            mask=self.masker,
+            clustering=self.clustering_img,
         )
-        algo.fit(imgs)
-
-        # Retrieve the parcellation, masker
-        self.labels, self.parcellation_img = algo.get_parcellation()
-        self.masker = algo.masker
-
-        # Align the images
-        template_data = np.zeros_like(
-            self.masker.transform(self.dict_decoding[subject_list[0]].img)
-        )
-        for i, subject in enumerate(subject_list):
-            transformed_img = algo.transform(
-                self.dict_decoding[subject].img, subject_index=i
-            )
-            self.dict_aligned[subject] = LabeledImage(
-                img=transformed_img,
-                y=self.dict_decoding[subject].y,
-            )
-            template_data += self.masker.transform(transformed_img) / len(
-                subject_list
+        
+        decoding_folds = []
+        for fold in self.folds:
+            print(f"Running {self.name} solver on fold {fold.name}")
+            template, dict_aligned = _compute_template_one_fold(
+                algo,
+                fold.dict_alignment,
+                fold.dict_decoding,
+                self.masker,
             )
 
-        # Generate the template
-        self.template = LabeledImage(
-            img=self.masker.inverse_transform(template_data),
-            y=self.dict_decoding[subject_list[0]].y,
-        )
+            decoding_fold = DecodingFold(
+                name=fold.name, template=template, dict_aligned=dict_aligned
+            )
+            decoding_folds.append(decoding_fold)
+
+        self.decoding_folds = decoding_folds
 
     def get_result(self):
         # Return the result from one optimization run.
@@ -101,17 +77,6 @@ class Solver(BaseSolver):
         # keyword arguments for `Objective.evaluate_result`
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
-        solver_name = (
-            self.name
-            + f"_{self.clustering}_{self.n_parcels}_sc_{self.scaling}"
-        )
         return dict(
-            aligned_dataset=(
-                self.parcellation_img,
-                self.labels,
-                self.masker,
-                self.template,
-                self.dict_aligned,
-                solver_name,
-            ),
+            decoding_folds=self.decoding_folds,
         )
