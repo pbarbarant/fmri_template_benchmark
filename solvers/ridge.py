@@ -52,7 +52,6 @@ class Solver(BaseSolver):
             alignment_method="ridge_cv",
             mask=self.masker,
             clustering=self.clustering_img,
-            verbose=3,
         )
 
         decoding_folds = []
