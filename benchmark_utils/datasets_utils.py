@@ -2,7 +2,7 @@ import numpy as np
 from benchmark_utils.utils import LabeledImage, Fold
 from nilearn import image
 from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
-from nilearn.masking import NiftiMasker
+from nilearn.maskers import NiftiMasker
 
 
 def fetch_clustering_img(masker, n_rois=400, resolution_mm=2):
@@ -59,7 +59,7 @@ def sample_fold(
     )
 
 
-def fetch_fitted_masker():
+def fit_mni152_masker():
     mask_img = load_mni152_brain_mask(resolution=2)
     return NiftiMasker(
         mask_img=mask_img, memory="nilearn_cache", memory_level=1
