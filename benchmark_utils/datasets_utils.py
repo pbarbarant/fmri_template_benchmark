@@ -3,18 +3,22 @@ from benchmark_utils.utils import LabeledImage, Fold
 from nilearn import image
 from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
 from nilearn.maskers import NiftiMasker
+from ibc_public import utils_data
+from tqdm import tqdm
+
+from joblib import Memory
+
+memory = Memory(
+    "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/nilearn_cache",
+    verbose=0,
+)
 
 
-def fetch_clustering_img(masker, n_rois=400, resolution_mm=2):
-    clustering_img = (
-        masker.transform(
-            fetch_atlas_schaefer_2018(
-                n_rois=n_rois,
-                resolution_mm=resolution_mm,
-            )["maps"]
-        )
-    ).astype(int)
-    return image.index_img(masker.inverse_transform(clustering_img), 0)
+def fetch_clustering_img(masker, n_rois=400):
+    clustering_img = fetch_atlas_schaefer_2018(n_rois=n_rois)["maps"]
+    resampled_img = image.resample_to_img(clustering_img, masker.mask_img_)
+    int_img = masker.inverse_transform(masker.transform(resampled_img).astype(int))
+    return image.index_img(int_img, 0)
 
 
 def _sample_labels(n_samples):
@@ -45,12 +49,8 @@ def sample_fold(
     dict_decoding = dict()
     for subject in subjects:
         # Generate random surface images for each subject.
-        dict_alignment[subject] = _sample_labeled_image(
-            n_samples_alignement, masker
-        )
-        dict_decoding[subject] = _sample_labeled_image(
-            n_samples_decoding, masker
-        )
+        dict_alignment[subject] = _sample_labeled_image(n_samples_alignement, masker)
+        dict_decoding[subject] = _sample_labeled_image(n_samples_decoding, masker)
 
     return Fold(
         name=name,
@@ -59,8 +59,63 @@ def sample_fold(
     )
 
 
-def fit_mni152_masker(resolution=2):
+def fit_mni152_masker(resolution=3):
     mask_img = load_mni152_brain_mask(resolution=resolution)
-    return NiftiMasker(
-        mask_img=mask_img, memory="nilearn_cache", memory_level=1
-    ).fit()
+    return NiftiMasker(mask_img=mask_img, memory="nilearn_cache", memory_level=1).fit()
+
+
+def fit_masker_to_data(img):
+    return NiftiMasker(memory="nilearn_cache", memory_level=1).fit(img)
+
+
+@memory.cache
+def fetch_one_ibc_fold(
+    name="fold-00",
+    subjects=None,
+    task=None,
+):
+    DERIVATIVES = "/data/parietal/store2/data/ibc/3mm"
+    df = utils_data.make_vol_db(
+        derivatives=DERIVATIVES,
+        subject_list=subjects,
+        task_list=[task],
+        acquisition="all",
+    )
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing IBC data"):
+        alignment_df = df[(df.subject == subject) & (df.path.str.contains("ffx"))]
+        decoding_df = df[(df.subject == subject) & ~(df.path.str.contains("ffx"))]
+        dict_alignment[subject] = LabeledImage(
+            img=image.concat_imgs(alignment_df.path.to_list()),
+            y=alignment_df.contrast.to_numpy(),
+        )
+        dict_decoding[subject] = LabeledImage(
+            img=image.concat_imgs(decoding_df.path.to_list()),
+            y=decoding_df.contrast.to_numpy(),
+        )
+    return Fold(
+        name=name,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+    )
+
+
+def check_dataset(folds, masker, clustering_img):
+    assert masker.mask_img_.shape == clustering_img.shape
+    first_subject = list(folds[0].dict_alignment.keys())[0]
+    labels = np.unique(folds[0].dict_alignment[first_subject].y)
+    for fold in folds:
+        for subject in fold.dict_alignment:
+            assert fold.dict_alignment[subject].img.shape[:-1] == masker.mask_img_.shape
+            assert fold.dict_decoding[subject].img.shape[:-1] == masker.mask_img_.shape
+            assert (
+                fold.dict_alignment[subject].y.shape[0]
+                == fold.dict_alignment[subject].img.shape[-1]
+            )
+            assert (
+                fold.dict_decoding[subject].y.shape[0]
+                == fold.dict_decoding[subject].img.shape[-1]
+            )
+            assert np.all(np.isin(fold.dict_alignment[subject].y, labels))
+            assert np.all(np.isin(fold.dict_decoding[subject].y, labels))
