@@ -225,3 +225,34 @@ def fetch_one_hcp_fold(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
     )
+
+
+@memory.cache
+def fetch_one_forrest_fold(
+    name="fold-00",
+    subjects=None,
+):
+    DATA_PATH = Path("/data/parietal/store2/work/tbazeill/forrest/derivatives/")
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing Forrest data"):
+        dict_alignment[subject] = LabeledImage(
+            img=image.load_img(DATA_PATH / f"forrest_{subject}.nii.gz"),
+            y=None,
+        )
+        dict_decoding[subject] = LabeledImage(
+            img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
+            y=pd.read_csv(DATA_PATH / f"{subject}_labels.csv", header=None).to_numpy(),
+        )
+    return Fold(
+        name=name,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+    )
+
+
+def generate_forrest_fold(subjects, n_parcels):
+    folds = [fetch_one_forrest_fold(name="fold-00", subjects=subjects)]
+    masker = fit_masker_to_data(folds[0].dict_alignment[subjects[0]].img)
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+    return folds, masker, clustering_img
