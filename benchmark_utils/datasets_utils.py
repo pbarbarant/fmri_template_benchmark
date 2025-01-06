@@ -1,4 +1,6 @@
 import numpy as np
+import glob
+import pandas as pd
 from benchmark_utils.utils import LabeledImage, Fold
 from nilearn import image
 from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
@@ -157,20 +159,38 @@ def fetch_one_ibc_fold(
 
 
 def generate_ibc_task_fold(task, subjects, n_parcels):
-    folds = [
-        fetch_one_ibc_fold(
-            name="fold-00",
-            subjects=subjects,
-            task=task,
-        )
-    ]
-
+    folds = [fetch_one_ibc_fold(name="fold-00", subjects=subjects, task=task)]
     masker = fit_masker_to_data(folds[0].dict_alignment[subjects[0]].img)
-    clustering_img = fetch_clustering_img(
-        masker,
-        n_rois=n_parcels,
-    )
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
     return folds, masker, clustering_img
+
+
+def make_hcp_db(derivatives, subject_list, task):
+    """Returns a dataframe listing HCP data."""
+    paths = []
+    contrasts = []
+    subjects = []
+    for subject in tqdm(subject_list):
+        zmaps_path = Path(derivatives) / subject / task / "level2/z_maps"
+        if not zmaps_path.exists():
+            raise FileNotFoundError(f"Path {zmaps_path} does not exist.")
+        zmaps = glob.glob(str(zmaps_path / "*.nii.gz"))
+        for path in zmaps:
+            contrast = Path(path).stem.removeprefix("z_").removesuffix(".nii")
+            if contrast.startswith("neg") or "-" in contrast or "_" in contrast:
+                continue
+            else:
+                paths.append(path)
+                contrasts.append(contrast)
+                subjects.append(subject)
+    df = pd.DataFrame(
+        {
+            "path": paths,
+            "subject": subjects,
+            "contrast": contrasts,
+        }
+    )
+    return df
 
 
 def fetch_one_hcp_fold(
@@ -178,8 +198,28 @@ def fetch_one_hcp_fold(
     subjects=None,
     task=None,
 ):
+    DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
+    df = make_hcp_db(
+        derivatives=DERIVATIVES,
+        subject_list=subjects,
+        task=task,
+    )
+
     dict_alignment = dict()
     dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing HCP data"):
+        alignment_df = df[(df.subject == subject)]
+        # Decoding data is the same as alignment data for HCP
+        # since there is only one contrast per subject.
+        decoding_df = df[(df.subject == subject)]
+        dict_alignment[subject] = LabeledImage(
+            img=image.concat_imgs(alignment_df.path.to_list()),
+            y=alignment_df.contrast.to_numpy(),
+        )
+        dict_decoding[subject] = LabeledImage(
+            img=image.concat_imgs(decoding_df.path.to_list()),
+            y=decoding_df.contrast.to_numpy(),
+        )
     return Fold(
         name=name,
         dict_alignment=dict_alignment,
