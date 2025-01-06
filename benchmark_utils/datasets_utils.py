@@ -7,6 +7,7 @@ from ibc_public import utils_data
 from tqdm import tqdm
 
 from joblib import Memory
+from pathlib import Path
 
 memory = Memory(
     "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/nilearn_cache",
@@ -119,3 +120,29 @@ def check_dataset(folds, masker, clustering_img):
             )
             assert np.all(np.isin(fold.dict_alignment[subject].y, labels))
             assert np.all(np.isin(fold.dict_decoding[subject].y, labels))
+
+
+def log_dataset_info(name, folds, clustering_img):
+    """Log the dataset information in a log file in the output folder."""
+    output_folder = Path(__file__).parent.parent / "outputs/logs"
+    output_folder.mkdir(exist_ok=True, parents=True)
+    first_subject = list(folds[0].dict_alignment.keys())[0]
+
+    with open(output_folder / f"{name}.log", "w") as f:
+        f.write(f"Dataset: {name}\n")
+        f.write(f"Number of folds: {len(folds)}\n")
+        f.write(f"Number of subjects: {len(folds[0].dict_alignment)}\n")
+        f.write(f"List of subjects: {list(folds[0].dict_alignment.keys())}\n")
+        f.write(f"Image shape: {clustering_img.shape}\n")
+        f.write(
+            f"Number of parcels: {len(np.unique(clustering_img.get_fdata())) - 1}\n"
+        )
+        f.write(
+            f"List of conditions: {np.unique(folds[0].dict_alignment[first_subject].y)}\n"
+        )
+        f.write(
+            f"Number of alignment samples: {folds[0].dict_alignment[first_subject].img.shape[-1]}\n"
+        )
+        f.write(
+            f"Number of decoding samples: {folds[0].dict_decoding[first_subject].img.shape[-1]}\n"
+        )
