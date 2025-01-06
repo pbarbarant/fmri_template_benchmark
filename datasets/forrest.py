@@ -4,12 +4,11 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from pathlib import Path
-
-    from nilearn.experimental import surface
-
-    from benchmark_utils.config import DATA_PATH_FORREST, MEMORY
-    from benchmark_utils.utils import load_dataset_surf, load_mask
+    from benchmark_utils.datasets_utils import (
+        check_dataset,
+        log_dataset_info,
+        generate_forrest_fold,
+    )
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -36,36 +35,26 @@ class Dataset(BaseDataset):
             "sub-10",
             "sub-11",
         ]
+        self.n_parcels = 400
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
         # to `Objective.set_data`. This defines the benchmark's
         # API to pass data. It is customizable for each benchmark.
-        data_path = Path(DATA_PATH_FORREST)
-
-        # Load the masker object
-        mask = load_mask(data_path, MEMORY)
-
-        dict_alignment = dict()
-        dict_decoding = dict()
-        for subject in self.subjects:
-            print(f"Loading data for subject {subject}")
-            (
-                data_alignment,
-                data_decoding,
-            ) = load_dataset_surf(subject, data_path, mask, self.mesh_name)
-            dict_alignment[subject] = data_alignment
-            dict_decoding[subject] = data_decoding
-
-        # Get the first image to create the masker
-        masker_img = next(iter(dict_alignment.values())).img
-        masker = surface.SurfaceMasker().fit(masker_img)
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
+
+        folds, masker, clustering_img = generate_forrest_fold(
+            subjects=self.subjects,
+            n_parcels=self.n_parcels,
+        )
+
+        check_dataset(folds, masker, clustering_img)
+        log_dataset_info(self.name, folds, clustering_img)
+
         return dict(
             dataset_name=self.name,
-            dict_alignment=dict_alignment,
-            dict_decoding=dict_decoding,
+            folds=folds,
             masker=masker,
-            mesh_name=self.mesh_name,
+            clustering_img=clustering_img,
         )
