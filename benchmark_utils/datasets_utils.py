@@ -104,10 +104,18 @@ def fetch_one_ibc_fold(
 
 def check_dataset(folds, masker, clustering_img):
     assert masker.mask_img_.shape == clustering_img.shape
-    first_subject = list(folds[0].dict_alignment.keys())[0]
-    labels = np.unique(folds[0].dict_alignment[first_subject].y)
     for fold in folds:
+        first_subject = list(fold.dict_alignment.keys())[0]
+        labels = np.unique(fold.dict_alignment[first_subject].y)
+        n_samples_alignment = fold.dict_alignment[first_subject].img.shape[-1]
+        n_samples_decoding = fold.dict_decoding[first_subject].img.shape[-1]
         for subject in fold.dict_alignment:
+            assert (
+                fold.dict_alignment[subject].img.shape[-1] == n_samples_alignment
+            ), "Inconsistent number of samples in alignment"
+            assert (
+                fold.dict_decoding[subject].img.shape[-1] == n_samples_decoding
+            ), "Inconsistent number of samples in decoding"
             assert fold.dict_alignment[subject].img.shape[:-1] == masker.mask_img_.shape
             assert fold.dict_decoding[subject].img.shape[:-1] == masker.mask_img_.shape
             assert (
