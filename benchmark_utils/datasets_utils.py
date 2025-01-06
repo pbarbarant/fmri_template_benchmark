@@ -21,7 +21,7 @@ def check_dataset(folds, masker, clustering_img):
     assert masker.mask_img_.shape == clustering_img.shape
     for fold in folds:
         first_subject = list(fold.dict_alignment.keys())[0]
-        labels = np.unique(fold.dict_alignment[first_subject].y)
+        labels = np.unique(fold.dict_decoding[first_subject].y)
         n_samples_alignment = fold.dict_alignment[first_subject].img.shape[-1]
         n_samples_decoding = fold.dict_decoding[first_subject].img.shape[-1]
         for subject in fold.dict_alignment:
@@ -34,14 +34,9 @@ def check_dataset(folds, masker, clustering_img):
             assert fold.dict_alignment[subject].img.shape[:-1] == masker.mask_img_.shape
             assert fold.dict_decoding[subject].img.shape[:-1] == masker.mask_img_.shape
             assert (
-                fold.dict_alignment[subject].y.shape[0]
-                == fold.dict_alignment[subject].img.shape[-1]
-            )
-            assert (
                 fold.dict_decoding[subject].y.shape[0]
                 == fold.dict_decoding[subject].img.shape[-1]
             )
-            assert np.all(np.isin(fold.dict_alignment[subject].y, labels))
             assert np.all(np.isin(fold.dict_decoding[subject].y, labels))
 
 
@@ -61,7 +56,7 @@ def log_dataset_info(name, folds, clustering_img):
             f"Number of parcels: {len(np.unique(clustering_img.get_fdata())) - 1}\n"
         )
         f.write(
-            f"List of conditions: {np.unique(folds[0].dict_alignment[first_subject].y)}\n"
+            f"List of conditions: {np.unique(folds[0].dict_decoding[first_subject].y)}\n"
         )
         f.write(
             f"Number of alignment samples: {folds[0].dict_alignment[first_subject].img.shape[-1]}\n"
