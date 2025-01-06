@@ -6,9 +6,7 @@ from benchopt import BaseDataset, safe_import_context
 with safe_import_context() as import_ctx:
     from benchmark_utils.datasets_utils import (
         check_dataset,
-        fetch_clustering_img,
-        fetch_one_ibc_fold,
-        fit_masker_to_data,
+        generate_ibc_task_fold,
         log_dataset_info,
     )
 
@@ -45,18 +43,10 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        folds = [
-            fetch_one_ibc_fold(
-                name="fold-00",
-                subjects=self.subjects,
-                task="RSVPLanguage",
-            )
-        ]
-
-        masker = fit_masker_to_data(folds[0].dict_alignment[self.subjects[0]].img)
-        clustering_img = fetch_clustering_img(
-            masker,
-            n_rois=self.n_parcels,
+        folds, masker, clustering_img = generate_ibc_task_fold(
+            task="RSVPLanguage",
+            subjects=self.subjects,
+            n_parcels=self.n_parcels,
         )
 
         check_dataset(folds, masker, clustering_img)
