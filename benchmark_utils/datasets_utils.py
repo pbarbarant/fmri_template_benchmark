@@ -15,6 +15,60 @@ memory = Memory(
 )
 
 
+def check_dataset(folds, masker, clustering_img):
+    assert masker.mask_img_.shape == clustering_img.shape
+    for fold in folds:
+        first_subject = list(fold.dict_alignment.keys())[0]
+        labels = np.unique(fold.dict_alignment[first_subject].y)
+        n_samples_alignment = fold.dict_alignment[first_subject].img.shape[-1]
+        n_samples_decoding = fold.dict_decoding[first_subject].img.shape[-1]
+        for subject in fold.dict_alignment:
+            assert (
+                fold.dict_alignment[subject].img.shape[-1] == n_samples_alignment
+            ), "Inconsistent number of samples in alignment"
+            assert (
+                fold.dict_decoding[subject].img.shape[-1] == n_samples_decoding
+            ), "Inconsistent number of samples in decoding"
+            assert fold.dict_alignment[subject].img.shape[:-1] == masker.mask_img_.shape
+            assert fold.dict_decoding[subject].img.shape[:-1] == masker.mask_img_.shape
+            assert (
+                fold.dict_alignment[subject].y.shape[0]
+                == fold.dict_alignment[subject].img.shape[-1]
+            )
+            assert (
+                fold.dict_decoding[subject].y.shape[0]
+                == fold.dict_decoding[subject].img.shape[-1]
+            )
+            assert np.all(np.isin(fold.dict_alignment[subject].y, labels))
+            assert np.all(np.isin(fold.dict_decoding[subject].y, labels))
+
+
+def log_dataset_info(name, folds, clustering_img):
+    """Log the dataset information in a log file in the output folder."""
+    output_folder = Path(__file__).parent.parent / "outputs/logs"
+    output_folder.mkdir(exist_ok=True, parents=True)
+    first_subject = list(folds[0].dict_alignment.keys())[0]
+
+    with open(output_folder / f"{name}.log", "w") as f:
+        f.write(f"Dataset: {name}\n")
+        f.write(f"Number of folds: {len(folds)}\n")
+        f.write(f"Number of subjects: {len(folds[0].dict_alignment)}\n")
+        f.write(f"List of subjects: {list(folds[0].dict_alignment.keys())}\n")
+        f.write(f"Image shape: {clustering_img.shape}\n")
+        f.write(
+            f"Number of parcels: {len(np.unique(clustering_img.get_fdata())) - 1}\n"
+        )
+        f.write(
+            f"List of conditions: {np.unique(folds[0].dict_alignment[first_subject].y)}\n"
+        )
+        f.write(
+            f"Number of alignment samples: {folds[0].dict_alignment[first_subject].img.shape[-1]}\n"
+        )
+        f.write(
+            f"Number of decoding samples: {folds[0].dict_decoding[first_subject].img.shape[-1]}\n"
+        )
+
+
 def fetch_clustering_img(masker, n_rois=400):
     clustering_img = fetch_atlas_schaefer_2018(n_rois=n_rois)["maps"]
     resampled_img = image.resample_to_img(clustering_img, masker.mask_img_)
@@ -119,55 +173,15 @@ def generate_ibc_task_fold(task, subjects, n_parcels):
     return folds, masker, clustering_img
 
 
-def check_dataset(folds, masker, clustering_img):
-    assert masker.mask_img_.shape == clustering_img.shape
-    for fold in folds:
-        first_subject = list(fold.dict_alignment.keys())[0]
-        labels = np.unique(fold.dict_alignment[first_subject].y)
-        n_samples_alignment = fold.dict_alignment[first_subject].img.shape[-1]
-        n_samples_decoding = fold.dict_decoding[first_subject].img.shape[-1]
-        for subject in fold.dict_alignment:
-            assert (
-                fold.dict_alignment[subject].img.shape[-1] == n_samples_alignment
-            ), "Inconsistent number of samples in alignment"
-            assert (
-                fold.dict_decoding[subject].img.shape[-1] == n_samples_decoding
-            ), "Inconsistent number of samples in decoding"
-            assert fold.dict_alignment[subject].img.shape[:-1] == masker.mask_img_.shape
-            assert fold.dict_decoding[subject].img.shape[:-1] == masker.mask_img_.shape
-            assert (
-                fold.dict_alignment[subject].y.shape[0]
-                == fold.dict_alignment[subject].img.shape[-1]
-            )
-            assert (
-                fold.dict_decoding[subject].y.shape[0]
-                == fold.dict_decoding[subject].img.shape[-1]
-            )
-            assert np.all(np.isin(fold.dict_alignment[subject].y, labels))
-            assert np.all(np.isin(fold.dict_decoding[subject].y, labels))
-
-
-def log_dataset_info(name, folds, clustering_img):
-    """Log the dataset information in a log file in the output folder."""
-    output_folder = Path(__file__).parent.parent / "outputs/logs"
-    output_folder.mkdir(exist_ok=True, parents=True)
-    first_subject = list(folds[0].dict_alignment.keys())[0]
-
-    with open(output_folder / f"{name}.log", "w") as f:
-        f.write(f"Dataset: {name}\n")
-        f.write(f"Number of folds: {len(folds)}\n")
-        f.write(f"Number of subjects: {len(folds[0].dict_alignment)}\n")
-        f.write(f"List of subjects: {list(folds[0].dict_alignment.keys())}\n")
-        f.write(f"Image shape: {clustering_img.shape}\n")
-        f.write(
-            f"Number of parcels: {len(np.unique(clustering_img.get_fdata())) - 1}\n"
-        )
-        f.write(
-            f"List of conditions: {np.unique(folds[0].dict_alignment[first_subject].y)}\n"
-        )
-        f.write(
-            f"Number of alignment samples: {folds[0].dict_alignment[first_subject].img.shape[-1]}\n"
-        )
-        f.write(
-            f"Number of decoding samples: {folds[0].dict_decoding[first_subject].img.shape[-1]}\n"
-        )
+def fetch_one_hcp_fold(
+    name="fold-00",
+    subjects=None,
+    task=None,
+):
+    dict_alignment = dict()
+    dict_decoding = dict()
+    return Fold(
+        name=name,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+    )
