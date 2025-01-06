@@ -102,6 +102,23 @@ def fetch_one_ibc_fold(
     )
 
 
+def generate_ibc_task_fold(task, subjects, n_parcels):
+    folds = [
+        fetch_one_ibc_fold(
+            name="fold-00",
+            subjects=subjects,
+            task=task,
+        )
+    ]
+
+    masker = fit_masker_to_data(folds[0].dict_alignment[subjects[0]].img)
+    clustering_img = fetch_clustering_img(
+        masker,
+        n_rois=n_parcels,
+    )
+    return folds, masker, clustering_img
+
+
 def check_dataset(folds, masker, clustering_img):
     assert masker.mask_img_.shape == clustering_img.shape
     for fold in folds:
