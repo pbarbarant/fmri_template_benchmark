@@ -1,37 +1,42 @@
 import numpy as np
-from benchmark_utils.utils import LabeledImage
+from benchmark_utils.datasets_utils import LabeledImage
 
 
-def _compute_template_one_fold(
+def compute_template(
     algo,
-    dict_alignment,
-    dict_decoding,
-    masker,
+    dataset,
 ):
     # Get the list of subjects
-    subject_list = list(dict_alignment.keys())
+    subject_list = list(dataset.dict_alignment.keys())
 
     # Get the list of images
-    imgs = [dict_alignment[subject].img for subject in subject_list]
+    imgs = [dataset.dict_alignment[subject].img for subject in subject_list]
 
     # Align the images
     algo.fit(imgs)
 
     # Initialize the template
-    template_data = np.zeros_like(masker.transform(dict_decoding[subject_list[0]].img))
+    template_data = np.zeros_like(
+        dataset.masker.transform(dataset.dict_decoding[subject_list[0]].img)
+    )
     dict_aligned = dict()
     for i, subject in enumerate(subject_list):
-        transformed_img = algo.transform(dict_decoding[subject].img, subject_index=i)
+        transformed_img = algo.transform(
+            dataset.dict_decoding[subject].img, subject_index=i
+        )
         dict_aligned[subject] = LabeledImage(
             img=transformed_img,
-            y=dict_decoding[subject].y,
+            y=dataset.dict_decoding[subject].y,
         )
-        template_data += masker.transform(transformed_img) / len(subject_list)
+        template_data += dataset.masker.transform(transformed_img) / len(subject_list)
 
     # Convert the template to a LabeledImage
     template = LabeledImage(
-        img=masker.inverse_transform(template_data),
-        y=dict_decoding[subject_list[0]].y,
+        img=dataset.masker.inverse_transform(template_data),
+        y=dataset.dict_decoding[subject_list[0]].y,
     )
 
-    return template, dict_aligned
+    dataset.template = template
+    dataset.dict_aligned = dict_aligned
+
+    return dataset
