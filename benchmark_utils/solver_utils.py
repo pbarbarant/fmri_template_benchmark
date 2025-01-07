@@ -10,7 +10,7 @@ def compute_template(
     subject_list = list(dataset.dict_alignment.keys())
 
     # Get the list of images
-    imgs = [dataset.dict_alignment[subject].img for subject in subject_list]
+    imgs = [dataset.dict_alignment[subject] for subject in subject_list]
 
     # Align the images
     algo.fit(imgs)
