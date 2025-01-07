@@ -23,14 +23,14 @@ memory = Memory(
 @dataclass
 class LabeledImage:
     img: Nifti1Image
-    y: np.ndarray
+    y: Optional[np.ndarray]
 
 
 @dataclass
 class Dataset:
     name: str
     subjects: List[str]
-    dict_alignment: Dict[str, LabeledImage]
+    dict_alignment: Dict[str, Nifti1Image]
     dict_decoding: Dict[str, LabeledImage]
     masker: NiftiMasker
     clustering_img: Nifti1Image
@@ -42,7 +42,7 @@ def check_init_dataset(dataset: Dataset) -> None:
     """Check that the dataset is correctly initialized."""
     first_subject = list(dataset.dict_alignment.keys())[0]
     labels = np.unique(dataset.dict_decoding[first_subject].y)
-    n_samples_alignment = dataset.dict_alignment[first_subject].img.shape[-1]
+    n_samples_alignment = dataset.dict_alignment[first_subject].shape[-1]
     n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
 
     assert dataset.template is None, "Template should be None at initialization"
@@ -50,14 +50,13 @@ def check_init_dataset(dataset: Dataset) -> None:
 
     for subject in dataset.dict_alignment:
         assert (
-            dataset.dict_alignment[subject].img.shape[-1] == n_samples_alignment
+            dataset.dict_alignment[subject].shape[-1] == n_samples_alignment
         ), "Inconsistent number of samples in alignment"
         assert (
             dataset.dict_decoding[subject].img.shape[-1] == n_samples_decoding
         ), "Inconsistent number of samples in decoding"
         assert (
-            dataset.dict_alignment[subject].img.shape[:-1]
-            == dataset.masker.mask_img_.shape
+            dataset.dict_alignment[subject].shape[:-1] == dataset.masker.mask_img_.shape
         ), "Alignment image shape does not match mask shape"
         assert (
             dataset.dict_decoding[subject].img.shape[:-1]
@@ -90,7 +89,7 @@ def log_dataset_info(dataset: Dataset) -> None:
             f"List of conditions: {np.unique(dataset.dict_decoding[first_subject].y)}\n"
         )
         f.write(
-            f"Number of alignment samples: {dataset.dict_alignment[first_subject].img.shape[-1]}\n"
+            f"Number of alignment samples: {dataset.dict_alignment[first_subject].shape[-1]}\n"
         )
         f.write(
             f"Number of decoding samples: {dataset.dict_decoding[first_subject].img.shape[-1]}\n"
@@ -123,6 +122,7 @@ def _sample_labeled_image(n_samples, masker):
 def sample_dataset(
     name,
     masker,
+    clustering_img,
     subjects,
     n_samples_alignement,
     n_samples_decoding,
@@ -141,7 +141,7 @@ def sample_dataset(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         masker=masker,
-        clustering_img=masker.mask_img_,
+        clustering_img=clustering_img,
     )
 
 
@@ -155,10 +155,11 @@ def fit_masker_to_data(img):
 
 
 @memory.cache
-def fetch_one_ibc_fold(
-    name="fold-00",
+def fetch_ibc(
+    name="IBC",
     subjects=None,
     task=None,
+    n_parcels=400,
 ):
     DERIVATIVES = "/data/parietal/store2/data/ibc/3mm"
     df = utils_data.make_vol_db(
@@ -172,26 +173,23 @@ def fetch_one_ibc_fold(
     for subject in tqdm(subjects, desc="Processing IBC data"):
         alignment_df = df[(df.subject == subject) & (df.path.str.contains("ffx"))]
         decoding_df = df[(df.subject == subject) & ~(df.path.str.contains("ffx"))]
-        dict_alignment[subject] = LabeledImage(
-            img=image.concat_imgs(alignment_df.path.to_list()),
-            y=alignment_df.contrast.to_numpy(),
-        )
+        dict_alignment[subject] = image.concat_imgs(alignment_df.path.to_list())
         dict_decoding[subject] = LabeledImage(
             img=image.concat_imgs(decoding_df.path.to_list()),
             y=decoding_df.contrast.to_numpy(),
         )
-    return Fold(
+
+    masker = fit_masker_to_data(dict_alignment[subjects[0]])
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+
+    return Dataset(
         name=name,
+        subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
     )
-
-
-def generate_ibc_task_fold(task, subjects, n_parcels):
-    folds = [fetch_one_ibc_fold(name="fold-00", subjects=subjects, task=task)]
-    masker = fit_masker_to_data(folds[0].dict_alignment[subjects[0]].img)
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
-    return folds, masker, clustering_img
 
 
 def make_hcp_db(derivatives, subject_list, task):
@@ -222,10 +220,11 @@ def make_hcp_db(derivatives, subject_list, task):
     return df
 
 
-def fetch_one_hcp_fold(
-    name="fold-00",
+def fetch_hcp(
+    name="HCP",
     subjects=None,
     task=None,
+    n_parcels=400,
 ):
     DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
     df = make_hcp_db(
@@ -241,47 +240,51 @@ def fetch_one_hcp_fold(
         # Decoding data is the same as alignment data for HCP
         # since there is only one contrast per subject.
         decoding_df = df[(df.subject == subject)]
-        dict_alignment[subject] = LabeledImage(
-            img=image.concat_imgs(alignment_df.path.to_list()),
-            y=alignment_df.contrast.to_numpy(),
-        )
+        dict_alignment[subject] = image.concat_imgs(alignment_df.path.to_list())
         dict_decoding[subject] = LabeledImage(
             img=image.concat_imgs(decoding_df.path.to_list()),
             y=decoding_df.contrast.to_numpy(),
         )
-    return Fold(
+
+    masker = fit_masker_to_data(dict_alignment[subjects[0]])
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+
+    return Dataset(
         name=name,
+        subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
     )
 
 
 @memory.cache
-def fetch_one_forrest_fold(
-    name="fold-00",
+def fetch_forrest(
+    name="Forrest",
     subjects=None,
+    n_parcels=400,
 ):
     DATA_PATH = Path("/data/parietal/store2/work/tbazeill/forrest/derivatives/")
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Forrest data"):
-        dict_alignment[subject] = LabeledImage(
-            img=image.load_img(DATA_PATH / f"forrest_{subject}.nii.gz"),
-            y=None,
+        dict_alignment[subject] = image.load_img(
+            DATA_PATH / f"forrest_{subject}.nii.gz"
         )
         dict_decoding[subject] = LabeledImage(
             img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
             y=pd.read_csv(DATA_PATH / f"{subject}_labels.csv", header=None).to_numpy(),
         )
-    return Fold(
+
+    masker = fit_masker_to_data(dict_alignment[subjects[0]])
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+
+    return Dataset(
         name=name,
+        subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
     )
-
-
-def generate_forrest_fold(subjects, n_parcels):
-    folds = [fetch_one_forrest_fold(name="fold-00", subjects=subjects)]
-    masker = fit_masker_to_data(folds[0].dict_alignment[subjects[0]].img)
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
-    return folds, masker, clustering_img
