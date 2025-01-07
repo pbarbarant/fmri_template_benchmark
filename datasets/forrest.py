@@ -5,9 +5,9 @@ from benchopt import BaseDataset, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchmark_utils.datasets_utils import (
-        check_dataset,
+        check_init_dataset,
         log_dataset_info,
-        generate_forrest_fold,
+        fetch_forrest,
     )
 
 
@@ -44,17 +44,13 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        folds, masker, clustering_img = generate_forrest_fold(
+        self.dataset = fetch_forrest(
+            name=self.name,
             subjects=self.subjects,
             n_parcels=self.n_parcels,
         )
 
-        check_dataset(folds, masker, clustering_img)
-        log_dataset_info(self.name, folds, clustering_img)
+        check_init_dataset(self.dataset)
+        log_dataset_info(self.dataset)
 
-        return dict(
-            dataset_name=self.name,
-            folds=folds,
-            masker=masker,
-            clustering_img=clustering_img,
-        )
+        return dict(dataset=self.dataset)
