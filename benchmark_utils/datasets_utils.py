@@ -1,12 +1,15 @@
 import numpy as np
 import glob
 import pandas as pd
-from benchmark_utils.utils import LabeledImage, Fold
 from nilearn import image
 from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
 from nilearn.maskers import NiftiMasker
 from ibc_public import utils_data
 from tqdm import tqdm
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+from nibabel import Nifti1Image
+
 
 from joblib import Memory
 from pathlib import Path
@@ -17,52 +20,80 @@ memory = Memory(
 )
 
 
-def check_dataset(folds, masker, clustering_img):
-    assert masker.mask_img_.shape == clustering_img.shape
-    for fold in folds:
-        first_subject = list(fold.dict_alignment.keys())[0]
-        labels = np.unique(fold.dict_decoding[first_subject].y)
-        n_samples_alignment = fold.dict_alignment[first_subject].img.shape[-1]
-        n_samples_decoding = fold.dict_decoding[first_subject].img.shape[-1]
-        for subject in fold.dict_alignment:
-            assert (
-                fold.dict_alignment[subject].img.shape[-1] == n_samples_alignment
-            ), "Inconsistent number of samples in alignment"
-            assert (
-                fold.dict_decoding[subject].img.shape[-1] == n_samples_decoding
-            ), "Inconsistent number of samples in decoding"
-            assert fold.dict_alignment[subject].img.shape[:-1] == masker.mask_img_.shape
-            assert fold.dict_decoding[subject].img.shape[:-1] == masker.mask_img_.shape
-            assert (
-                fold.dict_decoding[subject].y.shape[0]
-                == fold.dict_decoding[subject].img.shape[-1]
-            )
-            assert np.all(np.isin(fold.dict_decoding[subject].y, labels))
+@dataclass
+class LabeledImage:
+    img: Nifti1Image
+    y: np.ndarray
 
 
-def log_dataset_info(name, folds, clustering_img):
+@dataclass
+class Dataset:
+    name: str
+    subjects: List[str]
+    dict_alignment: Dict[str, LabeledImage]
+    dict_decoding: Dict[str, LabeledImage]
+    masker: NiftiMasker
+    clustering_img: Nifti1Image
+    dict_aligned: Optional[Dict[str, LabeledImage]] = None
+    template: Optional[LabeledImage] = None
+
+
+def check_init_dataset(dataset: Dataset) -> None:
+    """Check that the dataset is correctly initialized."""
+    first_subject = list(dataset.dict_alignment.keys())[0]
+    labels = np.unique(dataset.dict_decoding[first_subject].y)
+    n_samples_alignment = dataset.dict_alignment[first_subject].img.shape[-1]
+    n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
+
+    assert dataset.template is None, "Template should be None at initialization"
+    assert dataset.dict_aligned is None, "dict_aligned should be None at initialization"
+
+    for subject in dataset.dict_alignment:
+        assert (
+            dataset.dict_alignment[subject].img.shape[-1] == n_samples_alignment
+        ), "Inconsistent number of samples in alignment"
+        assert (
+            dataset.dict_decoding[subject].img.shape[-1] == n_samples_decoding
+        ), "Inconsistent number of samples in decoding"
+        assert (
+            dataset.dict_alignment[subject].img.shape[:-1]
+            == dataset.masker.mask_img_.shape
+        ), "Alignment image shape does not match mask shape"
+        assert (
+            dataset.dict_decoding[subject].img.shape[:-1]
+            == dataset.masker.mask_img_.shape
+        ), "Decoding image shape does not match mask shape"
+        assert (
+            dataset.dict_decoding[subject].y.shape[0]
+            == dataset.dict_decoding[subject].img.shape[-1]
+        ), "Number of labels does not match number of samples"
+        assert np.all(
+            np.isin(dataset.dict_decoding[subject].y, labels)
+        ), f"Labels in subject {subject} do not match the labels in the first subject"
+
+
+def log_dataset_info(dataset: Dataset) -> None:
     """Log the dataset information in a log file in the output folder."""
     output_folder = Path(__file__).parent.parent / "outputs/logs"
     output_folder.mkdir(exist_ok=True, parents=True)
-    first_subject = list(folds[0].dict_alignment.keys())[0]
+    first_subject = list(dataset.dict_alignment.keys())[0]
 
-    with open(output_folder / f"{name}.log", "w") as f:
-        f.write(f"Dataset: {name}\n")
-        f.write(f"Number of folds: {len(folds)}\n")
-        f.write(f"Number of subjects: {len(folds[0].dict_alignment)}\n")
-        f.write(f"List of subjects: {list(folds[0].dict_alignment.keys())}\n")
-        f.write(f"Image shape: {clustering_img.shape}\n")
+    with open(output_folder / f"{dataset.name}.log", "w") as f:
+        f.write(f"Dataset name: {dataset.name}\n")
+        f.write(f"Number of subjects: {len(dataset.dict_alignment)}\n")
+        f.write(f"List of subjects: {list(dataset.dict_alignment.keys())}\n")
+        f.write(f"Image shape: {dataset.clustering_img.shape}\n")
         f.write(
-            f"Number of parcels: {len(np.unique(clustering_img.get_fdata())) - 1}\n"
+            f"Number of parcels: {len(np.unique(dataset.clustering_img.get_fdata())) - 1}\n"
         )
         f.write(
-            f"List of conditions: {np.unique(folds[0].dict_decoding[first_subject].y)}\n"
+            f"List of conditions: {np.unique(dataset.dict_decoding[first_subject].y)}\n"
         )
         f.write(
-            f"Number of alignment samples: {folds[0].dict_alignment[first_subject].img.shape[-1]}\n"
+            f"Number of alignment samples: {dataset.dict_alignment[first_subject].img.shape[-1]}\n"
         )
         f.write(
-            f"Number of decoding samples: {folds[0].dict_decoding[first_subject].img.shape[-1]}\n"
+            f"Number of decoding samples: {dataset.dict_decoding[first_subject].img.shape[-1]}\n"
         )
 
 
@@ -89,7 +120,7 @@ def _sample_labeled_image(n_samples, masker):
     )
 
 
-def sample_fold(
+def sample_dataset(
     name,
     masker,
     subjects,
@@ -104,10 +135,13 @@ def sample_fold(
         dict_alignment[subject] = _sample_labeled_image(n_samples_alignement, masker)
         dict_decoding[subject] = _sample_labeled_image(n_samples_decoding, masker)
 
-    return Fold(
+    return Dataset(
         name=name,
+        subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=masker.mask_img_,
     )
 
 
