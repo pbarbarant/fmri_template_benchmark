@@ -5,9 +5,11 @@ from benchopt import BaseDataset, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchmark_utils.datasets_utils import (
+        check_init_dataset,
+        log_dataset_info,
         fetch_clustering_img,
         fit_mni152_masker,
-        sample_fold,
+        sample_dataset,
     )
 
 
@@ -38,20 +40,16 @@ class Dataset(BaseDataset):
         masker = fit_mni152_masker()
         clustering_img = fetch_clustering_img(masker, n_rois=self.n_parcels)
 
-        folds = [
-            sample_fold(
-                f"fold-{i:02d}",
-                masker,
-                self.subjects,
-                self.n_samples_alignement,
-                self.n_samples_decoding,
-            )
-            for i in range(2)
-        ]
-
-        return dict(
-            dataset_name=self.name,
-            folds=folds,
+        self.dataset = sample_dataset(
+            name=self.name,
             masker=masker,
             clustering_img=clustering_img,
+            subjects=self.subjects,
+            n_samples_alignement=self.n_samples_alignement,
+            n_samples_decoding=self.n_samples_decoding,
         )
+
+        check_init_dataset(self.dataset)
+        log_dataset_info(self.dataset)
+
+        return dict(dataset=self.dataset)
