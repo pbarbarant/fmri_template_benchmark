@@ -50,20 +50,14 @@ class Objective(BaseObjective):
 
     def set_data(
         self,
-        dataset_name,
-        folds,
-        masker,
-        clustering_img,
+        dataset,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
-        self.dataset_name = dataset_name
-        self.folds = folds
-        self.masker = masker
-        self.clustering_img = clustering_img
+        self.dataset = dataset
 
-        print(f"Running on: {dataset_name}")
+        print(f"Running on: {dataset.name}")
 
     def _compute_groups(self, subject_dict):
         n_samples = next(iter(subject_dict.values())).img.shape[-1]
@@ -75,14 +69,9 @@ class Objective(BaseObjective):
     def _compute_X_y(self, subject_dict, masker):
         subject_list = list(subject_dict.keys())
         X = np.concatenate(
-            [
-                masker.transform(subject_dict[subject].img)
-                for subject in subject_list
-            ]
+            [masker.transform(subject_dict[subject].img) for subject in subject_list]
         )
-        y = np.concatenate(
-            [subject_dict[subject].y for subject in subject_list]
-        )
+        y = np.concatenate([subject_dict[subject].y for subject in subject_list])
         return X, y
 
     def compute_pearson_corr(self, template, dict_aligned, masker):
@@ -95,9 +84,7 @@ class Objective(BaseObjective):
         pearson_corrs = [
             np.array(
                 [
-                    np.corrcoef(
-                        template_data[:, i], dict_aligned[subject][:, i]
-                    )[0, 1]
+                    np.corrcoef(template_data[:, i], dict_aligned[subject][:, i])[0, 1]
                     for i in range(n_vertices)
                 ]
             ).mean()
@@ -111,9 +98,7 @@ class Objective(BaseObjective):
         template = decoding_fold.template
         dict_aligned = decoding_fold.dict_aligned
 
-        pearson_corrs = self.compute_pearson_corr(
-            template, dict_aligned, masker
-        )
+        pearson_corrs = self.compute_pearson_corr(template, dict_aligned, masker)
 
         # Create cross-validation object on each subject
         groups = self._compute_groups(dict_aligned)
@@ -138,9 +123,7 @@ class Objective(BaseObjective):
         fitted_estimators = cv_results_svc["estimator"]
         dict_estimators = {
             subject: estimator
-            for subject, estimator in zip(
-                list(dict_aligned.keys()), fitted_estimators
-            )
+            for subject, estimator in zip(list(dict_aligned.keys()), fitted_estimators)
         }
 
         # Plot the template
@@ -171,7 +154,7 @@ class Objective(BaseObjective):
 
         return avg_score, cv_scores_svc, pearson_corrs
 
-    def evaluate_result(self, decoding_folds):
+    def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
@@ -180,14 +163,8 @@ class Objective(BaseObjective):
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         print("Evaluating decoding folds")
-        for decoding_fold in decoding_folds:
-            # avg_score, cv_scores_svc, pearson_corrs = self._evaluate_one_fold(
-            #     decoding_fold, self.masker
-            # )
-            avg_score = 0.5
-        return dict(
-            value=avg_score,
-        )
+        avg_score = 0.5
+        return dict(value=avg_score)
 
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
@@ -200,8 +177,4 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
-        return dict(
-            folds=self.folds,
-            masker=self.masker,
-            clustering_img=self.clustering_img,
-        )
+        return dict(dataset=self.dataset)
