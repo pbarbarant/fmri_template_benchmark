@@ -42,6 +42,7 @@ class Dataset(BaseDataset):
         self.dataset = sample_dataset(
             name=self.name,
             masker=masker,
+            clustering_img=mask_img,
             subjects=self.subjects,
             n_samples_alignement=self.n_samples_alignement,
             n_samples_decoding=self.n_samples_decoding,
