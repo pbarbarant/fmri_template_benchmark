@@ -66,9 +66,6 @@ def check_init_dataset(dataset: Dataset) -> None:
             dataset.dict_decoding[subject].y.shape[0]
             == dataset.dict_decoding[subject].img.shape[-1]
         ), "Number of labels does not match number of samples"
-        assert np.all(
-            np.isin(dataset.dict_decoding[subject].y, labels)
-        ), f"Labels in subject {subject} do not match the labels in the first subject"
 
 
 def log_dataset_info(dataset: Dataset) -> None:
@@ -220,6 +217,7 @@ def make_hcp_db(derivatives, subject_list, task):
     return df
 
 
+@memory.cache
 def fetch_hcp(
     name="HCP",
     subjects=None,
@@ -276,6 +274,65 @@ def fetch_forrest(
             img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
             y=pd.read_csv(DATA_PATH / f"{subject}_labels.csv", header=None).to_numpy(),
         )
+
+    masker = fit_masker_to_data(dict_alignment[subjects[0]])
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+
+    return Dataset(
+        name=name,
+        subjects=subjects,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
+    )
+
+
+def get_shared1000_idx(subject):
+    df = pd.read_csv(
+        "/data/parietal/store3/data/natural_scenes/info/nsd_stim_info_merged.csv"
+    )
+
+    # Add a column to the dataframe to indicate the subject
+
+    return df[
+        (df["shared1000"] == "True")
+        & (0 < df[f"subject{subject[-1]}_rep1"])
+        & (df[f"subject{subject[-1]}_rep1"] <= 22274)
+    ][f"subject{subject[-1]}_rep1"].to_list()
+
+
+def fetch_nsd(
+    name="NSD",
+    subjects=None,
+    n_parcels=400,
+):
+    DATA_PATH = Path("/data/parietal/store3/data/natural_scenes/")
+
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing NSD data"):
+        labels = np.load(
+            DATA_PATH / f"curated_3mm/{subject}_labels.npy", allow_pickle=True
+        )
+
+        alignment_idx = get_shared1000_idx(subject)
+        decoding_idx = np.setdiff1d(
+            np.arange(len(labels)), alignment_idx, assume_unique=True
+        )
+
+        # dict_alignment[subject] = image.index_img(
+        #     DATA_PATH / f"curated_3mm/{subject}.nii.gz", alignment_idx
+        # )
+        dict_alignment[subject] = None
+        dict_decoding[subject] = LabeledImage(
+            # img=image.index_img(
+            #     DATA_PATH / f"curated_3mm/{subject}.nii.gz", decoding_idx
+            # ),
+            img=None,
+            y=labels[decoding_idx],
+        )
+        print(labels[alignment_idx])
 
     masker = fit_masker_to_data(dict_alignment[subjects[0]])
     clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
