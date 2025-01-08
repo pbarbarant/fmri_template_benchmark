@@ -288,20 +288,6 @@ def fetch_forrest(
     )
 
 
-def get_shared1000_idx(subject):
-    df = pd.read_csv(
-        "/data/parietal/store3/data/natural_scenes/info/nsd_stim_info_merged.csv"
-    )
-
-    # Add a column to the dataframe to indicate the subject
-
-    return df[
-        (df["shared1000"] == "True")
-        & (0 < df[f"subject{subject[-1]}_rep1"])
-        & (df[f"subject{subject[-1]}_rep1"] <= 22274)
-    ][f"subject{subject[-1]}_rep1"].to_list()
-
-
 def fetch_nsd(
     name="NSD",
     subjects=None,
@@ -312,27 +298,8 @@ def fetch_nsd(
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing NSD data"):
-        labels = np.load(
-            DATA_PATH / f"curated_3mm/{subject}_labels.npy", allow_pickle=True
-        )
-
-        alignment_idx = get_shared1000_idx(subject)
-        decoding_idx = np.setdiff1d(
-            np.arange(len(labels)), alignment_idx, assume_unique=True
-        )
-
-        # dict_alignment[subject] = image.index_img(
-        #     DATA_PATH / f"curated_3mm/{subject}.nii.gz", alignment_idx
-        # )
         dict_alignment[subject] = None
-        dict_decoding[subject] = LabeledImage(
-            # img=image.index_img(
-            #     DATA_PATH / f"curated_3mm/{subject}.nii.gz", decoding_idx
-            # ),
-            img=None,
-            y=labels[decoding_idx],
-        )
-        print(labels[alignment_idx])
+        dict_decoding[subject] = LabeledImage(img=None, y=None)
 
     masker = fit_masker_to_data(dict_alignment[subjects[0]])
     clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
