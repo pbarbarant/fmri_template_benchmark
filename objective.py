@@ -4,16 +4,7 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    import numpy as np
-    from sklearn.dummy import DummyClassifier
-    from sklearn.model_selection import (
-        LeaveOneGroupOut,
-        cross_val_score,
-        cross_validate,
-    )
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.svm import LinearSVC
+    from benchmark_utils.decoding_utils import evaluate_dataset
 
 
 # The benchmark objective must be named `Objective` and
@@ -59,101 +50,6 @@ class Objective(BaseObjective):
 
         print(f"Running on: {dataset.name}")
 
-    def _compute_groups(self, subject_dict):
-        n_samples = next(iter(subject_dict.values())).img.shape[-1]
-        groups = np.concatenate(
-            [np.repeat(i, n_samples) for i in range(len(subject_dict.keys()))]
-        )
-        return groups
-
-    def _compute_X_y(self, subject_dict, masker):
-        subject_list = list(subject_dict.keys())
-        X = np.concatenate(
-            [masker.transform(subject_dict[subject].img) for subject in subject_list]
-        )
-        y = np.concatenate([subject_dict[subject].y for subject in subject_list])
-        return X, y
-
-    def compute_pearson_corr(self, template, dict_aligned, masker):
-        template_data = masker.transform(template.img)
-        n_vertices = template_data.shape[1]
-        dict_aligned = {
-            subject: masker.transform(dict_aligned[subject].img)
-            for subject in dict_aligned
-        }
-        pearson_corrs = [
-            np.array(
-                [
-                    np.corrcoef(template_data[:, i], dict_aligned[subject][:, i])[0, 1]
-                    for i in range(n_vertices)
-                ]
-            ).mean()
-            for subject in dict_aligned
-        ]
-        return pearson_corrs
-
-    def _evaluate_one_fold(self, decoding_fold, masker):
-        # Compute the voxel-wise pearson correlation between all subjects
-        # and the template
-        template = decoding_fold.template
-        dict_aligned = decoding_fold.dict_aligned
-
-        pearson_corrs = self.compute_pearson_corr(template, dict_aligned, masker)
-
-        # Create cross-validation object on each subject
-        groups = self._compute_groups(dict_aligned)
-
-        pipeline_svc = make_pipeline(
-            StandardScaler(),
-            LinearSVC(max_iter=int(self.max_iter), penalty="l2"),
-        )
-
-        X, y = self._compute_X_y(dict_aligned, masker)
-
-        cv_results_svc = cross_validate(
-            pipeline_svc,
-            X,
-            y,
-            groups=groups,
-            cv=LeaveOneGroupOut(),
-            n_jobs=10,
-            return_estimator=True,  # This option will return the estimators
-        )
-        cv_scores_svc = cv_results_svc["test_score"]
-        fitted_estimators = cv_results_svc["estimator"]
-        dict_estimators = {
-            subject: estimator
-            for subject, estimator in zip(list(dict_aligned.keys()), fitted_estimators)
-        }
-
-        # Plot the template
-        # plot_template()
-
-        # Plot the aligned features
-        # generate_aligned_dataset_gii(
-        #     dict_aligned=dict_aligned,
-        #     dict_estimators=dict_estimators,
-        #     solver_name=solver_name,
-        #     dataset_name=self.dataset_name,
-        #     subjects_list=list(dict_aligned.keys()),
-        #     masker=self.masker,
-        # )
-
-        cv_scores_dummy = cross_val_score(
-            DummyClassifier(strategy="most_frequent"),
-            X,
-            y,
-            groups=groups,
-            cv=LeaveOneGroupOut(),
-        )
-
-        avg_score = np.mean(cv_scores_svc)
-
-        print(f"Average decoding accuracy: {avg_score:.2f}")
-        print(f"Chance level: {np.mean(cv_scores_dummy):.2f}")
-
-        return avg_score, cv_scores_svc, pearson_corrs
-
     def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
@@ -162,9 +58,17 @@ class Objective(BaseObjective):
 
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
-        print("Evaluating decoding folds")
-        avg_score = 0.5
-        return dict(value=avg_score)
+        self.dataset = dataset
+        print(f"Evaluating on: {dataset.name}")
+        avg_score, chance_level, cv_scores, pearson_corrs = evaluate_dataset(
+            dataset, max_iter=self.max_iter
+        )
+        return dict(
+            value=avg_score,
+            chance_level=chance_level,
+            cv_scores=cv_scores,
+            pearson_corrs=pearson_corrs,
+        )
 
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
