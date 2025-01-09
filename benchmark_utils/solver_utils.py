@@ -28,7 +28,9 @@ def compute_template(
             img=transformed_img,
             y=dataset.dict_decoding[subject].y,
         )
-        template_data += dataset.masker.transform(transformed_img) / len(subject_list)
+        template_data += dataset.masker.transform(transformed_img) / len(
+            subject_list
+        )
 
     # Convert the template to a LabeledImage
     template = LabeledImage(

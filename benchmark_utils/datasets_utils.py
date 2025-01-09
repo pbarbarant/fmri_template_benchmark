@@ -208,13 +208,20 @@ def fetch_ibc(
     )
 
 
-def make_hcp_db(derivatives, subject_list, task):
+def make_hcp_db(
+    derivatives,
+    subject_list,
+    task,
+    phase_encoding="LR",
+):
     """Returns a dataframe listing HCP data."""
     paths = []
     contrasts = []
     subjects = []
     for subject in tqdm(subject_list):
-        zmaps_path = Path(derivatives) / subject / task / "level2/z_maps"
+        zmaps_path = (
+            Path(derivatives) / subject / task / f"{phase_encoding}/z_maps"
+        )
         if not zmaps_path.exists():
             raise FileNotFoundError(f"Path {zmaps_path} does not exist.")
         zmaps = glob.glob(str(zmaps_path / "*.nii.gz"))
@@ -267,7 +274,9 @@ def fetch_hcp(
     for subject in tqdm(subjects, desc="Processing HCP data"):
         sub_alignment_df = alignment_df[(alignment_df.subject == subject)]
         sub_decoding_df = decoding_df[(decoding_df.subject == subject)]
-        dict_alignment[subject] = image.concat_imgs(sub_alignment_df.path.to_list())
+        dict_alignment[subject] = image.concat_imgs(
+            sub_alignment_df.path.to_list()
+        )
         dict_decoding[subject] = LabeledImage(
             img=image.concat_imgs(sub_decoding_df.path.to_list()),
             y=sub_decoding_df.contrast.to_numpy(),
