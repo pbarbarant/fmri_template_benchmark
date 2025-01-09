@@ -317,18 +317,28 @@ def fetch_forrest(
     )
 
 
+@memory.cache
 def fetch_nsd(
     name="NSD",
     subjects=None,
     n_parcels=400,
 ):
-    DATA_PATH = Path("/data/parietal/store3/data/natural_scenes/")
+    DATA_PATH = Path(
+        "/data/parietal/store3/work/pbarbara/datasets/fmralign_benchopt_data/NSD"
+    )
 
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing NSD data"):
-        dict_alignment[subject] = None
-        dict_decoding[subject] = LabeledImage(img=None, y=None)
+        dict_alignment[subject] = image.load_img(
+            DATA_PATH / f"alignment/{subject}.nii.gz"
+        )
+        dict_decoding[subject] = LabeledImage(
+            img=image.load_img(DATA_PATH / f"decoding/{subject}.nii.gz"),
+            y=pd.read_csv(
+                DATA_PATH / f"decoding/{subject}_labels.csv", header=None
+            ).values.flatten(),
+        )
 
     masker = fit_masker_to_data(dict_alignment[subjects[0]])
     clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
