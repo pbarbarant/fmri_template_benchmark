@@ -22,7 +22,7 @@ class Dataset(BaseDataset):
     requirements = []
 
     def __init__(self):
-        self.subjects = [f"sub-{i:02d}" for i in range(1, 9)]
+        self.subjects = [f"subj{i:02d}" for i in range(1, 9)]
         self.n_parcels = 400
 
     def get_data(self):
