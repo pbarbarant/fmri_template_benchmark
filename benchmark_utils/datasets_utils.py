@@ -248,25 +248,29 @@ def fetch_hcp(
     n_parcels=400,
 ):
     DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
-    df = make_hcp_db(
+    alignment_df = make_hcp_db(
         derivatives=DERIVATIVES,
         subject_list=subjects,
         task=task,
+        phase_encoding="LR",
+    )
+
+    decoding_df = make_hcp_db(
+        derivatives=DERIVATIVES,
+        subject_list=subjects,
+        task=task,
+        phase_encoding="RL",
     )
 
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing HCP data"):
-        alignment_df = df[(df.subject == subject)]
-        # Decoding data is the same as alignment data for HCP
-        # since there is only one contrast per subject.
-        decoding_df = df[(df.subject == subject)]
-        dict_alignment[subject] = image.concat_imgs(
-            alignment_df.path.to_list()
-        )
+        sub_alignment_df = alignment_df[(alignment_df.subject == subject)]
+        sub_decoding_df = decoding_df[(decoding_df.subject == subject)]
+        dict_alignment[subject] = image.concat_imgs(sub_alignment_df.path.to_list())
         dict_decoding[subject] = LabeledImage(
-            img=image.concat_imgs(decoding_df.path.to_list()),
-            y=decoding_df.contrast.to_numpy(),
+            img=image.concat_imgs(sub_decoding_df.path.to_list()),
+            y=sub_decoding_df.contrast.to_numpy(),
         )
 
     masker = fit_masker_to_data(dict_alignment[subjects[0]])
