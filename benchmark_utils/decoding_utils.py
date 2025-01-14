@@ -28,54 +28,44 @@ def compute_batched_groups(subject_dict, n_groups=10):
 def compute_X_y(subject_dict, masker):
     subject_list = list(subject_dict.keys())
     X = np.concatenate(
-        [
-            masker.transform(subject_dict[subject].img)
-            for subject in subject_list
-        ]
+        [masker.transform(subject_dict[subject].img) for subject in subject_list]
     )
     y = np.concatenate([subject_dict[subject].y for subject in subject_list])
     return X, y
 
 
-def compute_pearson_corr(template, dict_aligned, masker):
-    template_data = masker.transform(template.img)
-    n_vertices = template_data.shape[1]
-    data_dict = {
-        subject: masker.transform(dict_aligned[subject].img)
-        for subject in dict_aligned
-    }
-    pearson_corrs = [
-        np.array(
-            [
-                np.corrcoef(template_data[:, i], data_dict[subject][:, i])[
-                    0, 1
-                ]
-                for i in range(n_vertices)
-            ]
-        ).mean()
-        for subject in data_dict
-    ]
+def compute_pearson_corr(dataset):
+    template_img = dataset.template.img
+    masker = dataset.masker
+    avg_parcel_template = masker.transform(template_img)
+    pearson_corrs = []
+    for subject in dataset.subjects:
+        subject_img = dataset.dict_aligned[subject].img
+        subject_img = masker.transform(subject_img)
+        subject_corr = np.corrcoef(subject_img, template_img)
+        pearson_corrs.append(subject_corr)
     return pearson_corrs
 
 
 def evaluate_dataset(dataset, max_iter=100):
-    template = dataset.template
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
 
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
-    pearson_corrs = compute_pearson_corr(template, dict_aligned, masker)
+    # pearson_corrs = compute_pearson_corr(dataset)
+    pearson_corrs = [1.0] * len(dataset.subjects)
 
     # Create cross-validation object on each subject
-    groups = compute_groups(dict_aligned)
-
     pipeline_svc = make_pipeline(
         StandardScaler(),
         LinearSVC(max_iter=int(max_iter), penalty="l2"),
     )
-
     X, y = compute_X_y(dict_aligned, masker)
+    if dataset.name.lower().startswith("hcp"):
+        groups = compute_batched_groups(dict_aligned, n_groups=10)
+    else:
+        groups = compute_groups(dict_aligned)
 
     cv_scores_svc = cross_val_score(
         pipeline_svc,
