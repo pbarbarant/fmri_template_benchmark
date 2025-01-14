@@ -6,7 +6,7 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from benchmark_utils.solver_utils import compute_template
-    from fmralign.alignment_methods import OptimalTransportAlignment
+    from fmralign.alignment_methods import POTAlignment
     from fmralign.template_alignment import TemplateAlignment
 
 
@@ -47,7 +47,7 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
         algo = TemplateAlignment(
-            alignment_method=OptimalTransportAlignment(reg=self.reg),
+            alignment_method=POTAlignment(reg=self.reg),
             mask=self.dataset.masker,
             clustering=self.dataset.clustering_img,
         )
