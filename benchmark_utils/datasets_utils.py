@@ -41,7 +41,6 @@ class Dataset:
 def check_init_dataset(dataset: Dataset) -> None:
     """Check that the dataset is correctly initialized."""
     first_subject = list(dataset.dict_alignment.keys())[0]
-    labels = np.unique(dataset.dict_decoding[first_subject].y)
     n_samples_alignment = dataset.dict_alignment[first_subject].shape[-1]
     n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
 
@@ -83,7 +82,7 @@ def log_dataset_info(dataset: Dataset) -> None:
             f"Number of parcels: {len(np.unique(dataset.clustering_img.get_fdata())) - 1}\n"
         )
         f.write(
-            f"List of conditions: {np.unique(dataset.dict_decoding[first_subject].y)}\n"
+            f"List of decoding conditions: {np.unique(dataset.dict_decoding[first_subject].y)}\n"
         )
         f.write(
             f"Number of alignment samples: {dataset.dict_alignment[first_subject].shape[-1]}\n"
@@ -191,9 +190,10 @@ def fetch_ibc(
     )
 
 
+@memory.cache
 def make_hcp_db(
     derivatives,
-    subject_list,
+    input_subjects,
     tasks,
     phase_encoding="LR",
 ):
@@ -201,7 +201,7 @@ def make_hcp_db(
     paths = []
     contrasts = []
     subjects = []
-    if "tasks" == "all":
+    if tasks == "all":
         tasks = [
             "EMOTION",
             "GAMBLING",
@@ -211,6 +211,10 @@ def make_hcp_db(
             "SOCIAL",
             "WM",
         ]
+    if isinstance(input_subjects, int):
+        # Glob all subjects and get the first `subjects` subjects.
+        subject_paths = sorted(glob.glob(derivatives + "**/"))[:input_subjects]
+        subject_list = [Path(path).name for path in subject_paths]
     for task in tasks:
         for subject in tqdm(subject_list):
             zmaps_path = Path(derivatives) / subject / task / f"{phase_encoding}/z_maps"
@@ -232,7 +236,7 @@ def make_hcp_db(
             "contrast": contrasts,
         }
     )
-    return df
+    return df, subject_list
 
 
 @memory.cache
@@ -243,23 +247,23 @@ def fetch_hcp(
     n_parcels=400,
 ):
     DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
-    alignment_df = make_hcp_db(
+    alignment_df, _ = make_hcp_db(
         derivatives=DERIVATIVES,
-        subject_list=subjects,
+        input_subjects=subjects,
         tasks="all",
         phase_encoding="LR",
     )
 
-    decoding_df = make_hcp_db(
+    decoding_df, subject_list = make_hcp_db(
         derivatives=DERIVATIVES,
-        subject_list=subjects,
-        tasks=task,
+        input_subjects=subjects,
+        tasks=[task],
         phase_encoding="RL",
     )
 
     dict_alignment = dict()
     dict_decoding = dict()
-    for subject in tqdm(subjects, desc="Processing HCP data"):
+    for subject in tqdm(subject_list, desc="Processing HCP data"):
         sub_alignment_df = alignment_df[(alignment_df.subject == subject)]
         sub_decoding_df = decoding_df[(decoding_df.subject == subject)]
         dict_alignment[subject] = image.concat_imgs(sub_alignment_df.path.to_list())
@@ -268,12 +272,12 @@ def fetch_hcp(
             y=sub_decoding_df.contrast.to_numpy(),
         )
 
-    masker = fit_masker_to_data(dict_alignment[subjects[0]])
+    masker = fit_masker_to_data(dict_alignment[subject_list[0]])
     clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
 
     return Dataset(
         name=name,
-        subjects=subjects,
+        subjects=subject_list,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         masker=masker,

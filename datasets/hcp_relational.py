@@ -14,7 +14,7 @@ with safe_import_context() as import_ctx:
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
-    name = "HCP_Social"
+    name = "HCP_Relational"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -35,7 +35,7 @@ class Dataset(BaseDataset):
         self.dataset = fetch_hcp(
             name=self.name,
             subjects=int(self.subjects),
-            task="SOCIAL",
+            task="RELATIONAL",
             n_parcels=self.n_parcels,
         )
 

@@ -22,11 +22,7 @@ class Dataset(BaseDataset):
     requirements = []
 
     def __init__(self):
-        self.subjects = [
-            "552544",
-            "553344",
-            "555348",
-        ]
+        self.subjects = 3
         self.n_parcels = 400
 
     def get_data(self):
@@ -38,7 +34,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_hcp(
             name=self.name,
-            subjects=self.subjects,
+            subjects=int(self.subjects),
             task="WM",
             n_parcels=self.n_parcels,
         )
