@@ -7,6 +7,7 @@ from sklearn.model_selection import (
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
+from nilearn.maskers import NiftiLabelsMasker
 
 
 def compute_groups(subject_dict):
@@ -34,17 +35,30 @@ def compute_X_y(subject_dict, masker):
     return X, y
 
 
-def compute_pearson_corr(dataset):
+def compute_pearson_corrs(dataset):
     template_img = dataset.template.img
+    clustering_img = dataset.clustering_img
     masker = dataset.masker
-    avg_parcel_template = masker.transform(template_img)
+    labels_masker = NiftiLabelsMasker(
+        labels_img=clustering_img, mask_img=masker.mask_img_
+    ).fit()
     pearson_corrs = []
     for subject in dataset.subjects:
         subject_img = dataset.dict_aligned[subject].img
-        subject_img = masker.transform(subject_img)
-        subject_corr = np.corrcoef(subject_img, template_img)
+        subject_corr = pearson_corr_parcels(subject_img, template_img, labels_masker)
         pearson_corrs.append(subject_corr)
     return pearson_corrs
+
+
+def pearson_corr_parcels(img1, img2, labels_masker):
+    """Compute the Pearson correlation between two images
+    by averaging the signal in each parcel."""
+    data1 = labels_masker.transform(img1)
+    data2 = labels_masker.transform(img2)
+    n_parcels = data1.shape[1]
+    return np.mean(
+        [np.corrcoef(data1[:, i], data2[:, i])[0, 1] for i in range(n_parcels)]
+    )
 
 
 def evaluate_dataset(dataset, max_iter=100):
@@ -53,8 +67,7 @@ def evaluate_dataset(dataset, max_iter=100):
 
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
-    # pearson_corrs = compute_pearson_corr(dataset)
-    pearson_corrs = [1.0] * len(dataset.subjects)
+    pearson_corrs = compute_pearson_corrs(dataset)
 
     # Create cross-validation object on each subject
     pipeline_svc = make_pipeline(
