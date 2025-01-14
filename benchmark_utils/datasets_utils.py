@@ -45,12 +45,8 @@ def check_init_dataset(dataset: Dataset) -> None:
     n_samples_alignment = dataset.dict_alignment[first_subject].shape[-1]
     n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
 
-    assert (
-        dataset.template is None
-    ), "Template should be None at initialization"
-    assert (
-        dataset.dict_aligned is None
-    ), "dict_aligned should be None at initialization"
+    assert dataset.template is None, "Template should be None at initialization"
+    assert dataset.dict_aligned is None, "dict_aligned should be None at initialization"
 
     for subject in dataset.dict_alignment:
         assert (
@@ -60,8 +56,7 @@ def check_init_dataset(dataset: Dataset) -> None:
             dataset.dict_decoding[subject].img.shape[-1] == n_samples_decoding
         ), "Inconsistent number of samples in decoding"
         assert (
-            dataset.dict_alignment[subject].shape[:-1]
-            == dataset.masker.mask_img_.shape
+            dataset.dict_alignment[subject].shape[:-1] == dataset.masker.mask_img_.shape
         ), "Alignment image shape does not match mask shape"
         assert (
             dataset.dict_decoding[subject].img.shape[:-1]
@@ -101,9 +96,7 @@ def log_dataset_info(dataset: Dataset) -> None:
 def fetch_clustering_img(masker, n_rois=400):
     clustering_img = fetch_atlas_schaefer_2018(n_rois=n_rois)["maps"]
     resampled_img = image.resample_to_img(clustering_img, masker.mask_img_)
-    int_img = masker.inverse_transform(
-        masker.transform(resampled_img).astype(int)
-    )
+    int_img = masker.inverse_transform(masker.transform(resampled_img).astype(int))
     return image.index_img(int_img, 0)
 
 
@@ -139,9 +132,7 @@ def sample_dataset(
         dict_alignment[subject] = _sample_labeled_image(
             n_samples_alignement, masker
         ).img
-        dict_decoding[subject] = _sample_labeled_image(
-            n_samples_decoding, masker
-        )
+        dict_decoding[subject] = _sample_labeled_image(n_samples_decoding, masker)
 
     return Dataset(
         name=name,
@@ -155,9 +146,7 @@ def sample_dataset(
 
 def fit_mni152_masker(resolution=3):
     mask_img = load_mni152_brain_mask(resolution=resolution)
-    return NiftiMasker(
-        mask_img=mask_img, memory="nilearn_cache", memory_level=1
-    ).fit()
+    return NiftiMasker(mask_img=mask_img, memory="nilearn_cache", memory_level=1).fit()
 
 
 def fit_masker_to_data(img):
@@ -181,15 +170,9 @@ def fetch_ibc(
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing IBC data"):
-        alignment_df = df[
-            (df.subject == subject) & (df.path.str.contains("ffx"))
-        ]
-        decoding_df = df[
-            (df.subject == subject) & ~(df.path.str.contains("ffx"))
-        ]
-        dict_alignment[subject] = image.concat_imgs(
-            alignment_df.path.to_list()
-        )
+        alignment_df = df[(df.subject == subject) & (df.path.str.contains("ffx"))]
+        decoding_df = df[(df.subject == subject) & ~(df.path.str.contains("ffx"))]
+        dict_alignment[subject] = image.concat_imgs(alignment_df.path.to_list())
         dict_decoding[subject] = LabeledImage(
             img=image.concat_imgs(decoding_df.path.to_list()),
             y=decoding_df.contrast.to_numpy(),
@@ -211,32 +194,29 @@ def fetch_ibc(
 def make_hcp_db(
     derivatives,
     subject_list,
-    task,
+    tasks,
     phase_encoding="LR",
 ):
     """Returns a dataframe listing HCP data."""
     paths = []
     contrasts = []
     subjects = []
-    for subject in tqdm(subject_list):
-        zmaps_path = (
-            Path(derivatives) / subject / task / f"{phase_encoding}/z_maps"
-        )
-        if not zmaps_path.exists():
-            raise FileNotFoundError(f"Path {zmaps_path} does not exist.")
-        zmaps = glob.glob(str(zmaps_path / "*.nii.gz"))
-        for path in zmaps:
-            contrast = Path(path).stem.removeprefix("z_").removesuffix(".nii")
-            if (
-                contrast.startswith("neg")
-                or "-" in contrast
-                or "_" in contrast
-            ):
-                continue
-            else:
-                paths.append(path)
-                contrasts.append(contrast)
-                subjects.append(subject)
+    if isinstance(tasks, str):
+        tasks = [tasks]
+    for task in tasks:
+        for subject in tqdm(subject_list):
+            zmaps_path = Path(derivatives) / subject / task / f"{phase_encoding}/z_maps"
+            if not zmaps_path.exists():
+                raise FileNotFoundError(f"Path {zmaps_path} does not exist.")
+            zmaps = glob.glob(str(zmaps_path / "*.nii.gz"))
+            for path in zmaps:
+                contrast = Path(path).stem.removeprefix("z_").removesuffix(".nii")
+                if contrast.startswith("neg") or "-" in contrast or "_" in contrast:
+                    continue
+                else:
+                    paths.append(path)
+                    contrasts.append(contrast)
+                    subjects.append(subject)
     df = pd.DataFrame(
         {
             "path": paths,
@@ -274,9 +254,7 @@ def fetch_hcp(
     for subject in tqdm(subjects, desc="Processing HCP data"):
         sub_alignment_df = alignment_df[(alignment_df.subject == subject)]
         sub_decoding_df = decoding_df[(decoding_df.subject == subject)]
-        dict_alignment[subject] = image.concat_imgs(
-            sub_alignment_df.path.to_list()
-        )
+        dict_alignment[subject] = image.concat_imgs(sub_alignment_df.path.to_list())
         dict_decoding[subject] = LabeledImage(
             img=image.concat_imgs(sub_decoding_df.path.to_list()),
             y=sub_decoding_df.contrast.to_numpy(),
@@ -301,9 +279,7 @@ def fetch_forrest(
     subjects=None,
     n_parcels=400,
 ):
-    DATA_PATH = Path(
-        "/data/parietal/store2/work/tbazeill/forrest/derivatives/"
-    )
+    DATA_PATH = Path("/data/parietal/store2/work/tbazeill/forrest/derivatives/")
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Forrest data"):
@@ -312,9 +288,7 @@ def fetch_forrest(
         )
         dict_decoding[subject] = LabeledImage(
             img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
-            y=pd.read_csv(
-                DATA_PATH / f"{subject}_labels.csv", header=None
-            ).to_numpy(),
+            y=pd.read_csv(DATA_PATH / f"{subject}_labels.csv", header=None).to_numpy(),
         )
 
     masker = fit_masker_to_data(dict_alignment[subjects[0]])
