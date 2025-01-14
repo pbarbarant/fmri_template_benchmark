@@ -17,6 +17,14 @@ def compute_groups(subject_dict):
     return groups
 
 
+def compute_batched_groups(subject_dict, n_groups=10):
+    n_samples = next(iter(subject_dict.values())).img.shape[-1]
+    n_subjects = len(subject_dict.keys())
+    batch_len = n_samples * n_subjects // n_groups
+    groups = np.concatenate([np.repeat(i, batch_len) for i in range(n_groups)])
+    return groups
+
+
 def compute_X_y(subject_dict, masker):
     subject_list = list(subject_dict.keys())
     X = np.concatenate(
