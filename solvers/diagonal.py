@@ -47,6 +47,7 @@ class Solver(BaseSolver):
             alignment_method="diagonal",
             mask=self.dataset.masker,
             clustering=self.dataset.clustering_img,
+            n_jobs=-1,
         )
 
         self.dataset = compute_template(

@@ -50,6 +50,7 @@ class Solver(BaseSolver):
             alignment_method=POTAlignment(reg=self.reg),
             mask=self.dataset.masker,
             clustering=self.dataset.clustering_img,
+            n_jobs=-1,
         )
 
         self.dataset = compute_template(
