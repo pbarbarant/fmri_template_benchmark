@@ -29,7 +29,10 @@ def compute_batched_groups(subject_dict, n_groups=10):
 def compute_X_y(subject_dict, masker):
     subject_list = list(subject_dict.keys())
     X = np.concatenate(
-        [masker.transform(subject_dict[subject].img) for subject in subject_list]
+        [
+            masker.transform(subject_dict[subject].img)
+            for subject in subject_list
+        ]
     )
     y = np.concatenate([subject_dict[subject].y for subject in subject_list])
     return X, y
@@ -45,7 +48,9 @@ def compute_pearson_corrs(dataset):
     pearson_corrs = []
     for subject in dataset.subjects:
         subject_img = dataset.dict_aligned[subject].img
-        subject_corr = pearson_corr_parcels(subject_img, template_img, labels_masker)
+        subject_corr = pearson_corr_parcels(
+            subject_img, template_img, labels_masker
+        )
         pearson_corrs.append(subject_corr)
     return pearson_corrs
 
