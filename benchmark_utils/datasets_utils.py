@@ -191,9 +191,36 @@ def fetch_ibc(
 
 
 @memory.cache
+def get_valid_subjects_list(derivatives):
+    """Check which subjects have all the tasks."""
+    tasks = [
+        "EMOTION",
+        "GAMBLING",
+        "LANGUAGE",
+        "MOTOR",
+        "RELATIONAL",
+        "SOCIAL",
+        "WM",
+    ]
+    valid_subject_list = []
+    subject_paths = sorted(glob.glob(derivatives + "**/"))
+    subject_list = [Path(path).name for path in subject_paths]
+    for subject in tqdm(subject_list, desc="Validating HCP data"):
+        for task in tasks:
+            lr_zmaps_path = Path(derivatives) / subject / task / "LR/z_maps"
+            rl_zmaps_path = Path(derivatives) / subject / task / "RL/z_maps"
+            if not lr_zmaps_path.exists() or not rl_zmaps_path.exists():
+                break
+        else:
+            valid_subject_list.append(subject)
+
+    return valid_subject_list
+
+
+@memory.cache
 def make_hcp_db(
     derivatives,
-    input_subjects,
+    subject_list,
     tasks,
     phase_encoding="LR",
 ):
@@ -211,12 +238,8 @@ def make_hcp_db(
             "SOCIAL",
             "WM",
         ]
-    if isinstance(input_subjects, int):
-        # Glob all subjects and get the first `subjects` subjects.
-        subject_paths = sorted(glob.glob(derivatives + "**/"))[:input_subjects]
-        subject_list = [Path(path).name for path in subject_paths]
-    for task in tasks:
-        for subject in tqdm(subject_list):
+    for subject in tqdm(subject_list, desc="Loading HCP data"):
+        for task in tasks:
             zmaps_path = Path(derivatives) / subject / task / f"{phase_encoding}/z_maps"
             if not zmaps_path.exists():
                 raise FileNotFoundError(f"Path {zmaps_path} does not exist.")
@@ -229,6 +252,7 @@ def make_hcp_db(
                     paths.append(path)
                     contrasts.append(contrast)
                     subjects.append(subject)
+
     df = pd.DataFrame(
         {
             "path": paths,
@@ -236,27 +260,29 @@ def make_hcp_db(
             "contrast": contrasts,
         }
     )
-    return df, subject_list
+    return df
 
 
 @memory.cache
 def fetch_hcp(
     name="HCP",
-    subjects=None,
+    n_subjects=None,
     task=None,
     n_parcels=400,
 ):
     DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
-    alignment_df, _ = make_hcp_db(
+    valid_subjects_list = get_valid_subjects_list(DERIVATIVES)
+    subject_list = valid_subjects_list[:n_subjects]
+    alignment_df = make_hcp_db(
         derivatives=DERIVATIVES,
-        input_subjects=subjects,
+        subject_list=subject_list,
         tasks="all",
         phase_encoding="LR",
     )
 
-    decoding_df, subject_list = make_hcp_db(
+    decoding_df = make_hcp_db(
         derivatives=DERIVATIVES,
-        input_subjects=subjects,
+        subject_list=subject_list,
         tasks=[task],
         phase_encoding="RL",
     )
