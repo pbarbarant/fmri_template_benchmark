@@ -201,8 +201,16 @@ def make_hcp_db(
     paths = []
     contrasts = []
     subjects = []
-    if isinstance(tasks, str):
-        tasks = [tasks]
+    if "tasks" == "all":
+        tasks = [
+            "EMOTION",
+            "GAMBLING",
+            "LANGUAGE",
+            "MOTOR",
+            "RELATIONAL",
+            "SOCIAL",
+            "WM",
+        ]
     for task in tasks:
         for subject in tqdm(subject_list):
             zmaps_path = Path(derivatives) / subject / task / f"{phase_encoding}/z_maps"
@@ -238,14 +246,14 @@ def fetch_hcp(
     alignment_df = make_hcp_db(
         derivatives=DERIVATIVES,
         subject_list=subjects,
-        task=task,
+        tasks="all",
         phase_encoding="LR",
     )
 
     decoding_df = make_hcp_db(
         derivatives=DERIVATIVES,
         subject_list=subjects,
-        task=task,
+        tasks=task,
         phase_encoding="RL",
     )
 
