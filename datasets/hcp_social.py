@@ -22,7 +22,7 @@ class Dataset(BaseDataset):
     requirements = []
 
     def __init__(self):
-        self.subjects = 3
+        self.subjects = 100
         self.n_parcels = 400
 
     def get_data(self):
