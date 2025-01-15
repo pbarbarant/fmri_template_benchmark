@@ -1,5 +1,6 @@
 import numpy as np
 from benchmark_utils.datasets_utils import LabeledImage
+from pathlib import Path
 
 
 def compute_template(
@@ -38,7 +39,17 @@ def compute_template(
         y=dataset.dict_decoding[subject_list[0]].y,
     )
 
+    # Save the template
+    save_template(template, dataset.name)
+
     dataset.template = template
     dataset.dict_aligned = dict_aligned
 
     return dataset
+
+
+def save_template(template, dataset_name):
+    output_dir = Path("outputs") / dataset_name
+    output_dir.mkdir(exist_ok=True, parents=True)
+    template_img = template.img
+    template_img.to_filename(output_dir / "template.nii.gz")
