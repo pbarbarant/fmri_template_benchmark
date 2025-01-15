@@ -44,12 +44,12 @@ def check_init_dataset(dataset: Dataset) -> None:
     n_samples_alignment = dataset.dict_alignment[first_subject].shape[-1]
     n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
 
-    assert (
-        dataset.template is None
-    ), "Template should be None at initialization"
-    assert (
-        dataset.dict_aligned is None
-    ), "dict_aligned should be None at initialization"
+    assert dataset.template is None, (
+        "Template should be None at initialization"
+    )
+    assert dataset.dict_aligned is None, (
+        "dict_aligned should be None at initialization"
+    )
 
     for subject in dataset.dict_alignment:
         assert (
@@ -401,6 +401,63 @@ def fetch_nsd(
 
     return Dataset(
         name=name,
+        subjects=subjects,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
+    )
+
+
+def load_budapest_img_labels(image_path):
+    img = image.load_img(image_path)
+    img_len = img.shape[-1]
+    n_chunks = img_len // 15
+    indices = np.concatenate(
+        [np.arange(i * 15, i * 15 + 5) for i in range(n_chunks)]
+    )
+    y = np.arange(n_chunks).repeat(5)
+    return image.index_img(img, indices), y
+
+
+@memory.cache
+def fetch_budapest(
+    n_parcels=400,
+    lo_run=1,
+):
+    DATA_PATH = Path("/data/parietal/store3/data/budapest/ds003017/")
+
+    # Fetch subjects
+    subjects = sorted([p.name for p in DATA_PATH.glob("sub-*")])
+
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing Budapest data"):
+        alignment_imgs = []
+        for run in range(1, 5):
+            if run == lo_run:
+                img, y = load_budapest_img_labels(
+                    DATA_PATH
+                    / subject
+                    / "func"
+                    / f"{subject}_task-movie_run-{run:02d}_bold.nii.gz"
+                )
+                dict_decoding[subject] = LabeledImage(img=img, y=y)
+            else:
+                img = image.load_img(
+                    DATA_PATH
+                    / subject
+                    / "func"
+                    / f"{subject}_task-movie_run-{run:02d}_bold.nii.gz"
+                )
+                alignment_imgs.append(img)
+        dict_alignment[subject] = image.concat_imgs(alignment_imgs)
+
+    masker = fit_masker_to_data(dict_alignment[subjects[0]])
+    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+
+    return Dataset(
+        name=f"Budapest_run-{run:02d}",
         subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
