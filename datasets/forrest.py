@@ -45,7 +45,6 @@ class Dataset(BaseDataset):
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
         self.dataset = fetch_forrest(
-            name=self.name,
             subjects=self.subjects,
             n_parcels=self.n_parcels,
         )
