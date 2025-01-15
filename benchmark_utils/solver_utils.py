@@ -48,8 +48,8 @@ def compute_template(
     return dataset
 
 
-def save_template(template, dataset_name):
-    output_dir = Path("outputs") / dataset_name
+def save_template(template, dataset_name, solver_name):
+    output_dir = Path("outputs") / dataset_name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
     template_img = template.img
     template_img.to_filename(output_dir / "template.nii.gz")
