@@ -457,7 +457,7 @@ def fetch_budapest(
     clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
 
     return Dataset(
-        name=f"Budapest_run-{run:02d}",
+        name=f"Budapest_run-{lo_run:02d}",
         subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
