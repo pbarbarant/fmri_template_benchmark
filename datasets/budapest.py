@@ -20,7 +20,7 @@ class Dataset(BaseDataset):
     # the cross product for each key in the dictionary.
     # Any parameters 'param' defined here is available as `self.param`.
     parameters = {
-        "left_out_runs": [1],
+        "left_out_run": [1, 2, 3, 4, 5],
     }
 
     # List of packages needed to run the dataset. See the corresponding
@@ -36,7 +36,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_budapest(
             n_parcels=400,
-            lo_run=self.left_out_runs,
+            lo_run=self.left_out_run,
         )
 
         check_init_dataset(self.dataset)
