@@ -340,7 +340,6 @@ def fetch_hcp(
 
 @memory.cache
 def fetch_forrest(
-    name="Forrest",
     subjects=None,
     n_parcels=400,
 ):
@@ -351,10 +350,10 @@ def fetch_forrest(
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Forrest data"):
         dict_alignment[subject] = image.load_img(
-            DATA_PATH / f"forrest_{subject}.nii.gz"
+            DATA_PATH / f"gm_3mm_{subject}.nii.gz"
         )
         dict_decoding[subject] = LabeledImage(
-            img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
+            img=image.load_img(DATA_PATH / f"forrest_gm_3mm_{subject}.nii.gz"),
             y=pd.read_csv(
                 DATA_PATH / f"{subject}_labels.csv", header=None
             ).to_numpy(),
@@ -364,7 +363,7 @@ def fetch_forrest(
     clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
 
     return Dataset(
-        name=name,
+        name="Forrest",
         subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
