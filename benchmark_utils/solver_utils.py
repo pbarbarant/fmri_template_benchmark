@@ -6,6 +6,7 @@ from pathlib import Path
 def compute_template(
     algo,
     dataset,
+    solver_name,
 ):
     # Get the list of subjects
     subject_list = list(dataset.dict_alignment.keys())
@@ -29,9 +30,7 @@ def compute_template(
             img=transformed_img,
             y=dataset.dict_decoding[subject].y,
         )
-        template_data += dataset.masker.transform(transformed_img) / len(
-            subject_list
-        )
+        template_data += dataset.masker.transform(transformed_img) / len(subject_list)
 
     # Convert the template to a LabeledImage
     template = LabeledImage(
@@ -40,7 +39,7 @@ def compute_template(
     )
 
     # Save the template
-    save_template(template, dataset.name)
+    save_template(template, dataset.name, solver_name)
 
     dataset.template = template
     dataset.dict_aligned = dict_aligned
