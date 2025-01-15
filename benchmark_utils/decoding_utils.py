@@ -91,6 +91,7 @@ def evaluate_dataset(dataset, max_iter=100):
         y,
         groups=groups,
         cv=LeaveOneGroupOut(),
+        n_jobs=-1,
     )
 
     cv_scores_dummy = cross_val_score(
@@ -99,6 +100,7 @@ def evaluate_dataset(dataset, max_iter=100):
         y,
         groups=groups,
         cv=LeaveOneGroupOut(),
+        n_jobs=-1,
     )
 
     avg_score = np.mean(cv_scores_svc)
