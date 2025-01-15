@@ -1,4 +1,4 @@
-slurm_time: 02:00:00        # max runtime 1 hour
+slurm_time: 02:00:00        # max runtime 2 hour
 slurm_job_name: benchopt    # Job name
 slurm_additional_parameters:
   cpus-per-task: 10         # requires 10 CPUs per job
