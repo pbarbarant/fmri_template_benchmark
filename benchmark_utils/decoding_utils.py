@@ -9,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 from nilearn.maskers import NiftiLabelsMasker
 from nilearn import image
+from joblib import Parallel, delayed
 
 
 def compute_groups(subject_dict):
@@ -30,7 +31,10 @@ def compute_batched_groups(subject_dict, n_groups=10):
 def compute_X_y(subject_dict, masker):
     subject_list = list(subject_dict.keys())
     X = np.concatenate(
-        [masker.transform(subject_dict[subject].img) for subject in subject_list]
+        [
+            masker.transform(subject_dict[subject].img)
+            for subject in subject_list
+        ]
     )
     y = np.concatenate([subject_dict[subject].y for subject in subject_list])
     return X, y
@@ -46,7 +50,9 @@ def compute_pearson_corrs(dataset):
     pearson_corrs = []
     for subject in dataset.subjects:
         subject_img = dataset.dict_aligned[subject].img
-        subject_corr = pearson_corr_parcels(subject_img, template_img, labels_masker)
+        subject_corr = pearson_corr_parcels(
+            subject_img, template_img, labels_masker
+        )
         pearson_corrs.append(subject_corr)
     return pearson_corrs
 
@@ -116,7 +122,7 @@ def classify_subject_movie(template_img, img, y, labels_masker):
     segments_subject = []
     for segment_id in segments_ids:
         # Get the slice of indices corresponding to the segment
-        segment_slice = y == segment_id
+        segment_slice = np.where(y == segment_id)[0]
         # Get the image segment for the template
         segments_template.append(image.index_img(template_img, segment_slice))
         # Get the image segment for the subject
@@ -127,11 +133,13 @@ def classify_subject_movie(template_img, img, y, labels_masker):
         segment_subject = segments_subject[i]
         correct_id = segments_ids[i]
         corr_list = []
-        for j in range(len(segment_id)):
+        for j in range(len(segments_ids)):
             segment_template = segments_template[j]
             # Compute the Pearson correlation with each segment of the template
             corr_list.append(
-                pearson_corr_parcels(segment_template, segment_subject, labels_masker)
+                pearson_corr_parcels(
+                    segment_template, segment_subject, labels_masker
+                )
             )
         # Predict the segment with the highest correlation
         predicted_id = segments_ids[np.argmax(corr_list)]
@@ -154,17 +162,17 @@ def evaluate_movie_dataset(dataset):
     labels_masker = NiftiLabelsMasker(
         labels_img=dataset.clustering_img, mask_img=masker.mask_img_
     ).fit()
-    cv_scores_classif = []
-    for subject in dataset.subjects:
-        print(f"Subject {subject}")
-        cv_scores_classif.append(
-            classify_subject_movie(
-                template_img=dataset.template.img,
-                img=dict_aligned[subject].img,
-                y=dict_aligned[subject].y,
-                labels_masker=labels_masker,
-            )
+
+    # Parallelize the classification of each subject
+    cv_scores_classif = Parallel(n_jobs=-1)(
+        delayed(classify_subject_movie)(
+            dataset.template.img,
+            dict_aligned[subject].img,
+            dataset.template.y,
+            labels_masker,
         )
+        for subject in dataset.subjects
+    )
 
     cv_scores_dummy = cross_val_score(
         DummyClassifier(strategy="most_frequent"),
@@ -185,9 +193,7 @@ def evaluate_movie_dataset(dataset):
 
 
 def evaluate_dataset(dataset, max_iter=100):
-    if True:
+    if dataset.name.lower().startswith("budapest"):
         return evaluate_movie_dataset(dataset)
-    # if dataset.name.lower().startswith("budapest"):
-    #     return evaluate_movie_dataset(dataset)
-    # else:
-    #     return evaluate_task_dataset(dataset, max_iter=max_iter)
+    else:
+        return evaluate_task_dataset(dataset, max_iter=max_iter)
