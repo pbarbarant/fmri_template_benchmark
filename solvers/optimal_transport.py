@@ -56,6 +56,7 @@ class Solver(BaseSolver):
         self.dataset = compute_template(
             algo=algo,
             dataset=self.dataset,
+            solver_name=self.name,
         )
 
     def get_result(self):
