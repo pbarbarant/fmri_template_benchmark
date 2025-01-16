@@ -427,7 +427,9 @@ def fetch_budapest(
     DATA_PATH = Path("/data/parietal/store3/data/budapest")
 
     # Fetch subjects
-    subjects = sorted([p.name for p in DATA_PATH.glob("sub-*")])
+    subjects = sorted([p.name for p in DATA_PATH.glob("sub-*") if p.is_dir()])[
+        :10
+    ]
 
     dict_alignment = dict()
     dict_decoding = dict()
