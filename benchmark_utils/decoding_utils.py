@@ -63,9 +63,12 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     data1 = labels_masker.transform(img1)
     data2 = labels_masker.transform(img2)
     n_parcels = data1.shape[1]
-    return np.mean(
-        [np.corrcoef(data1[:, i], data2[:, i])[0, 1] for i in range(n_parcels)]
-    )
+    correlations = [
+        np.corrcoef(data1[:, i], data2[:, i])[0, 1] for i in range(n_parcels)
+    ]
+    # Remove NaN values
+    cleaned_correlations = [c for c in correlations if not np.isnan(c)]
+    return np.mean(cleaned_correlations)
 
 
 def evaluate_task_dataset(dataset, max_iter=100):
