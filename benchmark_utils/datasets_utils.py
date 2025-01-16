@@ -424,7 +424,7 @@ def fetch_budapest(
     n_parcels=400,
     lo_run=1,
 ):
-    DATA_PATH = Path("/data/parietal/store3/data/budapest/ds003017/")
+    DATA_PATH = Path("/data/parietal/store3/data/budapest")
 
     # Fetch subjects
     subjects = sorted([p.name for p in DATA_PATH.glob("sub-*")])
@@ -439,7 +439,7 @@ def fetch_budapest(
                     DATA_PATH
                     / subject
                     / "func"
-                    / f"{subject}_task-movie_run-{run:02d}_bold.nii.gz"
+                    / f"{subject}_task-movie_run-{run:02d}_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz"
                 )
                 dict_decoding[subject] = LabeledImage(img=img, y=y)
             else:
@@ -447,7 +447,7 @@ def fetch_budapest(
                     DATA_PATH
                     / subject
                     / "func"
-                    / f"{subject}_task-movie_run-{run:02d}_bold.nii.gz"
+                    / f"{subject}_task-movie_run-{run:02d}_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz"
                 )
                 alignment_imgs.append(img)
         dict_alignment[subject] = image.concat_imgs(alignment_imgs)
