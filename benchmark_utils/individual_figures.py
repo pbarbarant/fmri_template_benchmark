@@ -29,7 +29,6 @@ SOLVERS = [
     "Diagonal",
     "OptimalTransport",
     "Procrustes",
-    "Ridge",
 ]
 
 for dataset in DATASETS:
