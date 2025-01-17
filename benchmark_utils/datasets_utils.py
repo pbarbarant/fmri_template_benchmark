@@ -3,7 +3,7 @@ import glob
 import pandas as pd
 from nilearn import image
 from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
-from nilearn.maskers import NiftiMasker
+from nilearn.maskers import MultiNiftiMasker
 from ibc_public import utils_data
 from tqdm import tqdm
 from typing import List, Dict, Optional
@@ -32,7 +32,7 @@ class Dataset:
     subjects: List[str]
     dict_alignment: Dict[str, Nifti1Image]
     dict_decoding: Dict[str, LabeledImage]
-    masker: NiftiMasker
+    masker: MultiNiftiMasker
     clustering_img: Nifti1Image
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
     template: Optional[LabeledImage] = None
@@ -97,13 +97,30 @@ def log_dataset_info(dataset: Dataset) -> None:
         )
 
 
-def fetch_clustering_img(masker, n_rois=400):
+def fetch_clustering_img(target_img, n_rois=400):
     clustering_img = fetch_atlas_schaefer_2018(n_rois=n_rois)["maps"]
-    resampled_img = image.resample_to_img(clustering_img, masker.mask_img_)
-    int_img = masker.inverse_transform(
-        masker.transform(resampled_img).astype(int)
-    )
-    return image.index_img(int_img, 0)
+    resampled_img = image.resample_to_img(clustering_img, target_img)
+    int_img = image.math_img("img.astype(int)", img=resampled_img)
+    return int_img
+
+
+def fit_mni152_masker(resolution=3):
+    mask_img = load_mni152_brain_mask(resolution=resolution)
+    return MultiNiftiMasker(
+        mask_img=mask_img, memory="nilearn_cache", memory_level=1
+    ).fit()
+
+
+def fit_masker(imgs, clustering_img, detrend=False, t_r=None):
+    mask_img = image.math_img("img > 0", img=clustering_img)
+    return MultiNiftiMasker(
+        mask_img=mask_img,
+        memory="nilearn_cache",
+        memory_level=1,
+        standardize=True,
+        detrend=detrend,
+        t_r=t_r,
+    ).fit(imgs)
 
 
 def _sample_labels(n_samples):
@@ -152,23 +169,6 @@ def sample_dataset(
     )
 
 
-def fit_mni152_masker(resolution=3):
-    mask_img = load_mni152_brain_mask(resolution=resolution)
-    return NiftiMasker(
-        mask_img=mask_img, memory="nilearn_cache", memory_level=1
-    ).fit()
-
-
-def fit_masker_to_data(imgs, detrend=False, t_r=None):
-    return NiftiMasker(
-        memory="nilearn_cache",
-        standardize=True,
-        detrend=detrend,
-        t_r=t_r,
-        memory_level=1,
-    ).fit(imgs)
-
-
 @memory.cache
 def fetch_ibc(
     name="IBC",
@@ -200,10 +200,13 @@ def fetch_ibc(
             y=decoding_df.contrast.to_numpy(),
         )
 
-    masker = fit_masker_to_data(
-        [dict_alignment[subject] for subject in subjects]
+    clustering_img = fetch_clustering_img(
+        dict_alignment[subjects[0]], n_parcels
     )
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subjects],
+        clustering_img,
+    )
 
     return Dataset(
         name=name,
@@ -333,8 +336,13 @@ def fetch_hcp(
             y=sub_decoding_df.contrast.to_numpy(),
         )
 
-    masker = fit_masker_to_data(dict_alignment[subject_list[0]])
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+    clustering_img = fetch_clustering_img(
+        dict_alignment[subject_list[0]], n_parcels
+    )
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subject_list],
+        clustering_img,
+    )
 
     return Dataset(
         name=name,
@@ -367,10 +375,13 @@ def fetch_forrest(
             ).to_numpy(),
         )
 
-    masker = fit_masker_to_data(
-        [dict_alignment[subject] for subject in subjects]
+    clustering_img = fetch_clustering_img(
+        dict_alignment[subjects[0]], n_parcels
     )
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subjects],
+        clustering_img,
+    )
 
     return Dataset(
         name="Forrest",
@@ -405,10 +416,13 @@ def fetch_nsd(
             ).values.flatten(),
         )
 
-    masker = fit_masker_to_data(
-        [dict_alignment[subject] for subject in subjects]
+    clustering_img = fetch_clustering_img(
+        dict_alignment[subjects[0]], n_parcels
     )
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subjects],
+        clustering_img,
+    )
 
     return Dataset(
         name=name,
@@ -466,12 +480,15 @@ def fetch_budapest(
                 alignment_imgs.append(img)
         dict_alignment[subject] = image.concat_imgs(alignment_imgs)
 
-    masker = fit_masker_to_data(
-        [dict_alignment[subject] for subject in subjects],
-        detrend=True,
-        t_r=1.0,
+    clustering_img = fetch_clustering_img(
+        dict_alignment[subjects[0]], n_parcels
     )
-    clustering_img = fetch_clustering_img(masker, n_rois=n_parcels)
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subjects],
+        clustering_img,
+        detrend=True,
+        t_r=2.0,
+    )
 
     return Dataset(
         name=f"Budapest_run-{lo_run:02d}",
