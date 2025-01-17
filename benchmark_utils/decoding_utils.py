@@ -9,7 +9,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 from nilearn.maskers import NiftiLabelsMasker
 from nilearn import image
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, dump
+from pathlib import Path
 
 
 def compute_groups(subject_dict):
@@ -90,7 +91,7 @@ def evaluate_task_dataset(dataset, max_iter=100):
     else:
         groups = compute_groups(dict_aligned)
 
-    cv_scores_svc = cross_val_score(
+    cv_scores_classif = cross_val_score(
         pipeline_svc,
         X,
         y,
@@ -108,13 +109,13 @@ def evaluate_task_dataset(dataset, max_iter=100):
         n_jobs=-1,
     )
 
-    avg_score = np.mean(cv_scores_svc)
+    avg_score = np.mean(cv_scores_classif)
     chance_level = np.mean(cv_scores_dummy)
 
     print(f"Average decoding accuracy: {avg_score:.2f}")
     print(f"Chance level: {chance_level:.2f}")
 
-    return avg_score, chance_level, cv_scores_svc, pearson_corrs
+    return avg_score, chance_level, cv_scores_classif, pearson_corrs
 
 
 def classify_subject_movie(template_img, img, y, labels_masker):
@@ -195,8 +196,48 @@ def evaluate_movie_dataset(dataset):
     return avg_score, chance_level, cv_scores_classif, pearson_corrs
 
 
-def evaluate_dataset(dataset, max_iter=100):
+def evaluate_dataset(dataset, solver_name, max_iter=100):
     if dataset.name.lower().startswith("budapest"):
-        return evaluate_movie_dataset(dataset)
+        avg_score, chance_level, cv_scores_classif, pearson_corrs = (
+            evaluate_movie_dataset(dataset)
+        )
     else:
-        return evaluate_task_dataset(dataset, max_iter=max_iter)
+        avg_score, chance_level, cv_scores_classif, pearson_corrs = (
+            evaluate_task_dataset(dataset, max_iter=max_iter)
+        )
+    # Save the results
+    save_decoding_results(
+        dataset,
+        avg_score,
+        chance_level,
+        cv_scores_classif,
+        pearson_corrs,
+        solver_name,
+    )
+    return avg_score, chance_level, cv_scores_classif, pearson_corrs
+
+
+def save_decoding_results(
+    dataset,
+    avg_score,
+    chance_level,
+    cv_scores_classif,
+    pearson_corrs,
+    solver_name,
+):
+    output_dir = (
+        Path(
+            "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/outputs"
+        )
+        / dataset.name
+        / solver_name
+    )
+    results_dict = {
+        "avg_score": avg_score,
+        "chance_level": chance_level,
+        "cv_scores_classif": cv_scores_classif,
+        "pearson_corrs": pearson_corrs,
+    }
+    # Dump the results with joblib
+    dump(results_dict, output_dir / "decoding_results.pkl")
+    print(f"Decoding results saved in {output_dir}")
