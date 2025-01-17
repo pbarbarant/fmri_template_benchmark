@@ -13,6 +13,11 @@ figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 DATASETS = [
+    "Budapest_run-01",
+    "Budapest_run-02",
+    "Budapest_run-03",
+    "Budapest_run-04",
+    "Budapest_run-05",
     "Simulated_MNI152",
     "IBC_Audio",
     "IBC_FaceBody",
@@ -33,6 +38,7 @@ SOLVERS = [
 
 for dataset in DATASETS:
     fig, axs = plt.subplots(1, len(SOLVERS), figsize=(50, 5))
+    vmax, vmin = 2, -2
     for solver in SOLVERS:
         template_path = data_path / dataset / solver / "template.nii.gz"
         # Load the template
@@ -42,11 +48,11 @@ for dataset in DATASETS:
                 template,
                 title=f"{solver}",
                 display_mode="ortho",
-                cut_coords=(0, 0, 0),
+                cut_coords=(-10, 0, 0),
                 draw_cross=False,
                 axes=axs[SOLVERS.index(solver)],
-                vmax=2,
-                vmin=-2,
+                vmax=vmax,
+                vmin=vmin,
             )
         else:
             axs[SOLVERS.index(solver)].axis("off")
