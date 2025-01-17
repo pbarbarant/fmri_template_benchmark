@@ -1,7 +1,7 @@
 # %%
 import glob
-import os
 from pathlib import Path
+from joblib import load
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -14,51 +14,73 @@ plt.rcParams["figure.dpi"] = 500
 data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
-# Parse the latest file
-file_list = glob.glob(os.path.join(data_path, "*.parquet"))
-latest_file = max(file_list, key=os.path.getmtime)
 
-# %% Plot the boxplot for the accuracies
-df = pd.read_parquet(latest_file)
 
-# Remove the simulated data
-df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
+def get_results_dataframe(
+    data_path: Path, score="cv_scores_classif"
+) -> pd.DataFrame:
+    # Glob recursively all the decoding_results.pkl files
+    results_paths = glob.glob(
+        str(data_path / "**" / "decoding_results.pkl"), recursive=True
+    )
+    # Build a dataframe with all the results
+    res_list = []
+    for path in results_paths:
+        path = Path(path)
+        dataset = path.parent.parent.name
+        solver = path.parent.name
+        results = load(path)
+        # Add the dataset name and solver name to the results
+        results["data_name"] = dataset
+        results["solver_name"] = solver
+        res_list.append(results)
 
-# Merge all BOLD5000 folds into one
-df.loc[df["data_name"].str.contains("BOLD5000"), "data_name"] = "BOLD5000"
+    df = pd.DataFrame(res_list)
 
-# Expand the lists in df["objective_cv_scores"]
-df = df.explode("objective_cv_scores")
+    # Remove the simulated data
+    df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
 
-# Sort alphabetically by dataset name and solver name
-df.sort_values(by=["data_name", "solver_name"], inplace=True)
+    # For Budapest data, remove the "_run-0*" suffix
+    df["data_name"] = df["data_name"].str.replace(r"_run-\d+", "", regex=True)
 
-# Fix underscores in the solver names
-df["solver_name"] = df["solver_name"].str.replace("_", " ")
+    # Sort alphabetically by dataset name and solver name
+    df.sort_values(by=["data_name", "solver_name"], inplace=True)
+
+    # Fix underscores in the solver names
+    df["solver_name"] = df["solver_name"].str.replace("_", " ")
+
+    # Expand the lists in df[score]
+    df = df.explode(score)
+
+    return df
+
+
+df = get_results_dataframe(data_path, score="cv_scores_classif")
+# Expand the lists in df["cv_scores_classif"]
 
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 # Create the figure and axes with a specific size
-fig, ax = plt.subplots(figsize=(12, 5))
+fig, ax = plt.subplots(figsize=(12, 7))
 
 # Create the box plot
 sns.boxplot(
     data=df,
-    x="objective_cv_scores",
+    x="cv_scores_classif",
     y="data_name",
     hue="solver_name",
     showfliers=False,
     ax=ax,
     fill=False,
     legend=False,
-    color="k",
+    palette="dark:k",
 )
 # Create the scatter plot
 sns.stripplot(
     data=df,
-    x="objective_cv_scores",
+    x="cv_scores_classif",
     y="data_name",
     size=4,
     hue="solver_name",
@@ -101,48 +123,33 @@ plt.savefig(
 # Display the plot
 plt.show()
 
-# %%
+
 # Do the same for the Pearson correlation
-df = pd.read_parquet(latest_file)
-
-# Remove the simulated data
-df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
-
-# Merge all BOLD5000 folds into one
-df.loc[df["data_name"].str.contains("BOLD5000"), "data_name"] = "BOLD5000"
-
-# Expand the lists in df["objective_cv_scores"]
-df = df.explode("objective_pearson_corrs")
-
-# Sort alphabetically by dataset name and solver name
-df.sort_values(by=["data_name", "solver_name"], inplace=True)
-
-# Fix underscores in the solver names
-df["solver_name"] = df["solver_name"].str.replace("_", " ")
+df = get_results_dataframe(data_path, score="pearson_corrs")
 
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 # Create the figure and axes with a specific size
-fig, ax = plt.subplots(figsize=(12, 5))
+fig, ax = plt.subplots(figsize=(12, 7))
 
 # Create the box plot
 sns.boxplot(
     data=df,
-    x="objective_pearson_corrs",
+    x="pearson_corrs",
     y="data_name",
     hue="solver_name",
     showfliers=False,
     ax=ax,
     fill=False,
     legend=False,
-    color="k",
+    palette="dark:k",
 )
 # Create the scatter plot
 sns.stripplot(
     data=df,
-    x="objective_pearson_corrs",
+    x="pearson_corrs",
     y="data_name",
     size=4,
     hue="solver_name",
@@ -154,7 +161,7 @@ sns.stripplot(
 ax.set_xlabel("Pearson Correlation", fontweight="bold")
 ax.set_ylabel("Dataset", fontweight="bold")
 ax.set_title(
-    "Average voxel-wise Pearson correlation to the template",
+    "Average parcel-wise Pearson correlation to the template",
     fontweight="bold",
     fontsize="large",
 )
