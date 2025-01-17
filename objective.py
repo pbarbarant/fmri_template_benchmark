@@ -50,7 +50,7 @@ class Objective(BaseObjective):
 
         print(f"Running on: {dataset.name}")
 
-    def evaluate_result(self, dataset):
+    def evaluate_result(self, dataset, solver_name):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
@@ -58,10 +58,9 @@ class Objective(BaseObjective):
 
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
-        self.dataset = dataset
         print(f"Evaluating on: {dataset.name}")
         avg_score, chance_level, cv_scores, pearson_corrs = evaluate_dataset(
-            dataset, max_iter=self.max_iter
+            dataset, solver_name, max_iter=self.max_iter
         )
         return dict(
             value=avg_score,
