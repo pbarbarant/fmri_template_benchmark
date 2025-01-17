@@ -435,7 +435,7 @@ def fetch_budapest(
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Budapest data"):
         alignment_imgs = []
-        for run in range(1, 5):
+        for run in range(1, 6):
             if run == lo_run:
                 img, y = load_budapest_img_labels(
                     DATA_PATH
