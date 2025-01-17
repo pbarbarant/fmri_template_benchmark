@@ -168,7 +168,7 @@ def evaluate_movie_dataset(dataset):
     ).fit()
 
     # Parallelize the classification of each subject
-    cv_scores_classif = Parallel(n_jobs=-1)(
+    cv_scores_classif = Parallel(n_jobs=-1, verbose=1)(
         delayed(classify_subject_movie)(
             dataset.template.img,
             dict_aligned[subject].img,
