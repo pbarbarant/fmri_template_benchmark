@@ -1,17 +1,8 @@
 # %%
-import glob
-import os
 from pathlib import Path
-from joblib import Parallel, delayed
-
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import scienceplots  # noqa: F401
-import numpy as np
 
-from nilearn import surface, plotting, datasets
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+from nilearn import plotting
 
 from nilearn import image
 
