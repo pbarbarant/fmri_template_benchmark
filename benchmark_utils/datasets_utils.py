@@ -14,7 +14,7 @@ from nibabel import Nifti1Image
 from joblib import Memory
 from pathlib import Path
 
-memory = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
+MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
 
 
 @dataclass
@@ -104,7 +104,7 @@ def fetch_clustering_img(target_img, n_rois=400):
 def fit_mni152_masker(resolution=3):
     mask_img = load_mni152_brain_mask(resolution=resolution)
     return MultiNiftiMasker(
-        mask_img=mask_img, memory="nilearn_cache", memory_level=1
+        mask_img=mask_img, memory=MEMORY, memory_level=1
     ).fit()
 
 
@@ -112,7 +112,7 @@ def fit_masker(imgs, clustering_img, detrend=False, t_r=None):
     mask_img = image.math_img("img > 0", img=clustering_img)
     return MultiNiftiMasker(
         mask_img=mask_img,
-        memory="nilearn_cache",
+        memory=MEMORY,
         memory_level=1,
         standardize=True,
         detrend=detrend,
@@ -166,7 +166,7 @@ def sample_dataset(
     )
 
 
-@memory.cache
+@MEMORY.cache
 def fetch_ibc(
     name="IBC",
     subjects=None,
@@ -215,7 +215,7 @@ def fetch_ibc(
     )
 
 
-@memory.cache
+@MEMORY.cache
 def get_valid_subjects_list(derivatives):
     """Check which subjects have all the tasks."""
     tasks = [
@@ -242,7 +242,7 @@ def get_valid_subjects_list(derivatives):
     return valid_subject_list
 
 
-@memory.cache
+@MEMORY.cache
 def make_hcp_db(
     derivatives,
     subject_list,
@@ -296,7 +296,7 @@ def make_hcp_db(
     return df
 
 
-@memory.cache
+@MEMORY.cache
 def fetch_hcp(
     name="HCP",
     n_subjects=None,
@@ -351,7 +351,7 @@ def fetch_hcp(
     )
 
 
-@memory.cache
+@MEMORY.cache
 def fetch_forrest(
     subjects=None,
     n_parcels=400,
@@ -390,7 +390,7 @@ def fetch_forrest(
     )
 
 
-@memory.cache
+@MEMORY.cache
 def fetch_nsd(
     name="NSD",
     subjects=None,
@@ -442,7 +442,7 @@ def load_budapest_img_labels(image_path):
     return image.index_img(img, indices), y
 
 
-@memory.cache
+@MEMORY.cache
 def fetch_budapest(
     n_parcels=400,
     lo_run=1,
