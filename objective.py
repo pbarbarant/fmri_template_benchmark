@@ -21,7 +21,7 @@ class Objective(BaseObjective):
     # All parameters 'p' defined here are available as 'self.p'.
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
-        "max_iter": [1e2],
+        "debug_mode": [True],
     }
 
     # List of packages needed to run the benchmark.
@@ -58,9 +58,17 @@ class Objective(BaseObjective):
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         print(f"Evaluating on: {dataset.name}")
-        avg_score, chance_level, cv_scores, pearson_corrs = evaluate_dataset(
-            dataset, solver_name, max_iter=self.max_iter
-        )
+        if bool(self.debug_mode):
+            # For debugging purposes, we can return a dummy result.
+            n_subjects = len(dataset.subjects)
+            avg_score = 0.5
+            chance_level = 0.5
+            cv_scores = [0.5] * n_subjects
+            pearson_corrs = [0.5] * n_subjects
+        else:
+            avg_score, chance_level, cv_scores, pearson_corrs = (
+                evaluate_dataset(dataset, solver_name)
+            )
         return dict(
             value=avg_score,
             chance_level=chance_level,
