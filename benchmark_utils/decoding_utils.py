@@ -100,7 +100,7 @@ def cross_validate_subjects(
     return cv_scores_classif
 
 
-def evaluate_task_dataset(dataset, max_iter=100):
+def evaluate_task_dataset(dataset):
     subject_list = dataset.subjects
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
@@ -210,14 +210,14 @@ def evaluate_movie_dataset(dataset):
     return avg_score, chance_level, cv_scores_classif, pearson_corrs
 
 
-def evaluate_dataset(dataset, solver_name, max_iter=100):
+def evaluate_dataset(dataset, solver_name):
     if dataset.name.lower().startswith("budapest"):
         avg_score, chance_level, cv_scores_classif, pearson_corrs = (
             evaluate_movie_dataset(dataset)
         )
     else:
         avg_score, chance_level, cv_scores_classif, pearson_corrs = (
-            evaluate_task_dataset(dataset, max_iter=max_iter)
+            evaluate_task_dataset(dataset)
         )
     # Save the results
     save_decoding_results(
