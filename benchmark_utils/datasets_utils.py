@@ -484,7 +484,7 @@ def fetch_budapest(
         [dict_alignment[subject] for subject in subjects],
         clustering_img,
         detrend=True,
-        t_r=2.0,
+        t_r=1.0,
     )
 
     return Dataset(
