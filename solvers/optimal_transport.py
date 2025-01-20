@@ -51,7 +51,7 @@ class Solver(BaseSolver):
             mask=self.dataset.masker,
             clustering=self.dataset.clustering_img,
             n_jobs=-1,
-            verbose=1,
+            verbose=2,
         )
 
         self.dataset = compute_template(
