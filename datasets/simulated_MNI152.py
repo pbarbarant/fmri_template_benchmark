@@ -38,7 +38,9 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         masker = fit_mni152_masker()
-        clustering_img = fetch_clustering_img(masker, n_rois=self.n_parcels)
+        clustering_img = fetch_clustering_img(
+            masker.mask_img_, n_rois=self.n_parcels
+        )
 
         self.dataset = sample_dataset(
             name=self.name,
