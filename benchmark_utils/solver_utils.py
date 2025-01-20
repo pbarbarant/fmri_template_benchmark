@@ -1,9 +1,10 @@
 import numpy as np
 from benchmark_utils.datasets_utils import LabeledImage
 from pathlib import Path
+from joblib import load, dump
 
 
-def compute_template(
+def _compute_template(
     algo,
     dataset,
     solver_name,
@@ -41,7 +42,7 @@ def compute_template(
     )
 
     # Save the template
-    save_template(template, dataset.name, solver_name)
+    save_template_nii(template, dataset.name, solver_name)
 
     dataset.template = template
     dataset.dict_aligned = dict_aligned
@@ -49,7 +50,42 @@ def compute_template(
     return dataset
 
 
-def save_template(template, dataset_name, solver_name):
+def compute_template(
+    algo,
+    dataset,
+    solver_name,
+):
+    cache_dir = (
+        Path(__file__).parent.parent
+        / "memory_cache"
+        / "alignments"
+        / dataset.name
+        / solver_name
+    )
+    if (cache_dir / "dict_aligned.pkl").exists() and (
+        cache_dir / "template.pkl"
+    ).exists():
+        print(f"Loading aligned data from cache: {cache_dir}")
+        # Load the dataset from the cache
+        template = load(cache_dir / "template.pkl")
+        dict_aligned = load(cache_dir / "dict_aligned.pkl")
+        dataset.template = template
+        dataset.dict_aligned = dict_aligned
+        return dataset
+    else:
+        dataset = _compute_template(
+            algo=algo,
+            dataset=dataset,
+            solver_name=solver_name,
+        )
+        # Save the dataset to the cache
+        cache_dir.mkdir(exist_ok=True, parents=True)
+        dump(dataset.template, cache_dir / "template.pkl")
+        dump(dataset.dict_aligned, cache_dir / "dict_aligned.pkl")
+        return dataset
+
+
+def save_template_nii(template, dataset_name, solver_name):
     output_dir = Path("outputs") / dataset_name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
     template_img = template.img
