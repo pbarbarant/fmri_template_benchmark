@@ -9,6 +9,7 @@ from nilearn.maskers import NiftiLabelsMasker
 from nilearn import image
 from joblib import Parallel, delayed, dump
 from pathlib import Path
+from scipy.stats import pearsonr
 
 
 def compute_groups(subject_dict):
@@ -63,7 +64,7 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     data2 = labels_masker.transform(img2)
     n_parcels = data1.shape[1]
     correlations = [
-        np.corrcoef(data1[:, i], data2[:, i])[0, 1] for i in range(n_parcels)
+        pearsonr(data1[:, i], data2[:, i])[0] for i in range(n_parcels)
     ]
     # Remove NaN values
     cleaned_correlations = [c for c in correlations if not np.isnan(c)]
