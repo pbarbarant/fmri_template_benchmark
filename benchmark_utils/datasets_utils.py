@@ -14,7 +14,7 @@ from nibabel import Nifti1Image
 from joblib import Memory
 from pathlib import Path
 
-memory = Memory(Path(__file__).parent.parent / "nilearn_cache", verbose=0)
+memory = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
 
 
 @dataclass
