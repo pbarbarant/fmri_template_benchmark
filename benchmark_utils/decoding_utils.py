@@ -4,9 +4,7 @@ from sklearn.model_selection import (
     LeaveOneGroupOut,
     cross_val_score,
 )
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVC
+from nilearn.decoding import Decoder
 from nilearn.maskers import NiftiLabelsMasker
 from nilearn import image
 from joblib import Parallel, delayed, dump
@@ -72,7 +70,36 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     return np.mean(cleaned_correlations)
 
 
+def cross_validate_subjects(
+    imgs,
+    y,
+    groups,
+    masker=None,
+    estimator="svc",
+):
+    decoder_svc = Decoder(
+        estimator=estimator,
+        mask=masker,
+        cv=LeaveOneGroupOut(),
+        standardize=True,
+        screening_percentile=100,
+        scoring="balanced_accuracy",
+        n_jobs=-1,
+    )
+    decoder_svc.fit(imgs, y, groups=groups)
+    # Average the score along classes
+    cv_scores = decoder_svc.cv_scores_
+    # Convert the dictionary to a 2D array
+    cv_scores_classif = np.vstack(
+        [cv_scores[subject] for subject in cv_scores.keys()]
+    )
+    # Average the scores along classes
+    cv_scores_classif = np.mean(cv_scores_classif, axis=0)
+    return cv_scores_classif
+
+
 def evaluate_task_dataset(dataset, max_iter=100):
+    subject_list = dataset.subjects
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
 
@@ -80,40 +107,25 @@ def evaluate_task_dataset(dataset, max_iter=100):
     # and the template
     pearson_corrs = compute_pearson_corrs(dataset)
 
-    # Create cross-validation object on each subject
-    pipeline_svc = make_pipeline(
-        StandardScaler(),
-        LinearSVC(max_iter=int(max_iter), penalty="l2"),
-    )
-    X, y = compute_X_y(dict_aligned, masker)
+    # Leave one subject out cross-validation
     if dataset.name.lower().startswith("hcp"):
         groups = compute_batched_groups(dict_aligned, n_groups=10)
+        imgs = None
     else:
         groups = compute_groups(dict_aligned)
+        imgs = image.concat_imgs(
+            [dict_aligned[subject].img for subject in dataset.subjects]
+        )
 
-    cv_scores_classif = cross_val_score(
-        pipeline_svc,
-        X,
-        y,
-        groups=groups,
-        cv=LeaveOneGroupOut(),
-        n_jobs=-1,
+    y = np.concatenate([dict_aligned[subject].y for subject in subject_list])
+
+    cv_scores_classif = cross_validate_subjects(
+        imgs, y, groups, masker=masker, estimator="svc"
     )
-
-    cv_scores_dummy = cross_val_score(
-        DummyClassifier(strategy="most_frequent"),
-        X,
-        y,
-        groups=groups,
-        cv=LeaveOneGroupOut(),
-        n_jobs=-1,
-    )
-
     avg_score = np.mean(cv_scores_classif)
-    chance_level = np.mean(cv_scores_dummy)
+    chance_level = 0.5
 
     print(f"Average decoding accuracy: {avg_score:.2f}")
-    print(f"Chance level: {chance_level:.2f}")
 
     return avg_score, chance_level, cv_scores_classif, pearson_corrs
 
@@ -225,13 +237,7 @@ def save_decoding_results(
     pearson_corrs,
     solver_name,
 ):
-    output_dir = (
-        Path(
-            "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/outputs"
-        )
-        / dataset.name
-        / solver_name
-    )
+    output_dir = Path("outputs") / dataset.name / solver_name
     results_dict = {
         "avg_score": avg_score,
         "chance_level": chance_level,
