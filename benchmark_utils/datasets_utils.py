@@ -14,10 +14,7 @@ from nibabel import Nifti1Image
 from joblib import Memory
 from pathlib import Path
 
-memory = Memory(
-    "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/nilearn_cache",
-    verbose=0,
-)
+memory = Memory(Path(__file__).parent.parent / "nilearn_cache", verbose=0)
 
 
 @dataclass
