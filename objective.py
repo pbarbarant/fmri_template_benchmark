@@ -22,7 +22,6 @@ class Objective(BaseObjective):
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
         "max_iter": [1e2],
-        "n_parcels": [400],
     }
 
     # List of packages needed to run the benchmark.
