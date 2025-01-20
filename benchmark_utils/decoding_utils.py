@@ -86,7 +86,7 @@ def cross_validate_subjects(
         screening_percentile=100,
         scoring="balanced_accuracy",
         n_jobs=-1,
-        verbose=2,
+        verbose=11,
     )
     decoder_svc.fit(imgs, y, groups=groups)
     # Average the score along classes
@@ -182,7 +182,7 @@ def evaluate_movie_dataset(dataset):
     ).fit()
 
     # Parallelize the classification of each subject
-    cv_scores_classif = Parallel(n_jobs=-1, verbose=2)(
+    cv_scores_classif = Parallel(n_jobs=-1, verbose=11)(
         delayed(classify_subject_movie)(
             dataset.template.img,
             dict_aligned[subject].img,
