@@ -88,6 +88,9 @@ sns.stripplot(
     jitter=True,
 )
 
+# Add a vertical line at chance level
+ax.axvline(0.5, color="gray", linestyle="--")
+
 # Customize the plot
 ax.set_xlabel("Accuracy", fontweight="bold")
 ax.set_ylabel("Dataset", fontweight="bold")
