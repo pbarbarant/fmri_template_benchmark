@@ -83,7 +83,7 @@ def cross_validate_subjects(
         mask=masker,
         cv=LeaveOneGroupOut(),
         standardize=True,
-        screening_percentile=100,
+        screening_percentile=5,
         scoring="balanced_accuracy",
         n_jobs=-1,
         verbose=11,
