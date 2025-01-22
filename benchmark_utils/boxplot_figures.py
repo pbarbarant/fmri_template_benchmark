@@ -40,7 +40,14 @@ def get_results_dataframe(
     # Remove the simulated data
     df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
 
-    # For Budapest data, remove the "_run-0*" suffix
+    # Add a type column to indicate tasks or movie
+    df["type"] = df["data_name"].apply(
+        lambda x: "movie"
+        if x.lower().startswith("raiders") or x.lower().startswith("budapest")
+        else "task"
+    )
+
+    # For datasets split in runs, remove the "_run-0*" suffix
     df["data_name"] = df["data_name"].str.replace(r"_run-\d+", "", regex=True)
 
     # Sort alphabetically by dataset name and solver name
@@ -62,70 +69,66 @@ df = get_results_dataframe(data_path, score="cv_scores_classif")
 plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
-# Create the figure and axes with a specific size
-fig, ax = plt.subplots(figsize=(12, 7))
 
-# Create the box plot
-sns.boxplot(
-    data=df,
-    x="cv_scores_classif",
-    y="data_name",
-    hue="solver_name",
-    showfliers=False,
-    ax=ax,
-    fill=False,
-    legend=False,
-    palette="dark:k",
+def create_accuracy_plot(data, title, fig_height=7, chance_level=True):
+    fig, ax = plt.subplots(figsize=(12, fig_height))
+
+    sns.boxplot(
+        data=data,
+        x="cv_scores_classif",
+        y="data_name",
+        hue="solver_name",
+        showfliers=False,
+        ax=ax,
+        fill=False,
+        legend=False,
+        palette="dark:k",
+    )
+
+    sns.stripplot(
+        data=data,
+        x="cv_scores_classif",
+        y="data_name",
+        size=4,
+        hue="solver_name",
+        dodge=True,
+        jitter=True,
+        ax=ax,
+    )
+
+    if chance_level:
+        ax.axvline(0.5, color="gray", linestyle="--")
+    ax.set_xlabel("Accuracy", fontweight="bold")
+    ax.set_ylabel("Dataset", fontweight="bold")
+    ax.set_title(title, fontweight="bold", fontsize="large")
+
+    for i, data_name in enumerate(data["data_name"].unique()):
+        if i % 2 == 0:
+            ax.axhspan(i - 0.5, i + 0.5, color="gray", alpha=0.05)
+
+    ax.set_yticklabels(
+        [name.replace("_", " ") for name in data["data_name"].unique()]
+    )
+    ax.legend(title="Alignment method", title_fontsize="large")
+    sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
+
+    plt.tight_layout()
+    return fig
+
+
+# Create separate plots
+movie_data = df[df["type"] == "movie"]
+task_data = df[df["type"] == "task"]
+
+fig1 = create_accuracy_plot(
+    movie_data, "Movie Prediction Accuracies", fig_height=3, chance_level=False
 )
-# Create the scatter plot
-sns.stripplot(
-    data=df,
-    x="cv_scores_classif",
-    y="data_name",
-    size=4,
-    hue="solver_name",
-    dodge=True,
-    jitter=True,
-)
+fig2 = create_accuracy_plot(task_data, "Task Prediction Accuracies")
+fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
+fig2.savefig(figures_path / "boxplot_task_accuracy.pdf", bbox_inches="tight")
 
-# Add a vertical line at chance level
-ax.axvline(0.5, color="gray", linestyle="--")
-
-# Customize the plot
-ax.set_xlabel("Accuracy", fontweight="bold")
-ax.set_ylabel("Dataset", fontweight="bold")
-ax.set_title(
-    "Prediction accuracies for various template estimators",
-    fontweight="bold",
-    fontsize="large",
-)
-# Set the legend title
-ax.legend(title="Alignment method", title_fontsize="large")
-
-# Move the legend outside the plot
-sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
-
-# Add gray rectangles to separate the datasets
-for i, data_name in enumerate(df["data_name"].unique()):
-    if i % 2 == 0:
-        ax.axhspan(i - 0.5, i + 0.5, color="gray", alpha=0.05)
-
-# Fix underscores in the dataset names
-ax.set_yticklabels(
-    [name.replace("_", " ") for name in df["data_name"].unique()]
-)
-
-# Adjust the layout to prevent the legend from being cut off
-plt.tight_layout()
-
-# Save the figure with high resolution
-plt.savefig(
-    figures_path / "boxplot_accuracies.pdf", dpi=500, bbox_inches="tight"
-)
-
-# Display the plot
 plt.show()
-
+# %%
 
 # Do the same for the Pearson correlation
 df = get_results_dataframe(data_path, score="pearson_corrs")
