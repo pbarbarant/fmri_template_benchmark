@@ -211,9 +211,11 @@ def evaluate_movie_dataset(dataset):
 
 
 def evaluate_dataset(dataset, solver_name):
-    if dataset.name.lower().startswith(
-        "budapest"
-    ) or dataset.name.lower().startswith("raiders"):
+    if (
+        dataset.name.lower().startswith("budapest")
+        or dataset.name.lower().startswith("raiders")
+        or dataset.name.lower().endswith("movie")
+    ):
         avg_score, chance_level, cv_scores_classif, pearson_corrs = (
             evaluate_movie_dataset(dataset)
         )
