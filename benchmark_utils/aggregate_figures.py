@@ -4,13 +4,12 @@ import os
 from pathlib import Path
 
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import scienceplots  # noqa: F401
+import matplotlib.pyplot as plt
 import numpy as np
-
-from nilearn import surface, plotting, datasets
+import scienceplots  # noqa: F401
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from nilearn import datasets, plotting, surface
 
 plt.rcParams["figure.dpi"] = 300
 

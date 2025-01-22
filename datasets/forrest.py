@@ -6,8 +6,8 @@ from benchopt import BaseDataset, safe_import_context
 with safe_import_context() as import_ctx:
     from benchmark_utils.datasets_utils import (
         check_init_dataset,
-        log_dataset_info,
         fetch_forrest,
+        log_dataset_info,
     )
 
 

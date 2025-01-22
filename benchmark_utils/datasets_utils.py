@@ -1,18 +1,17 @@
-import numpy as np
 import glob
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import numpy as np
 import pandas as pd
+from ibc_public import utils_data
+from joblib import Memory
+from nibabel import Nifti1Image
 from nilearn import image
 from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
 from nilearn.maskers import MultiNiftiMasker
-from ibc_public import utils_data
 from tqdm import tqdm
-from typing import List, Dict, Optional
-from dataclasses import dataclass
-from nibabel import Nifti1Image
-
-
-from joblib import Memory
-from pathlib import Path
 
 MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
 

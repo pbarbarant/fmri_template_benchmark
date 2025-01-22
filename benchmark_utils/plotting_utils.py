@@ -1,8 +1,8 @@
-import numpy as np
-import nibabel as nib
-import matplotlib.pyplot as plt
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import nibabel as nib
+import numpy as np
 from nilearn import datasets, plotting
 
 

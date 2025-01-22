@@ -1,15 +1,16 @@
+from pathlib import Path
+
 import numpy as np
+from joblib import Parallel, delayed, dump
+from nilearn import image
+from nilearn.decoding import Decoder
+from nilearn.maskers import NiftiLabelsMasker
+from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import (
     LeaveOneGroupOut,
     cross_val_score,
 )
-from nilearn.decoding import Decoder
-from nilearn.maskers import NiftiLabelsMasker
-from nilearn import image
-from joblib import Parallel, delayed, dump
-from pathlib import Path
-from scipy.stats import pearsonr
 
 
 def compute_groups(subject_dict):

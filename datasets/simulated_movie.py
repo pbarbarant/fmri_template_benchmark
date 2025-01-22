@@ -4,8 +4,9 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from nilearn.maskers import NiftiMasker
     from fmralign.tests.utils import random_niimg
+    from nilearn.maskers import NiftiMasker
+
     from benchmark_utils.datasets_utils import (
         check_init_dataset,
         log_dataset_info,

@@ -1,10 +1,8 @@
 # %%
 from pathlib import Path
+
 import matplotlib.pyplot as plt
-
-from nilearn import plotting
-
-from nilearn import image
+from nilearn import image, plotting
 
 plt.rcParams["figure.dpi"] = 500
 

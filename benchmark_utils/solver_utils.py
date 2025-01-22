@@ -1,7 +1,9 @@
-import numpy as np
-from benchmark_utils.datasets_utils import LabeledImage
 from pathlib import Path
-from joblib import load, dump
+
+import numpy as np
+from joblib import dump, load
+
+from benchmark_utils.datasets_utils import LabeledImage
 
 
 def _compute_template(
