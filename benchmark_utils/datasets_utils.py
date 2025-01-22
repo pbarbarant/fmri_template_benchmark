@@ -604,3 +604,40 @@ def fetch_raiders(
         masker=masker,
         clustering_img=clustering_img,
     )
+
+
+@MEMORY.cache
+def fetch_neuromod(n_parcels):
+    DATA_PATH = Path("/data/parietal/store2/work/tbazeill/neuromod/3mm/")
+    subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
+
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing Neuromod data"):
+        dict_alignment[subject] = image.load_img(
+            DATA_PATH
+            / f"{subject}_task-life_space-MNI152NLin2009cAsym_desc-postproc_bold.nii.gz"
+        )
+        dict_decoding[subject] = LabeledImage(
+            img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
+            y=pd.read_csv(
+                DATA_PATH / f"{subject}_labels.csv", header=None
+            ).values.flatten(),
+        )
+
+    clustering_img = fetch_clustering_img(
+        dict_alignment[subjects[0]], n_parcels
+    )
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subjects],
+        clustering_img,
+    )
+
+    return Dataset(
+        name="Neuromod",
+        subjects=subjects,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
+    )
