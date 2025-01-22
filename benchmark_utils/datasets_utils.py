@@ -136,6 +136,19 @@ def _sample_labeled_image(n_samples, masker):
     )
 
 
+def _sample_movie_segment(n_segments, masker):
+    mask_img = masker.mask_img_
+    n_voxels = masker.transform(mask_img).shape[1]
+    segment_len = 5
+    data = np.random.randn(n_segments * segment_len, n_voxels)
+    img = masker.inverse_transform(data)
+    y = np.arange(n_segments).repeat(segment_len)
+    return LabeledImage(
+        img=img,
+        y=y,
+    )
+
+
 def sample_dataset(
     name,
     masker,
@@ -154,6 +167,36 @@ def sample_dataset(
         ).img
         dict_decoding[subject] = _sample_labeled_image(
             n_samples_decoding, masker
+        )
+
+    return Dataset(
+        name=name,
+        subjects=subjects,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
+    )
+
+
+def sample_movie_dataset(
+    name,
+    masker,
+    clustering_img,
+    subjects,
+    n_segments_alignement,
+    n_segments_decoding,
+):
+    print(f"Generating fold {name}")
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in subjects:
+        # Generate random surface images for each subject.
+        dict_alignment[subject] = _sample_movie_segment(
+            n_segments_alignement, masker
+        ).img
+        dict_decoding[subject] = _sample_movie_segment(
+            n_segments_decoding, masker
         )
 
     return Dataset(
