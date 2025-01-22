@@ -127,7 +127,6 @@ fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
 fig2.savefig(figures_path / "boxplot_task_accuracy.pdf", bbox_inches="tight")
 
 plt.show()
-# %%
 
 # Do the same for the Pearson correlation
 df = get_results_dataframe(data_path, score="pearson_corrs")
