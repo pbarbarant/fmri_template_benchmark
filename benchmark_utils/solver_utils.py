@@ -96,6 +96,7 @@ def save_template_nii(template, dataset_name, solver_name):
     template_img = template.img
     template_img.to_filename(output_dir / "template.nii.gz")
 
+
 def save_template_gii(template, dataset_name, solver_name):
     output_dir = Path("outputs") / dataset_name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
