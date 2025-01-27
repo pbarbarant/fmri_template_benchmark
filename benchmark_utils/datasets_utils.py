@@ -9,8 +9,14 @@ from ibc_public import utils_data
 from joblib import Memory
 from nibabel import Nifti1Image
 from nilearn import image
-from nilearn.datasets import fetch_atlas_schaefer_2018, load_mni152_brain_mask
-from nilearn.maskers import MultiNiftiMasker
+from nilearn.datasets import (
+    fetch_atlas_schaefer_2018,
+    load_mni152_brain_mask,
+    load_fsaverage,
+)
+from nilearn.maskers._utils import concatenate_surface_images
+from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
+from nilearn.surface import SurfaceImage, vol_to_surf
 from tqdm import tqdm
 
 MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
@@ -18,7 +24,7 @@ MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
 
 @dataclass
 class LabeledImage:
-    img: Nifti1Image
+    img: Nifti1Image | SurfaceImage
     y: Optional[np.ndarray]
 
 
@@ -32,6 +38,7 @@ class Dataset:
     clustering_img: Nifti1Image
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
     template: Optional[LabeledImage] = None
+    is_surf: bool = False
 
 
 def check_init_dataset(dataset: Dataset) -> None:
@@ -54,14 +61,24 @@ def check_init_dataset(dataset: Dataset) -> None:
         assert (
             dataset.dict_decoding[subject].img.shape[-1] == n_samples_decoding
         ), "Inconsistent number of samples in decoding"
-        assert (
-            dataset.dict_alignment[subject].shape[:-1]
-            == dataset.masker.mask_img_.shape
-        ), "Alignment image shape does not match mask shape"
-        assert (
-            dataset.dict_decoding[subject].img.shape[:-1]
-            == dataset.masker.mask_img_.shape
-        ), "Decoding image shape does not match mask shape"
+        if dataset.is_surf:
+            assert (
+                dataset.dict_alignment[subject].shape[0]
+                == dataset.masker.mask_img_.shape[0]
+            ), "Alignment image shape does not match mask shape"
+            assert (
+                dataset.dict_decoding[subject].img.shape[0]
+                == dataset.masker.mask_img_.shape[0]
+            ), "Decoding image shape does not match mask shape"
+        else:
+            assert (
+                dataset.dict_alignment[subject].shape[:-1]
+                == dataset.masker.mask_img_.shape
+            ), "Alignment image shape does not match mask shape"
+            assert (
+                dataset.dict_decoding[subject].img.shape[:-1]
+                == dataset.masker.mask_img_.shape
+            ), "Decoding image shape does not match mask shape"
         assert (
             dataset.dict_decoding[subject].y.shape[0]
             == dataset.dict_decoding[subject].img.shape[-1]
@@ -79,9 +96,16 @@ def log_dataset_info(dataset: Dataset) -> None:
         f.write(f"Number of subjects: {len(dataset.dict_alignment)}\n")
         f.write(f"List of subjects: {list(dataset.dict_alignment.keys())}\n")
         f.write(f"Image shape: {dataset.clustering_img.shape}\n")
-        f.write(
-            f"Number of parcels: {len(np.unique(dataset.clustering_img.get_fdata())) - 1}\n"
-        )
+        if dataset.is_surf:
+            parts = dataset.clustering_img.data.parts
+            n_parcels = max(parts["left"].max(), parts["right"].max())-1
+            f.write(
+                f"Number of parcels: {n_parcels}\n"
+            )
+        else:
+            f.write(
+                f"Number of parcels: {len(np.unique(dataset.clustering_img.get_fdata())) - 1}\n"
+            )
         f.write(
             f"List of decoding conditions: {np.unique(dataset.dict_decoding[first_subject].y)}\n"
         )
@@ -226,10 +250,10 @@ def fetch_ibc(
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing IBC data"):
         alignment_df = df[
-            (df.subject == subject) & (df.path.str.contains("ffx"))
+            (df.subject == subject) & (df.path.str.contains("_dir-ap"))
         ]
         decoding_df = df[
-            (df.subject == subject) & ~(df.path.str.contains("ffx"))
+            (df.subject == subject) & (df.path.str.contains("_dir-pa"))
         ]
         dict_alignment[subject] = image.concat_imgs(
             alignment_df.path.to_list()
@@ -254,6 +278,82 @@ def fetch_ibc(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+    )
+
+
+def load_surface_img(paths, mesh):
+    # Remove lh.gii and rh.gii extension
+    paths = [path[:-7] for path in paths]
+    # Remove duplicates
+    paths = list(dict.fromkeys(paths))
+    surf_imgs = []
+    for path in paths:
+        surf_img = SurfaceImage(
+            mesh=mesh,
+            data={
+                "left": path + "_lh.gii",
+                "right": path + "_rh.gii",
+            },
+        )
+        surf_imgs.append(surf_img)
+    return concatenate_surface_images(surf_imgs)
+
+
+@MEMORY.cache
+def fetch_ibc_surf(
+    name="IBC",
+    subjects=None,
+    task=None,
+    n_parcels=400,
+):
+    DERIVATIVES = "/data/parietal/store2/data/ibc/derivatives"
+    df = utils_data.make_surf_db(
+        derivatives=DERIVATIVES,
+        subject_list=subjects,
+        task_list=[task],
+        acquisition="all",
+    )
+    mesh = load_fsaverage("fsaverage5")["pial"]
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing IBC data"):
+        alignment_df = df[
+            (df.subject == subject) & (df.path.str.contains("_dir-ap"))
+        ]
+        decoding_df = df[
+            (df.subject == subject) & (df.path.str.contains("_dir-pa"))
+        ]
+        dict_alignment[subject] = load_surface_img(
+            alignment_df.path.to_list(), mesh
+        )
+        dict_decoding[subject] = LabeledImage(
+            img=load_surface_img(decoding_df.path.to_list(), mesh),
+            y=decoding_df[decoding_df.side == "lh"].contrast.to_numpy(),
+        )
+
+    atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels)["maps"]
+    left_data = vol_to_surf(atlas, mesh.parts["left"])
+    right_data = vol_to_surf(atlas, mesh.parts["right"])
+    clustering_img = SurfaceImage(
+        mesh=mesh,
+        data={
+            "left": left_data.astype(int),
+            "right": right_data.astype(int),
+        },
+    )
+
+    masker = SurfaceMasker(
+        memory=MEMORY, memory_level=1, standardize=True
+    ).fit([dict_alignment[subject] for subject in subjects])
+
+    return Dataset(
+        name=name,
+        subjects=subjects,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
+        is_surf=True,
     )
 
 
