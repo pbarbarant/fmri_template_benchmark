@@ -44,7 +44,10 @@ def _compute_template(
     )
 
     # Save the template
-    save_template_nii(template, dataset.name, solver_name)
+    if dataset.is_surf:
+        save_template_gii(template, dataset.name, solver_name)
+    else:
+        save_template_nii(template, dataset.name, solver_name)
 
     dataset.template = template
     dataset.dict_aligned = dict_aligned
@@ -92,3 +95,9 @@ def save_template_nii(template, dataset_name, solver_name):
     output_dir.mkdir(exist_ok=True, parents=True)
     template_img = template.img
     template_img.to_filename(output_dir / "template.nii.gz")
+
+def save_template_gii(template, dataset_name, solver_name):
+    output_dir = Path("outputs") / dataset_name / solver_name
+    output_dir.mkdir(exist_ok=True, parents=True)
+    template_img = template.img
+    template_img.data.to_filename(output_dir / "template_data.gii")
