@@ -11,11 +11,11 @@ from nibabel import Nifti1Image
 from nilearn import image
 from nilearn.datasets import (
     fetch_atlas_schaefer_2018,
-    load_mni152_brain_mask,
     load_fsaverage,
+    load_mni152_brain_mask,
 )
-from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
+from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.surface import SurfaceImage, vol_to_surf
 from tqdm import tqdm
 
