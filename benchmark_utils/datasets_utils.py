@@ -39,6 +39,7 @@ class Dataset:
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
     template: Optional[LabeledImage] = None
     is_surf: bool = False
+    paradigm: str = "task"
 
 
 def check_init_dataset(dataset: Dataset) -> None:
@@ -98,10 +99,8 @@ def log_dataset_info(dataset: Dataset) -> None:
         f.write(f"Image shape: {dataset.clustering_img.shape}\n")
         if dataset.is_surf:
             parts = dataset.clustering_img.data.parts
-            n_parcels = max(parts["left"].max(), parts["right"].max())-1
-            f.write(
-                f"Number of parcels: {n_parcels}\n"
-            )
+            n_parcels = max(parts["left"].max(), parts["right"].max()) - 1
+            f.write(f"Number of parcels: {n_parcels}\n")
         else:
             f.write(
                 f"Number of parcels: {len(np.unique(dataset.clustering_img.get_fdata())) - 1}\n"
@@ -159,7 +158,7 @@ def _sample_labeled_image(n_samples, masker):
     )
 
 
-def _sample_movie_segment(n_segments, masker):
+def sample_movie_segment(n_segments, masker):
     mask_img = masker.mask_img_
     n_voxels = masker.transform(mask_img).shape[1]
     segment_len = 5
@@ -215,10 +214,10 @@ def sample_movie_dataset(
     dict_decoding = dict()
     for subject in subjects:
         # Generate random surface images for each subject.
-        dict_alignment[subject] = _sample_movie_segment(
+        dict_alignment[subject] = sample_movie_segment(
             n_segments_alignement, masker
         ).img
-        dict_decoding[subject] = _sample_movie_segment(
+        dict_decoding[subject] = sample_movie_segment(
             n_segments_decoding, masker
         )
 
@@ -229,6 +228,7 @@ def sample_movie_dataset(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        paradigm="movie",
     )
 
 
@@ -636,6 +636,7 @@ def fetch_budapest(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        paradigm="movie",
     )
 
 
@@ -702,6 +703,7 @@ def fetch_raiders(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        paradigm="movie",
     )
 
 
