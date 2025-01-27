@@ -4,7 +4,8 @@ import numpy as np
 from joblib import Parallel, delayed, dump
 from nilearn import image
 from nilearn.decoding import Decoder
-from nilearn.maskers import NiftiLabelsMasker
+from nilearn.maskers import NiftiLabelsMasker, SurfaceLabelsMasker
+from nilearn.maskers._utils import concatenate_surface_images
 from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import (
@@ -45,9 +46,14 @@ def compute_pearson_corrs(dataset):
     template_img = dataset.template.img
     clustering_img = dataset.clustering_img
     masker = dataset.masker
-    labels_masker = NiftiLabelsMasker(
-        labels_img=clustering_img, mask_img=masker.mask_img_
-    ).fit()
+    if dataset.is_surf:
+        labels_masker = SurfaceLabelsMasker(
+            labels_img=clustering_img, mask_img=masker.mask_img_
+        ).fit()
+    else:
+        labels_masker = NiftiLabelsMasker(
+            labels_img=clustering_img, mask_img=masker.mask_img_
+        ).fit()
     pearson_corrs = []
     for subject in dataset.subjects:
         subject_img = dataset.dict_aligned[subject].img
@@ -116,9 +122,14 @@ def evaluate_task_dataset(dataset):
         imgs = None
     else:
         groups = compute_groups(dict_aligned)
-        imgs = image.concat_imgs(
-            [dict_aligned[subject].img for subject in dataset.subjects]
-        )
+        if dataset.is_surf:
+            imgs = concatenate_surface_images(
+                [dict_aligned[subject].img for subject in dataset.subjects]
+            )
+        else:
+            imgs = image.concat_imgs(
+                [dict_aligned[subject].img for subject in dataset.subjects]
+            )
 
     y = np.concatenate([dict_aligned[subject].y for subject in subject_list])
 
