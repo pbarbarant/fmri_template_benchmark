@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from ibc_public import utils_data
 from joblib import Memory
-from nibabel import Nifti1Image
+from nibabel.nifti1 import Nifti1Image
 from nilearn import image
 from nilearn.datasets import (
     fetch_atlas_schaefer_2018,
@@ -25,7 +25,7 @@ MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
 @dataclass
 class LabeledImage:
     img: Nifti1Image | SurfaceImage
-    y: Optional[np.ndarray]
+    y: np.ndarray
 
 
 @dataclass
@@ -47,6 +47,7 @@ def check_init_dataset(dataset: Dataset) -> None:
     first_subject = list(dataset.dict_alignment.keys())[0]
     n_samples_alignment = dataset.dict_alignment[first_subject].shape[-1]
     n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
+    mask_img = dataset.masker.mask_img_
 
     assert dataset.template is None, (
         "Template should be None at initialization"
@@ -64,21 +65,18 @@ def check_init_dataset(dataset: Dataset) -> None:
         ), "Inconsistent number of samples in decoding"
         if dataset.is_surf:
             assert (
-                dataset.dict_alignment[subject].shape[0]
-                == dataset.masker.mask_img_.shape[0]
+                dataset.dict_alignment[subject].shape[0] == mask_img.shape[0]
             ), "Alignment image shape does not match mask shape"
             assert (
                 dataset.dict_decoding[subject].img.shape[0]
-                == dataset.masker.mask_img_.shape[0]
+                == mask_img.shape[0]
             ), "Decoding image shape does not match mask shape"
         else:
             assert (
-                dataset.dict_alignment[subject].shape[:-1]
-                == dataset.masker.mask_img_.shape
+                dataset.dict_alignment[subject].shape[:-1] == mask_img.shape
             ), "Alignment image shape does not match mask shape"
             assert (
-                dataset.dict_decoding[subject].img.shape[:-1]
-                == dataset.masker.mask_img_.shape
+                dataset.dict_decoding[subject].img.shape[:-1] == mask_img.shape
             ), "Decoding image shape does not match mask shape"
         assert (
             dataset.dict_decoding[subject].y.shape[0]
