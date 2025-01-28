@@ -1,16 +1,17 @@
 from pathlib import Path
 
 import numpy as np
+from fmralign.template_alignment import TemplateAlignment
 from joblib import dump, load
 
-from benchmark_utils.datasets_utils import LabeledImage
+from benchmark_utils.datasets_utils import Dataset, LabeledImage
 
 
 def _compute_template(
-    algo,
-    dataset,
-    solver_name,
-):
+    algo: TemplateAlignment,
+    dataset: Dataset,
+    solver_name: str,
+) -> Dataset:
     # Get the list of subjects
     subject_list = list(dataset.dict_alignment.keys())
 
@@ -56,10 +57,10 @@ def _compute_template(
 
 
 def compute_template(
-    algo,
-    dataset,
-    solver_name,
-):
+    algo: TemplateAlignment,
+    dataset: Dataset,
+    solver_name: str,
+) -> Dataset:
     cache_dir = (
         Path(__file__).parent.parent
         / "memory_cache"
@@ -90,14 +91,18 @@ def compute_template(
         return dataset
 
 
-def save_template_nii(template, dataset_name, solver_name):
+def save_template_nii(
+    template: LabeledImage, dataset_name: str, solver_name: str
+) -> None:
     output_dir = Path("outputs") / dataset_name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
     template_img = template.img
     template_img.to_filename(output_dir / "template.nii.gz")
 
 
-def save_template_gii(template, dataset_name, solver_name):
+def save_template_gii(
+    template: LabeledImage, dataset_name: str, solver_name: str
+) -> None:
     output_dir = Path("outputs") / dataset_name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
     template_img = template.img
