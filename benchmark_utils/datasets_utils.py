@@ -6,20 +6,30 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 from ibc_public import utils_data
-from joblib import Memory
 from nibabel.nifti1 import Nifti1Image
 from nilearn import image
 from nilearn.datasets import (
     fetch_atlas_schaefer_2018,
+    fetch_atlas_surf_destrieux,
     load_fsaverage,
     load_mni152_brain_mask,
 )
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
-from nilearn.surface import PolyMesh, SurfaceImage, vol_to_surf
+from nilearn.surface import PolyMesh, SurfaceImage
 from tqdm import tqdm
 
-MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
+from benchmark_utils.conf import (
+    BUDAPEST_PATH,
+    FORREST_PATH,
+    HCP_PATH,
+    IBC_PATH,
+    IBC_SURF_PATH,
+    MEMORY,
+    NEUROMOD_PATH,
+    NSD_PATH,
+    RAIDERS_PATH,
+)
 
 
 @dataclass
@@ -245,9 +255,8 @@ def fetch_ibc(
     task: str = None,
     n_parcels: int = 400,
 ) -> Dataset:
-    DERIVATIVES = "/data/parietal/store2/data/ibc/3mm"
     df = utils_data.make_vol_db(
-        derivatives=DERIVATIVES,
+        derivatives=IBC_PATH,
         subject_list=subjects,
         task_list=[task],
         acquisition="all",
@@ -314,11 +323,9 @@ def fetch_ibc_surf(
     name: str = "IBC",
     subjects: List[str] = None,
     task: str = None,
-    n_parcels: int = 400,
 ) -> Dataset:
-    DERIVATIVES = "/data/parietal/store2/data/ibc/derivatives"
     df = utils_data.make_surf_db(
-        derivatives=DERIVATIVES,
+        derivatives=IBC_SURF_PATH,
         subject_list=subjects,
         task_list=[task],
         acquisition="all",
@@ -341,14 +348,12 @@ def fetch_ibc_surf(
             y=decoding_df[decoding_df.side == "lh"].contrast.to_numpy(),
         )
 
-    atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels)["maps"]
-    left_data = vol_to_surf(atlas, mesh.parts["left"])
-    right_data = vol_to_surf(atlas, mesh.parts["right"])
+    atlas = fetch_atlas_surf_destrieux()
     clustering_img = SurfaceImage(
         mesh=mesh,
         data={
-            "left": left_data.astype(int),
-            "right": right_data.astype(int),
+            "left": atlas["map_left"],
+            "right": atlas["map_right"],
         },
     )
 
@@ -455,18 +460,17 @@ def fetch_hcp(
     task: str = None,
     n_parcels: int = 400,
 ) -> Dataset:
-    DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
-    valid_subjects_list = get_valid_hcp_subjects_list(DERIVATIVES)
+    valid_subjects_list = get_valid_hcp_subjects_list(HCP_PATH)
     subject_list = valid_subjects_list[:n_subjects]
     alignment_df = make_hcp_db(
-        derivatives=DERIVATIVES,
+        derivatives=HCP_PATH,
         subject_list=subject_list,
         tasks="all",
         phase_encoding="LR",
     )
 
     decoding_df = make_hcp_db(
-        derivatives=DERIVATIVES,
+        derivatives=HCP_PATH,
         subject_list=subject_list,
         tasks=[task],
         phase_encoding="RL",
@@ -508,19 +512,18 @@ def fetch_forrest(
     subjects: List[str] = None,
     n_parcels: int = 400,
 ) -> Dataset:
-    DATA_PATH = Path(
-        "/data/parietal/store2/work/tbazeill/forrest/derivatives/"
-    )
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Forrest data"):
         dict_alignment[subject] = image.load_img(
-            DATA_PATH / f"gm_3mm_{subject}.nii.gz"
+            Path(FORREST_PATH) / f"gm_3mm_{subject}.nii.gz"
         )
         dict_decoding[subject] = LabeledImage(
-            img=image.load_img(DATA_PATH / f"forrest_gm_3mm_{subject}.nii.gz"),
+            img=image.load_img(
+                Path(FORREST_PATH) / f"forrest_gm_3mm_{subject}.nii.gz"
+            ),
             y=pd.read_csv(
-                DATA_PATH / f"{subject}_labels.csv", header=None
+                Path(FORREST_PATH) / f"{subject}_labels.csv", header=None
             ).to_numpy(),
         )
 
@@ -548,20 +551,16 @@ def fetch_nsd(
     subjects: List[str] = None,
     n_parcels: int = 400,
 ) -> Dataset:
-    DATA_PATH = Path(
-        "/data/parietal/store3/work/pbarbara/datasets/fmralign_benchopt_data/NSD"
-    )
-
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing NSD data"):
         dict_alignment[subject] = image.load_img(
-            DATA_PATH / f"alignment/{subject}.nii.gz"
+            Path(NSD_PATH) / f"alignment/{subject}.nii.gz"
         )
         dict_decoding[subject] = LabeledImage(
-            img=image.load_img(DATA_PATH / f"decoding/{subject}.nii.gz"),
+            img=image.load_img(Path(NSD_PATH) / f"decoding/{subject}.nii.gz"),
             y=pd.read_csv(
-                DATA_PATH / f"decoding/{subject}_labels.csv", header=None
+                Path(NSD_PATH) / f"decoding/{subject}_labels.csv", header=None
             ).values.flatten(),
         )
 
@@ -601,12 +600,10 @@ def fetch_budapest(
     n_parcels: int = 400,
     lo_run: int = 1,
 ) -> Dataset:
-    DATA_PATH = Path("/data/parietal/store3/data/budapest")
-
     # Fetch subjects
-    subjects = sorted([p.name for p in DATA_PATH.glob("sub-*") if p.is_dir()])[
-        :10
-    ]
+    subjects = sorted(
+        [p.name for p in Path(BUDAPEST_PATH).glob("sub-*") if p.is_dir()]
+    )[:10]
 
     dict_alignment = dict()
     dict_decoding = dict()
@@ -615,7 +612,7 @@ def fetch_budapest(
         for run in range(1, 6):
             if run == lo_run:
                 img, y = load_budapest_img_labels(
-                    DATA_PATH
+                    Path(BUDAPEST_PATH)
                     / subject
                     / "func"
                     / f"{subject}_task-movie_run-{run:02d}_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz"
@@ -623,7 +620,7 @@ def fetch_budapest(
                 dict_decoding[subject] = LabeledImage(img=img, y=y)
             else:
                 img = image.load_img(
-                    DATA_PATH
+                    Path(BUDAPEST_PATH)
                     / subject
                     / "func"
                     / f"{subject}_task-movie_run-{run:02d}_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz"
@@ -672,19 +669,17 @@ def fetch_raiders(
     n_parcels: int = 400,
     lo_run: int = 1,
 ) -> Dataset:
-    DATA_PATH = Path(
-        "/data/parietal/store3/data/raiders_haxby_full/labs/haxby/raiders-fmriprep/"
-    )
-
     # Fetch subjects
-    subjects = sorted([p.name for p in DATA_PATH.glob("sub-*") if p.is_dir()])
+    subjects = sorted(
+        [p.name for p in Path(RAIDERS_PATH).glob("sub-*") if p.is_dir()]
+    )
 
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Raiders data"):
         alignment_imgs = []
         for run in range(1, 9):
-            prefix = DATA_PATH / subject / "func"
+            prefix = Path(RAIDERS_PATH) / subject / "func"
             img_path = (
                 prefix
                 / glob.glob(
@@ -725,7 +720,7 @@ def fetch_raiders(
 
 @MEMORY.cache
 def fetch_neuromod(n_parcels: int) -> Dataset:
-    DATA_PATH = Path("/data/parietal/store2/work/tbazeill/neuromod/3mm/")
+    DATA_PATH = Path()
     subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
 
     dict_alignment = dict()
