@@ -358,7 +358,7 @@ def fetch_ibc_surf(
 
 
 @MEMORY.cache
-def get_valid_subjects_list(derivatives):
+def get_valid_hcp_subjects_list(derivatives):
     """Check which subjects have all the tasks."""
     tasks = [
         "EMOTION",
@@ -446,7 +446,7 @@ def fetch_hcp(
     n_parcels=400,
 ):
     DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
-    valid_subjects_list = get_valid_subjects_list(DERIVATIVES)
+    valid_subjects_list = get_valid_hcp_subjects_list(DERIVATIVES)
     subject_list = valid_subjects_list[:n_subjects]
     alignment_df = make_hcp_db(
         derivatives=DERIVATIVES,
