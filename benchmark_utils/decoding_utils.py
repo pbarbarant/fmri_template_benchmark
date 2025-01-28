@@ -13,6 +13,8 @@ from sklearn.model_selection import (
     cross_val_score,
 )
 
+from benchmark_utils.conf import N_JOBS
+
 
 def compute_groups(subject_dict):
     n_samples = next(iter(subject_dict.values())).img.shape[-1]
@@ -92,7 +94,7 @@ def cross_validate_subjects(
         standardize=True,
         screening_percentile=5,
         scoring="balanced_accuracy",
-        n_jobs=-1,
+        N_JOBS=N_JOBS,
         verbose=11,
     )
     decoder_svc.fit(imgs, y, groups=groups)
@@ -194,7 +196,7 @@ def evaluate_movie_dataset(dataset):
     ).fit()
 
     # Parallelize the classification of each subject
-    cv_scores_classif = Parallel(n_jobs=-1, verbose=11)(
+    cv_scores_classif = Parallel(N_JOBS=-1, verbose=11)(
         delayed(classify_subject_movie)(
             dataset.template.img,
             dict_aligned[subject].img,
@@ -210,7 +212,7 @@ def evaluate_movie_dataset(dataset):
         y,
         groups=groups,
         cv=LeaveOneGroupOut(),
-        n_jobs=-1,
+        N_JOBS=-1,
     )
 
     avg_score = np.mean(cv_scores_classif)
