@@ -34,7 +34,6 @@ class Dataset(BaseDataset):
             "sub-13",
             "sub-14",
         ]
-        self.n_parcels = 400
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -47,7 +46,6 @@ class Dataset(BaseDataset):
             name=self.name,
             subjects=self.subjects,
             task="RSVPLanguage",
-            n_parcels=self.n_parcels,
         )
 
         check_init_dataset(self.dataset)
