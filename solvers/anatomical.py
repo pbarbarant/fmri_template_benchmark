@@ -7,6 +7,7 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fmralign.template_alignment import TemplateAlignment
 
+    from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_template
 
 
@@ -48,7 +49,7 @@ class Solver(BaseSolver):
             alignment_method="identity",
             mask=self.dataset.masker,
             clustering=self.dataset.clustering_img,
-            n_jobs=-1,
+            n_jobs=N_JOBS,
             verbose=11,
         )
 
