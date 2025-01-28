@@ -13,7 +13,7 @@ def _compute_template(
     solver_name: str,
 ) -> Dataset:
     # Get the list of subjects
-    subject_list = list(dataset.dict_alignment.keys())
+    subject_list = dataset.subject_list
 
     # Get the list of images
     imgs = [dataset.dict_alignment[subject] for subject in subject_list]
