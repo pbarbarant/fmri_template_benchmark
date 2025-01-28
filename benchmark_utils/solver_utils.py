@@ -13,20 +13,20 @@ def _compute_template(
     solver_name: str,
 ) -> Dataset:
     # Get the list of subjects
-    subject_list = dataset.subject_list
+    subjects = dataset.subjects
 
     # Get the list of images
-    imgs = [dataset.dict_alignment[subject] for subject in subject_list]
+    imgs = [dataset.dict_alignment[subject] for subject in subjects]
 
     # Align the images
     algo.fit(imgs)
 
     # Initialize the template
     template_data = np.zeros_like(
-        dataset.masker.transform(dataset.dict_decoding[subject_list[0]].img)
+        dataset.masker.transform(dataset.dict_decoding[subjects[0]].img)
     )
     dict_aligned = dict()
-    for i, subject in enumerate(subject_list):
+    for i, subject in enumerate(subjects):
         transformed_img = algo.transform(
             dataset.dict_decoding[subject].img, subject_index=i
         )
@@ -35,13 +35,13 @@ def _compute_template(
             y=dataset.dict_decoding[subject].y,
         )
         template_data += dataset.masker.transform(transformed_img) / len(
-            subject_list
+            subjects
         )
 
     # Convert the template to a LabeledImage
     template = LabeledImage(
         img=dataset.masker.inverse_transform(template_data),
-        y=dataset.dict_decoding[subject_list[0]].y,
+        y=dataset.dict_decoding[subjects[0]].y,
     )
 
     # Save the template
