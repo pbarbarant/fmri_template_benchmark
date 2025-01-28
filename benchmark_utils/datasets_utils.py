@@ -16,7 +16,7 @@ from nilearn.datasets import (
 )
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
-from nilearn.surface import SurfaceImage, vol_to_surf
+from nilearn.surface import PolyMesh, SurfaceImage, vol_to_surf
 from tqdm import tqdm
 
 MEMORY = Memory(Path(__file__).parent.parent / "memory_cache", verbose=0)
@@ -116,21 +116,25 @@ def log_dataset_info(dataset: Dataset) -> None:
         )
 
 
-def fetch_clustering_img(target_img, n_rois=400):
+def fetch_clustering_img(
+    target_img: Nifti1Image, n_rois: int = 400
+) -> Nifti1Image:  # -> FileBasedImage | Nifti1Image | Any:# -> FileBasedImage | Nifti1Image | Any:
     clustering_img = fetch_atlas_schaefer_2018(n_rois=n_rois)["maps"]
     resampled_img = image.resample_to_img(clustering_img, target_img)
     int_img = image.math_img("img.astype(int)", img=resampled_img)
     return int_img
 
 
-def fit_mni152_masker(resolution=3):
+def fit_mni152_masker(resolution: int = 3) -> MultiNiftiMasker:
     mask_img = load_mni152_brain_mask(resolution=resolution)
     return MultiNiftiMasker(
         mask_img=mask_img, memory=MEMORY, memory_level=1
     ).fit()
 
 
-def fit_masker(imgs, clustering_img, detrend=False, t_r=None):
+def fit_masker(
+    imgs, clustering_img, detrend=False, t_r=None
+) -> MultiNiftiMasker:
     mask_img = image.math_img("img > 0", img=clustering_img)
     return MultiNiftiMasker(
         mask_img=mask_img,
@@ -142,11 +146,13 @@ def fit_masker(imgs, clustering_img, detrend=False, t_r=None):
     ).fit(imgs)
 
 
-def _sample_labels(n_samples):
+def _sample_labels(n_samples: int) -> np.ndarray:
     return np.arange(3).reshape(1, -1).repeat(n_samples // 3, axis=0).flatten()
 
 
-def _sample_labeled_image(n_samples, masker):
+def _sample_labeled_image(
+    n_samples: int, masker: MultiNiftiMasker
+) -> LabeledImage:
     mask_img = masker.mask_img_
     n_voxels = masker.transform(mask_img).shape[1]
     data = np.random.randn(n_samples, n_voxels)
@@ -158,7 +164,9 @@ def _sample_labeled_image(n_samples, masker):
     )
 
 
-def sample_movie_segment(n_segments, masker):
+def sample_movie_segment(
+    n_segments: int, masker: MultiNiftiMasker
+) -> LabeledImage:
     mask_img = masker.mask_img_
     n_voxels = masker.transform(mask_img).shape[1]
     segment_len = 5
@@ -172,13 +180,13 @@ def sample_movie_segment(n_segments, masker):
 
 
 def sample_dataset(
-    name,
-    masker,
-    clustering_img,
-    subjects,
-    n_samples_alignement,
-    n_samples_decoding,
-):
+    name: str,
+    masker: MultiNiftiMasker,
+    clustering_img: Nifti1Image,
+    subjects: List[str],
+    n_samples_alignement: int,
+    n_samples_decoding: int,
+) -> Dataset:
     print(f"Generating fold {name}")
     dict_alignment = dict()
     dict_decoding = dict()
@@ -208,7 +216,7 @@ def sample_movie_dataset(
     subjects,
     n_segments_alignement,
     n_segments_decoding,
-):
+) -> Dataset:
     print(f"Generating fold {name}")
     dict_alignment = dict()
     dict_decoding = dict()
@@ -234,11 +242,11 @@ def sample_movie_dataset(
 
 @MEMORY.cache
 def fetch_ibc(
-    name="IBC",
-    subjects=None,
-    task=None,
-    n_parcels=400,
-):
+    name: str = "IBC",
+    subjects: List[str] = None,
+    task: str = None,
+    n_parcels: int = 400,
+) -> Dataset:
     DERIVATIVES = "/data/parietal/store2/data/ibc/3mm"
     df = utils_data.make_vol_db(
         derivatives=DERIVATIVES,
@@ -281,7 +289,11 @@ def fetch_ibc(
     )
 
 
-def load_surface_img(paths, mesh):
+def load_surface_img(
+    paths: List[str], mesh: PolyMesh
+) -> (
+    SurfaceImage
+):  # -> Any | SurfaceImage:# -> Any | SurfaceImage:# -> Any | SurfaceImage:
     # Remove lh.gii and rh.gii extension
     paths = [path[:-7] for path in paths]
     # Remove duplicates
@@ -301,11 +313,11 @@ def load_surface_img(paths, mesh):
 
 @MEMORY.cache
 def fetch_ibc_surf(
-    name="IBC",
-    subjects=None,
-    task=None,
-    n_parcels=400,
-):
+    name: str = "IBC",
+    subjects: List[str] = None,
+    task: str = None,
+    n_parcels: int = 400,
+) -> Dataset:
     DERIVATIVES = "/data/parietal/store2/data/ibc/derivatives"
     df = utils_data.make_surf_db(
         derivatives=DERIVATIVES,
@@ -358,7 +370,7 @@ def fetch_ibc_surf(
 
 
 @MEMORY.cache
-def get_valid_hcp_subjects_list(derivatives):
+def get_valid_hcp_subjects_list(derivatives: str) -> List[str]:
     """Check which subjects have all the tasks."""
     tasks = [
         "EMOTION",
@@ -386,11 +398,11 @@ def get_valid_hcp_subjects_list(derivatives):
 
 @MEMORY.cache
 def make_hcp_db(
-    derivatives,
-    subject_list,
-    tasks,
-    phase_encoding="LR",
-):
+    derivatives: str,
+    subject_list: List[str],
+    tasks: List[str],
+    phase_encoding: str = "LR",
+) -> pd.DataFrame:
     """Returns a dataframe listing HCP data."""
     paths = []
     contrasts = []
@@ -440,11 +452,11 @@ def make_hcp_db(
 
 @MEMORY.cache
 def fetch_hcp(
-    name="HCP",
-    n_subjects=None,
-    task=None,
-    n_parcels=400,
-):
+    name: str = "HCP",
+    n_subjects: int = None,
+    task: str = None,
+    n_parcels: int = 400,
+) -> Dataset:
     DERIVATIVES = "/data/parietal/store/data/HCP900/glm/"
     valid_subjects_list = get_valid_hcp_subjects_list(DERIVATIVES)
     subject_list = valid_subjects_list[:n_subjects]
@@ -495,9 +507,9 @@ def fetch_hcp(
 
 @MEMORY.cache
 def fetch_forrest(
-    subjects=None,
-    n_parcels=400,
-):
+    subjects: List[str] = None,
+    n_parcels: int = 400,
+) -> Dataset:
     DATA_PATH = Path(
         "/data/parietal/store2/work/tbazeill/forrest/derivatives/"
     )
@@ -534,10 +546,10 @@ def fetch_forrest(
 
 @MEMORY.cache
 def fetch_nsd(
-    name="NSD",
-    subjects=None,
-    n_parcels=400,
-):
+    name: str = "NSD",
+    subjects: List[str] = None,
+    n_parcels: int = 400,
+) -> Dataset:
     DATA_PATH = Path(
         "/data/parietal/store3/work/pbarbara/datasets/fmralign_benchopt_data/NSD"
     )
@@ -573,7 +585,9 @@ def fetch_nsd(
     )
 
 
-def load_budapest_img_labels(image_path):
+def load_budapest_img_labels(
+    image_path: Path,
+) -> tuple[Nifti1Image, np.ndarray]:
     img = image.load_img(image_path)
     img_len = img.shape[-1]
     n_chunks = img_len // 15
@@ -586,9 +600,9 @@ def load_budapest_img_labels(image_path):
 
 @MEMORY.cache
 def fetch_budapest(
-    n_parcels=400,
-    lo_run=1,
-):
+    n_parcels: int = 400,
+    lo_run: int = 1,
+) -> Dataset:
     DATA_PATH = Path("/data/parietal/store3/data/budapest")
 
     # Fetch subjects
@@ -640,7 +654,11 @@ def fetch_budapest(
     )
 
 
-def load_raiders_img_labels(image_path):
+def load_raiders_img_labels(
+    image_path: Path,
+) -> tuple[
+    Nifti1Image, np.ndarray
+]:  # -> tuple[FileBasedImage | Nifti1Image | Any, ndarray[Any, dt...:
     img = image.load_img(image_path)
     img_len = img.shape[-1]
     n_chunks = img_len // 15
@@ -653,9 +671,9 @@ def load_raiders_img_labels(image_path):
 
 @MEMORY.cache
 def fetch_raiders(
-    n_parcels=400,
-    lo_run=1,
-):
+    n_parcels: int = 400,
+    lo_run: int = 1,
+) -> Dataset:
     DATA_PATH = Path(
         "/data/parietal/store3/data/raiders_haxby_full/labs/haxby/raiders-fmriprep/"
     )
@@ -708,7 +726,7 @@ def fetch_raiders(
 
 
 @MEMORY.cache
-def fetch_neuromod(n_parcels):
+def fetch_neuromod(n_parcels: int) -> Dataset:
     DATA_PATH = Path("/data/parietal/store2/work/tbazeill/neuromod/3mm/")
     subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
 
