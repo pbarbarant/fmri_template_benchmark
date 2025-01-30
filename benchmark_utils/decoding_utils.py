@@ -254,6 +254,7 @@ def save_decoding_results(
     solver_name,
 ):
     output_dir = Path("outputs") / dataset.name / solver_name
+    output_dir.mkdir(parents=True, exist_ok=True)
     results_dict = {
         "avg_score": avg_score,
         "chance_level": chance_level,
