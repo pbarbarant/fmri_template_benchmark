@@ -22,7 +22,7 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "reg": [1e-4],
+        "reg": [1e-6],
     }
 
     # List of packages needed to run the solver. See the corresponding
