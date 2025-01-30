@@ -720,7 +720,7 @@ def fetch_raiders(
 
 @MEMORY.cache
 def fetch_neuromod(n_parcels: int) -> Dataset:
-    DATA_PATH = Path()
+    DATA_PATH = Path(NEUROMOD_PATH)
     subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
 
     dict_alignment = dict()
