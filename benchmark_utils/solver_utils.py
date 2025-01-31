@@ -1,10 +1,77 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from fmralign.template_alignment import TemplateAlignment
 from joblib import dump, load
 
 from benchmark_utils.datasets_utils import Dataset, LabeledImage
+from sklearn.decomposition import PCA
+
+
+def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:
+    imgs = [
+        dict_subjects[subject].img for subject in subjects
+    ]  # Use subjects passed as parameter
+    data = np.concatenate([masker.transform(img) for img in imgs], axis=0)
+    pca = PCA(n_components=2)
+    return pca.fit_transform(data)
+
+
+def plot_pca(dataset: Dataset, solver_name: str) -> None:
+    subjects = dataset.subjects
+    masker = dataset.masker
+    pca_unaligned = compute_pca(dataset.dict_decoding, subjects, masker)
+    pca_aligned = compute_pca(dataset.dict_aligned, subjects, masker)
+
+    # Create a single figure with 2 subplots
+    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+
+    legend_subjects = np.repeat(
+        subjects, dataset.dict_decoding[subjects[0]].y.shape[0]
+    )
+    legend_condition = np.concatenate(
+        [dataset.dict_decoding[subject].y for subject in subjects]
+    )
+
+    for subject in subjects:
+        ax[0, 0].scatter(
+            pca_unaligned[legend_subjects == subject, 0],
+            pca_unaligned[legend_subjects == subject, 1],
+            label=subject,
+        )
+        ax[0, 1].scatter(
+            pca_aligned[legend_subjects == subject, 0],
+            pca_aligned[legend_subjects == subject, 1],
+            label=subject,
+        )
+
+    for condition in np.unique(legend_condition):
+        ax[1, 0].scatter(
+            pca_unaligned[legend_condition == condition, 0],
+            pca_unaligned[legend_condition == condition, 1],
+            label=condition,
+        )
+        ax[1, 1].scatter(
+            pca_aligned[legend_condition == condition, 0],
+            pca_aligned[legend_condition == condition, 1],
+            label=condition,
+        )
+
+    # Add titles and legends
+    ax[0, 0].set_title("PCA of unaligned data")
+    ax[0, 1].set_title(f"PCA of aligned data ({solver_name})")
+    ax[0, 0].legend()
+    ax[0, 1].legend()
+    ax[1, 0].legend()
+    ax[1, 1].legend()
+
+    # Save the figure
+    fig.savefig(
+        Path("outputs") / "figures" / f"{dataset.name}_{solver_name}_pca.png",
+        bbox_inches="tight",
+        dpi=300,
+    )
 
 
 def _compute_template(
