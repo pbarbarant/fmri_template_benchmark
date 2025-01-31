@@ -135,27 +135,19 @@ def compute_template(
         / dataset.name
         / solver_name
     )
-    if (cache_dir / "dict_aligned.pkl").exists() and (
-        cache_dir / "template.pkl"
-    ).exists():
-        print(f"Loading aligned data from cache: {cache_dir}")
-        # Load the dataset from the cache
-        template = load(cache_dir / "template.pkl")
-        dict_aligned = load(cache_dir / "dict_aligned.pkl")
-        dataset.template = template
-        dataset.dict_aligned = dict_aligned
-        return dataset
-    else:
-        dataset = _compute_template(
-            algo=algo,
-            dataset=dataset,
-            solver_name=solver_name,
-        )
-        # Save the dataset to the cache
-        cache_dir.mkdir(exist_ok=True, parents=True)
-        dump(dataset.template, cache_dir / "template.pkl")
-        dump(dataset.dict_aligned, cache_dir / "dict_aligned.pkl")
-        return dataset
+    dataset = _compute_template(
+        algo=algo,
+        dataset=dataset,
+        solver_name=solver_name,
+    )
+    print("Computing PCA")
+    plot_pca(dataset, solver_name)
+    print("PCA computed")
+    # Save the dataset to the cache
+    cache_dir.mkdir(exist_ok=True, parents=True)
+    dump(dataset.template, cache_dir / "template.pkl")
+    dump(dataset.dict_aligned, cache_dir / "dict_aligned.pkl")
+    return dataset
 
 
 def save_template_nii(
