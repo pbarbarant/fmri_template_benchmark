@@ -22,7 +22,7 @@ class Solver(BaseSolver):
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        "reg": [1e-6],
+        "reg": [0.1],
     }
 
     # List of packages needed to run the solver. See the corresponding
@@ -53,7 +53,7 @@ class Solver(BaseSolver):
             clustering=self.dataset.clustering_img,
             device=torch.device("cuda"),
             n_jobs=N_JOBS,
-            verbose=11,
+            verbose=1,
             reg=self.reg,
         )
 
