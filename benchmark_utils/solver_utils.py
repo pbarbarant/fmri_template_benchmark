@@ -66,9 +66,11 @@ def plot_pca(dataset: Dataset, solver_name: str) -> None:
     ax[1, 0].legend()
     ax[1, 1].legend()
 
+    output_dir = Path("outputs") / "figures"
+    output_dir.mkdir(exist_ok=True, parents=True)
     # Save the figure
     fig.savefig(
-        Path("outputs") / "figures" / f"{dataset.name}_{solver_name}_pca.png",
+        output_dir / f"{dataset.name}_{solver_name}_pca.png",
         bbox_inches="tight",
         dpi=300,
     )
@@ -128,13 +130,6 @@ def compute_template(
     dataset: Dataset,
     solver_name: str,
 ) -> Dataset:
-    cache_dir = (
-        Path(__file__).parent.parent
-        / "memory_cache"
-        / "alignments"
-        / dataset.name
-        / solver_name
-    )
     dataset = _compute_template(
         algo=algo,
         dataset=dataset,
@@ -144,9 +139,6 @@ def compute_template(
     plot_pca(dataset, solver_name)
     print("PCA computed")
     # Save the dataset to the cache
-    cache_dir.mkdir(exist_ok=True, parents=True)
-    dump(dataset.template, cache_dir / "template.pkl")
-    dump(dataset.dict_aligned, cache_dir / "dict_aligned.pkl")
     return dataset
 
 
