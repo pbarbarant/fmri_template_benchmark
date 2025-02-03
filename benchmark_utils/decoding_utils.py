@@ -88,35 +88,6 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     return np.mean(cleaned_correlations)
 
 
-def cross_validate_subjects(
-    imgs,
-    y,
-    groups,
-    masker=None,
-    estimator="svc",
-):
-    decoder_svc = Decoder(
-        estimator=estimator,
-        mask=masker,
-        cv=LeaveOneGroupOut(),
-        standardize=True,
-        screening_percentile=5,
-        scoring="balanced_accuracy",
-        n_jobs=N_JOBS,
-        verbose=11,
-    )
-    decoder_svc.fit(imgs, y, groups=groups)
-    # Average the score along classes
-    cv_scores = decoder_svc.cv_scores_
-    # Convert the dictionary to a 2D array
-    cv_scores_classif = np.vstack(
-        [cv_scores[subject] for subject in cv_scores.keys()]
-    )
-    # Average the scores along classes
-    cv_scores_classif = np.mean(cv_scores_classif, axis=0)
-    return cv_scores_classif
-
-
 def evaluate_task_dataset(dataset):
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
