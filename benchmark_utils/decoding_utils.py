@@ -8,6 +8,9 @@ from nilearn.maskers import NiftiLabelsMasker, SurfaceLabelsMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.svm import LinearSVC
+from sklearn.feature_selection import SelectPercentile
 from sklearn.model_selection import (
     LeaveOneGroupOut,
     cross_val_score,
@@ -32,15 +35,20 @@ def compute_batched_groups(subject_dict, n_groups=10):
     return groups
 
 
-def compute_X_y(subject_dict, masker):
-    subject_list = list(subject_dict.keys())
-    X = np.concatenate(
-        [
-            masker.transform(subject_dict[subject].img)
-            for subject in subject_list
-        ]
-    )
-    y = np.concatenate([subject_dict[subject].y for subject in subject_list])
+def compute_X_y(dataset):
+    subject_list = dataset.subjects
+    dict_aligned = dataset.dict_aligned
+    masker = dataset.masker
+    if dataset.is_surf:
+        imgs = concatenate_surface_images(
+            [dict_aligned[subject].img for subject in dataset.subjects]
+        )
+    else:
+        imgs = image.concat_imgs(
+            [dict_aligned[subject].img for subject in dataset.subjects]
+        )
+    X = masker.transform(imgs)
+    y = np.concatenate([dict_aligned[subject].y for subject in subject_list])
     return X, y
 
 
@@ -110,36 +118,39 @@ def cross_validate_subjects(
 
 
 def evaluate_task_dataset(dataset):
-    subject_list = dataset.subjects
-    dict_aligned = dataset.dict_aligned
-    masker = dataset.masker
-
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
     pearson_corrs = compute_pearson_corrs(dataset)
 
     # Leave one subject out cross-validation
     if dataset.name.lower().startswith("hcp"):
-        groups = compute_batched_groups(dict_aligned, n_groups=10)
-        imgs = None
+        groups = compute_batched_groups(dataset.dict_aligned, n_groups=10)
     else:
-        groups = compute_groups(dict_aligned)
-        if dataset.is_surf:
-            imgs = concatenate_surface_images(
-                [dict_aligned[subject].img for subject in dataset.subjects]
-            )
-        else:
-            imgs = image.concat_imgs(
-                [dict_aligned[subject].img for subject in dataset.subjects]
-            )
+        groups = compute_groups(dataset.dict_aligned)
 
-    y = np.concatenate([dict_aligned[subject].y for subject in subject_list])
+    X, y = compute_X_y(dataset)
 
-    cv_scores_classif = cross_validate_subjects(
-        imgs, y, groups, masker=masker, estimator="svc"
+    svc = LinearSVC(max_iter=100)
+    pipeline = make_pipeline(SelectPercentile(percentile=5), svc)
+    cv_scores_classif = cross_val_score(
+        pipeline,
+        X,
+        y,
+        groups=groups,
+        cv=LeaveOneGroupOut(),
+        n_jobs=N_JOBS,
     )
     avg_score = np.mean(cv_scores_classif)
-    chance_level = 0.5
+    chance_level = np.mean(
+        cross_val_score(
+            DummyClassifier(strategy="most_frequent"),
+            X,
+            y,
+            groups=groups,
+            cv=LeaveOneGroupOut(),
+            n_jobs=N_JOBS,
+        )
+    )
 
     print(f"Average decoding accuracy: {avg_score:.2f}")
 
