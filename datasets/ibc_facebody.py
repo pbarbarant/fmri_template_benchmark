@@ -10,6 +10,17 @@ with safe_import_context() as import_ctx:
         log_dataset_info,
     )
 
+SUBJECTS = [
+    "sub-04",
+    "sub-05",
+    "sub-06",
+    "sub-09",
+    "sub-11",
+    "sub-12",
+    "sub-14",
+    "sub-15",
+]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -21,19 +32,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {
-        "target": [
-            "template",
-            "sub-04",
-            "sub-05",
-            "sub-06",
-            "sub-09",
-            "sub-11",
-            "sub-12",
-            "sub-14",
-            "sub-15",
-        ]
-    }
+    parameters = {"target": ["template"] + SUBJECTS}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -41,21 +40,11 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        self.subjects = [
-            "sub-04",
-            "sub-05",
-            "sub-06",
-            "sub-09",
-            "sub-11",
-            "sub-12",
-            "sub-14",
-            "sub-15",
-        ]
         self.n_parcels = 400
 
         self.dataset = fetch_ibc(
             name=self.name,
-            subjects=self.subjects,
+            subjects=SUBJECTS,
             task="FaceBody",
             n_parcels=self.n_parcels,
         )

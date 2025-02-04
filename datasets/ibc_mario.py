@@ -10,6 +10,12 @@ with safe_import_context() as import_ctx:
         log_dataset_info,
     )
 
+SUBJECTS = [
+    "sub-09",
+    "sub-11",
+    "sub-12",
+]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -20,14 +26,7 @@ class Dataset(BaseDataset):
     # section in objective.py
     install_pip = "pip"
     requirements = []
-    parameters = {
-        "target": [
-            "template",
-            "sub-09",
-            "sub-11",
-            "sub-12",
-        ]
-    }
+    parameters = {"target": ["template"] + SUBJECTS}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -35,16 +34,11 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        self.subjects = [
-            "sub-09",
-            "sub-11",
-            "sub-12",
-        ]
         self.n_parcels = 400
 
         self.dataset = fetch_ibc(
             name=self.name,
-            subjects=self.subjects,
+            subjects=SUBJECTS,
             task="Mario",
             n_parcels=self.n_parcels,
         )
