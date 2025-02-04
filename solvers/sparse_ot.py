@@ -49,11 +49,16 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
+        self.device = (
+            torch.device("cuda")
+            if torch.cuda.is_available()
+            else torch.device("cpu")
+        )
         if self.dataset.target == "template":
             algo = SparseTemplateAlignment(
                 mask=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
-                device=torch.device("cuda"),
+                device=self.device,
                 n_jobs=N_JOBS,
                 verbose=1,
                 reg=self.reg,
@@ -62,7 +67,7 @@ class Solver(BaseSolver):
             algo = SparsePairwiseAlignment(
                 mask=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
-                device=torch.device("cuda"),
+                device=self.device,
                 n_jobs=N_JOBS,
                 verbose=1,
                 reg=self.reg,
