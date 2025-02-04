@@ -75,4 +75,4 @@ class Solver(BaseSolver):
         # keyword arguments for `Objective.evaluate_result`
         # This defines the benchmark's API for solvers' results.
         # it is customizable for each benchmark.
-        return dict(dataset=self.dataset, solver_name=self.name)
+        return dict(dataset=self.dataset)
