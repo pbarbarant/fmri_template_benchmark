@@ -6,9 +6,10 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fmralign.template_alignment import TemplateAlignment
+    from fmralign.pairwise_alignment import PairwiseAlignment
 
     from benchmark_utils.conf import N_JOBS
-    from benchmark_utils.solver_utils import compute_template
+    from benchmark_utils.solver_utils import compute_alignment
 
 
 # The benchmark solvers must be named `Solver` and
@@ -45,15 +46,24 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
-        algo = TemplateAlignment(
-            alignment_method="ridge_cv",
-            mask=self.dataset.masker,
-            clustering=self.dataset.clustering_img,
-            n_jobs=N_JOBS,
-            verbose=11,
-        )
+        if self.dataset.target == "template":
+            algo = TemplateAlignment(
+                alignment_method="ridge_cv",
+                mask=self.dataset.masker,
+                clustering=self.dataset.clustering_img,
+                n_jobs=N_JOBS,
+                verbose=11,
+            )
+        else:
+            algo = PairwiseAlignment(
+                alignment_method="ridge_cv",
+                mask=self.dataset.masker,
+                clustering=self.dataset.clustering_img,
+                n_jobs=N_JOBS,
+                verbose=11,
+            )
 
-        self.dataset = compute_template(
+        self.dataset = compute_alignment(
             algo=algo,
             dataset=self.dataset,
             solver_name=self.name,
