@@ -13,6 +13,8 @@ with safe_import_context() as import_ctx:
         sample_dataset,
     )
 
+SUBJECTS = ["sub-01", "sub-02", "sub-03"]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -25,7 +27,7 @@ class Dataset(BaseDataset):
     requirements = []
 
     parameters = {
-        "target": ["sub-01", "template"],
+        "target": ["template"] + SUBJECTS,
     }
 
     def get_data(self):
@@ -34,7 +36,7 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        self.subjects = ["sub-01", "sub-02", "sub-03"]
+        self.subjects = SUBJECTS
         self.n_samples_alignement = 200
         self.n_samples_decoding = 150
 
