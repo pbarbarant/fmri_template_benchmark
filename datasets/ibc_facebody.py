@@ -44,6 +44,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_ibc(
             name=self.name,
+            target=self.target,
             subjects=SUBJECTS,
             task="FaceBody",
             n_parcels=self.n_parcels,

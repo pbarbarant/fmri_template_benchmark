@@ -38,6 +38,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_ibc(
             name=self.name,
+            target=self.target,
             subjects=SUBJECTS,
             task="Mario",
             n_parcels=self.n_parcels,
