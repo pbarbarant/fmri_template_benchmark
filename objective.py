@@ -4,7 +4,10 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchmark_utils.decoding_utils import evaluate_dataset
+    from benchmark_utils.decoding_utils import (
+        evaluate_template_dataset,
+        evaluate_subject_dataset,
+    )
 
 
 # The benchmark objective must be named `Objective` and
@@ -47,7 +50,7 @@ class Objective(BaseObjective):
         # API to pass data. This is customizable for each benchmark.
         self.dataset = dataset
 
-        print(f"Running on: {dataset.name}")
+        print(f"Running on: {dataset.name}, target: {dataset.target}")
 
     def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
@@ -60,21 +63,14 @@ class Objective(BaseObjective):
         print(f"Evaluating on: {dataset.name}")
         if bool(self.debug_mode):
             # For debugging purposes, we can return a dummy result.
-            n_subjects = len(dataset.subjects)
             avg_score = 0.5
-            chance_level = 0.5
-            cv_scores = [0.5] * n_subjects
-            pearson_corrs = [0.5] * n_subjects
         else:
-            avg_score, chance_level, cv_scores, pearson_corrs = (
-                evaluate_dataset(dataset)
-            )
-        return dict(
-            value=avg_score,
-            chance_level=chance_level,
-            cv_scores=cv_scores,
-            pearson_corrs=pearson_corrs,
-        )
+            if dataset.target == "template":
+                avg_score = evaluate_template_dataset(dataset)
+            else:
+                avg_score = evaluate_subject_dataset(dataset)
+
+        return dict(value=avg_score)
 
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
