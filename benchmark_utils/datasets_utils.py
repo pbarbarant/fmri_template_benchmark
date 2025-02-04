@@ -50,6 +50,7 @@ class Dataset:
     template: Optional[LabeledImage] = None
     is_surf: bool = False
     paradigm: str = "task"
+    target: str = "template"
 
 
 def check_init_dataset(dataset: Dataset) -> None:
@@ -189,6 +190,7 @@ def sample_movie_segment(
 
 def sample_dataset(
     name: str,
+    target: str,
     masker: MultiNiftiMasker,
     clustering_img: Nifti1Image,
     subjects: List[str],
@@ -214,6 +216,7 @@ def sample_dataset(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        target=target,
     )
 
 
