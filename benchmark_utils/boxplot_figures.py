@@ -26,12 +26,14 @@ def get_results_dataframe(
     res_list = []
     for path in results_paths:
         path = Path(path)
-        dataset = path.parent.parent.name
-        solver = path.parent.name
+        dataset = path.parent.parent.parent.name
+        solver = path.parent.parent.name
+        target = path.parent.name
         results = load(path)
         # Add the dataset name and solver name to the results
         results["data_name"] = dataset
         results["solver_name"] = solver
+        results["target"] = target
         res_list.append(results)
 
     df = pd.DataFrame(res_list)
@@ -48,6 +50,14 @@ def get_results_dataframe(
 
     # For datasets split in runs, remove the "_run-0*" suffix
     df["data_name"] = df["data_name"].str.replace(r"_run-\d+", "", regex=True)
+
+    # Add (template) to the solver name if target is template
+    df["solver_name"] = df.apply(
+        lambda x: x["solver_name"] + " (template)"
+        if x["target"] == "template"
+        else x["solver_name"],
+        axis=1,
+    )
 
     # Sort alphabetically by dataset name and solver name
     df.sort_values(by=["data_name", "solver_name"], inplace=True)
@@ -69,7 +79,7 @@ plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 
-def create_accuracy_plot(data, title, fig_height=7, chance_level=True):
+def create_accuracy_plot(data, title, fig_height=7):
     fig, ax = plt.subplots(figsize=(12, fig_height))
 
     sns.boxplot(
@@ -118,7 +128,7 @@ movie_data = df[df["type"] == "movie"]
 task_data = df[df["type"] == "task"]
 
 fig1 = create_accuracy_plot(
-    movie_data, "Movie Prediction Accuracies", fig_height=3, chance_level=False
+    movie_data, "Movie Prediction Accuracies", fig_height=3
 )
 fig2 = create_accuracy_plot(task_data, "Task Prediction Accuracies")
 fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
