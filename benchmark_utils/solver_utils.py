@@ -142,8 +142,8 @@ def compute_pairwise(
             dict_aligned[subject] = dataset.dict_decoding[subject]
         else:
             algo.fit(
-                dataset.dict_alignment[subject].img,
-                dataset.dict_alignment[target_subject].img,
+                dataset.dict_alignment[subject],
+                dataset.dict_alignment[target_subject],
             )
             transformed_img = algo.transform(
                 dataset.dict_decoding[subject].img
