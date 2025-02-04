@@ -2,11 +2,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from fmralign.template_alignment import TemplateAlignment
-from joblib import dump, load
+from fmralign.template_alignment import TemplateAlignment, PairwiseAlignment
 
 from benchmark_utils.datasets_utils import Dataset, LabeledImage
 from sklearn.decomposition import PCA
+
+from typing import Union
 
 
 def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:
@@ -18,7 +19,7 @@ def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:
     return pca.fit_transform(data)
 
 
-def plot_pca(dataset: Dataset, solver_name: str) -> None:
+def plot_pca(dataset: Dataset) -> None:
     subjects = dataset.subjects
     masker = dataset.masker
     pca_unaligned = compute_pca(dataset.dict_decoding, subjects, masker)
@@ -60,26 +61,27 @@ def plot_pca(dataset: Dataset, solver_name: str) -> None:
 
     # Add titles and legends
     ax[0, 0].set_title("PCA of unaligned data")
-    ax[0, 1].set_title(f"PCA of aligned data ({solver_name})")
+    ax[0, 1].set_title(f"PCA - {dataset.solver} - target {dataset.target}")
     ax[0, 0].legend()
     ax[0, 1].legend()
     ax[1, 0].legend()
     ax[1, 1].legend()
 
-    output_dir = Path("outputs") / "figures"
+    output_dir = (
+        Path("outputs") / dataset.name / dataset.solver / dataset.target
+    )
     output_dir.mkdir(exist_ok=True, parents=True)
     # Save the figure
     fig.savefig(
-        output_dir / f"{dataset.name}_{solver_name}_pca.png",
+        output_dir / "pca.png",
         bbox_inches="tight",
         dpi=300,
     )
 
 
-def _compute_template(
+def compute_template(
     algo: TemplateAlignment,
     dataset: Dataset,
-    solver_name: str,
 ) -> Dataset:
     # Get the list of subjects
     subjects = dataset.subjects
@@ -115,9 +117,9 @@ def _compute_template(
 
     # Save the template
     if dataset.is_surf:
-        save_template_gii(template, dataset.name, solver_name)
+        save_template_gii(template, dataset.name, dataset.solver)
     else:
-        save_template_nii(template, dataset.name, solver_name)
+        save_template_nii(template, dataset.name, dataset.solver)
 
     dataset.template = template
     dataset.dict_aligned = dict_aligned
@@ -125,20 +127,52 @@ def _compute_template(
     return dataset
 
 
-def compute_template(
-    algo: TemplateAlignment,
+def compute_pairwise(
+    target_subject: str,
+    algo: PairwiseAlignment,
+    dataset: Dataset,
+) -> Dataset:
+    subjects = dataset.subjects
+    dict_aligned = dict()
+    for subject in subjects:
+        if subject == target_subject:
+            dict_aligned[subject] = dataset.dict_decoding[subject]
+        else:
+            algo.fit(
+                dataset.dict_decoding[subject].img,
+                dataset.dict_decoding[target_subject].img,
+            )
+            transformed_img = algo.transform(
+                dataset.dict_decoding[subject].img
+            )
+            dict_aligned[subject] = LabeledImage(
+                img=transformed_img,
+                y=dataset.dict_decoding[subject].y,
+            )
+
+    dataset.dict_aligned = dict_aligned
+    return dataset
+
+
+def compute_alignment(
+    algo: Union[TemplateAlignment, PairwiseAlignment],
     dataset: Dataset,
     solver_name: str,
 ) -> Dataset:
-    dataset = _compute_template(
-        algo=algo,
-        dataset=dataset,
-        solver_name=solver_name,
-    )
+    dataset.solver = solver_name
+    if isinstance(algo, TemplateAlignment):
+        dataset = compute_template(algo, dataset)
+    elif isinstance(algo, PairwiseAlignment):
+        dataset = compute_pairwise(dataset.target, algo, dataset)
+    else:
+        raise ValueError(
+            "algo must be either TemplateAlignment or PairwiseAlignment"
+        )
+
+    # Compute the PCA
     print("Computing PCA")
-    plot_pca(dataset, solver_name)
+    plot_pca(dataset)
     print("PCA computed")
-    # Save the dataset to the cache
     return dataset
 
 
