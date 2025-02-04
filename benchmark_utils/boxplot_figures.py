@@ -95,8 +95,6 @@ def create_accuracy_plot(data, title, fig_height=7, chance_level=True):
         ax=ax,
     )
 
-    if chance_level:
-        ax.axvline(0.5, color="gray", linestyle="--")
     ax.set_xlabel("Accuracy", fontweight="bold")
     ax.set_ylabel("Dataset", fontweight="bold")
     ax.set_title(title, fontweight="bold", fontsize="large")
