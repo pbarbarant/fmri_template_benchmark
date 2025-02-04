@@ -202,7 +202,7 @@ def evaluate_movie_dataset(dataset):
     return avg_score, chance_level, cv_scores_classif
 
 
-def evaluate_dataset(dataset):
+def evaluate_template_dataset(dataset):
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
     pearson_corrs = compute_pearson_corrs(dataset)
@@ -224,7 +224,62 @@ def evaluate_dataset(dataset):
         cv_scores_classif,
         pearson_corrs,
     )
-    return avg_score, chance_level, cv_scores_classif, pearson_corrs
+
+    # Return only the average score for benchopt
+    return avg_score
+
+
+def evaluate_subject_dataset(dataset):
+    masker = dataset.masker
+    dict_aligned = dataset.dict_aligned
+    # Compute the voxel-wise pearson correlation between all subjects
+    # and the target
+    pearson_corrs = compute_pearson_corrs(dataset)
+
+    # Evaluate the decoding performance
+    pipeline = make_pipeline(
+        SelectPercentile(percentile=5), LinearSVC(max_iter=100)
+    )
+    X_train = masker.transform(
+        image.concat_imgs(
+            [
+                dict_aligned[subject].img
+                for subject in dataset.subjects
+                if subject != dataset.target
+            ]
+        )
+    )
+
+    y_train = np.concatenate(
+        [
+            dict_aligned[subject].y
+            for subject in dataset.subjects
+            if subject != dataset.target
+        ]
+    )
+
+    X_test = masker.transform(dict_aligned[dataset.target].img)
+    y_test = dict_aligned[dataset.target].y
+
+    pipeline.fit(X_train, y_train)
+    avg_score = pipeline.score(X_test, y_test)
+
+    dummy_clf = DummyClassifier(strategy="most_frequent")
+    dummy_clf.fit(X_train, y_train)
+    chance_level = dummy_clf.score(X_test, y_test)
+
+    cv_scores_classif = [avg_score]
+    # Save the results
+    save_decoding_results(
+        dataset,
+        avg_score,
+        chance_level,
+        cv_scores_classif,
+        pearson_corrs,
+    )
+
+    # Return only the average score for benchopt
+    return avg_score
 
 
 def save_decoding_results(
