@@ -89,10 +89,6 @@ def pearson_corr_parcels(img1, img2, labels_masker):
 
 
 def evaluate_task_dataset(dataset):
-    # Compute the voxel-wise pearson correlation between all subjects
-    # and the template
-    pearson_corrs = compute_pearson_corrs(dataset)
-
     # Leave one subject out cross-validation
     if dataset.name.lower().startswith("hcp"):
         groups = compute_batched_groups(dataset.dict_aligned, n_groups=10)
@@ -125,7 +121,7 @@ def evaluate_task_dataset(dataset):
 
     print(f"Average decoding accuracy: {avg_score:.2f}")
 
-    return avg_score, chance_level, cv_scores_classif, pearson_corrs
+    return avg_score, chance_level, cv_scores_classif
 
 
 def classify_subject_movie(template_img, img, y, labels_masker):
@@ -165,10 +161,6 @@ def evaluate_movie_dataset(dataset):
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
 
-    # Compute the voxel-wise pearson correlation between all subjects
-    # and the template
-    pearson_corrs = compute_pearson_corrs(dataset)
-
     # Create cross-validation object on each subject
     X, y = compute_X_y(dict_aligned, masker)
     groups = compute_groups(dict_aligned)
@@ -203,17 +195,22 @@ def evaluate_movie_dataset(dataset):
     print(f"Average decoding accuracy: {avg_score:.2f}")
     print(f"Chance level: {chance_level:.2f}")
 
-    return avg_score, chance_level, cv_scores_classif, pearson_corrs
+    return avg_score, chance_level, cv_scores_classif
 
 
 def evaluate_dataset(dataset, solver_name):
+    # Compute the voxel-wise pearson correlation between all subjects
+    # and the template
+    pearson_corrs = compute_pearson_corrs(dataset)
+
+    # Evaluate the decoding performance
     if dataset.paradigm == "movie":
-        avg_score, chance_level, cv_scores_classif, pearson_corrs = (
-            evaluate_movie_dataset(dataset)
+        avg_score, chance_level, cv_scores_classif = evaluate_movie_dataset(
+            dataset
         )
     else:
-        avg_score, chance_level, cv_scores_classif, pearson_corrs = (
-            evaluate_task_dataset(dataset)
+        avg_score, chance_level, cv_scores_classif = evaluate_task_dataset(
+            dataset
         )
     # Save the results
     save_decoding_results(
@@ -235,7 +232,7 @@ def save_decoding_results(
     pearson_corrs,
     solver_name,
 ):
-    output_dir = Path("outputs") / dataset.name / solver_name
+    output_dir = Path("outputs") / dataset.name / solver_name / dataset.target
     output_dir.mkdir(parents=True, exist_ok=True)
     results_dict = {
         "avg_score": avg_score,
