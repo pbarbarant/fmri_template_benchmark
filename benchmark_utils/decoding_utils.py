@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 from joblib import Parallel, delayed, dump
 from nilearn import image
-from nilearn.decoding import Decoder
 from nilearn.maskers import NiftiLabelsMasker, SurfaceLabelsMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from scipy.stats import pearsonr
@@ -53,7 +52,12 @@ def compute_X_y(dataset):
 
 
 def compute_pearson_corrs(dataset):
-    template_img = dataset.template.img
+    """Compute the Pearson correlation between each subject and the target."""
+    target = dataset.target
+    if target == "template":
+        target_img = dataset.dict_aligned[target].img
+    else:
+        target_img = dataset.template.img
     clustering_img = dataset.clustering_img
     masker = dataset.masker
     if dataset.is_surf:
@@ -68,7 +72,7 @@ def compute_pearson_corrs(dataset):
     for subject in dataset.subjects:
         subject_img = dataset.dict_aligned[subject].img
         subject_corr = pearson_corr_parcels(
-            subject_img, template_img, labels_masker
+            subject_img, target_img, labels_masker
         )
         pearson_corrs.append(subject_corr)
     return pearson_corrs
@@ -198,7 +202,7 @@ def evaluate_movie_dataset(dataset):
     return avg_score, chance_level, cv_scores_classif
 
 
-def evaluate_dataset(dataset, solver_name):
+def evaluate_dataset(dataset):
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
     pearson_corrs = compute_pearson_corrs(dataset)
