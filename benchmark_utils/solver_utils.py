@@ -2,7 +2,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from fmralign.template_alignment import TemplateAlignment, PairwiseAlignment
+from fmralign.template_alignment import TemplateAlignment
+from fmralign.pairwise_alignment import PairwiseAlignment
+from fmralign.sparse_template_alignment import SparseTemplateAlignment
+from fmralign.sparse_pairwise_alignment import SparsePairwiseAlignment
 
 from benchmark_utils.datasets_utils import Dataset, LabeledImage
 from sklearn.decomposition import PCA
@@ -160,9 +163,9 @@ def compute_alignment(
     solver_name: str,
 ) -> Dataset:
     dataset.solver = solver_name
-    if isinstance(algo, TemplateAlignment):
+    if isinstance(algo, (TemplateAlignment, SparseTemplateAlignment)):
         dataset = compute_template(algo, dataset)
-    elif isinstance(algo, PairwiseAlignment):
+    elif isinstance(algo, (PairwiseAlignment, SparsePairwiseAlignment)):
         dataset = compute_pairwise(dataset.target, algo, dataset)
     else:
         raise ValueError(
