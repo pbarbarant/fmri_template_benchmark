@@ -38,7 +38,7 @@ class Dataset(BaseDataset):
         self.n_samples_alignement = 20
         self.n_samples_decoding = 15
 
-        _, mask_img = random_niimg((8, 7, 6))
+        _, mask_img = random_niimg((5, 4, 3))
         masker = NiftiMasker(mask_img=mask_img).fit()
 
         self.dataset = sample_dataset(
