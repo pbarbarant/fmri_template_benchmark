@@ -255,6 +255,7 @@ def sample_movie_dataset(
 @MEMORY.cache
 def fetch_ibc(
     name: str = "IBC",
+    target: str = "template",
     subjects: List[str] = None,
     task: str = None,
     n_parcels: int = 400,
@@ -297,6 +298,7 @@ def fetch_ibc(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        target=target,
     )
 
 
