@@ -55,9 +55,9 @@ def compute_pearson_corrs(dataset):
     """Compute the Pearson correlation between each subject and the target."""
     target = dataset.target
     if target == "template":
-        target_img = dataset.dict_aligned[target].img
-    else:
         target_img = dataset.template.img
+    else:
+        target_img = dataset.dict_aligned[target].img
     clustering_img = dataset.clustering_img
     masker = dataset.masker
     if dataset.is_surf:
