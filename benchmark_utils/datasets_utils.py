@@ -51,6 +51,7 @@ class Dataset:
     is_surf: bool = False
     paradigm: str = "task"
     target: str = "template"
+    solver: Optional[str] = None
 
 
 def check_init_dataset(dataset: Dataset) -> None:
