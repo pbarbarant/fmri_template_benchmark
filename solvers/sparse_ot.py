@@ -7,9 +7,10 @@ with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     import torch
     from fmralign.sparse_template_alignment import SparseTemplateAlignment
+    from fmralign.sparse_pairwise_alignment import SparsePairwiseAlignment
 
     from benchmark_utils.conf import N_JOBS
-    from benchmark_utils.solver_utils import compute_template
+    from benchmark_utils.solver_utils import compute_alignment
 
 
 # The benchmark solvers must be named `Solver` and
@@ -48,16 +49,26 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
-        algo = SparseTemplateAlignment(
-            mask=self.dataset.masker,
-            clustering=self.dataset.clustering_img,
-            device=torch.device("cuda"),
-            n_jobs=N_JOBS,
-            verbose=1,
-            reg=self.reg,
-        )
+        if self.dataset.target == "template":
+            algo = SparseTemplateAlignment(
+                mask=self.dataset.masker,
+                clustering=self.dataset.clustering_img,
+                device=torch.device("cuda"),
+                n_jobs=N_JOBS,
+                verbose=1,
+                reg=self.reg,
+            )
+        else:
+            algo = SparsePairwiseAlignment(
+                mask=self.dataset.masker,
+                clustering=self.dataset.clustering_img,
+                device=torch.device("cuda"),
+                n_jobs=N_JOBS,
+                verbose=1,
+                reg=self.reg,
+            )
 
-        self.dataset = compute_template(
+        self.dataset = compute_alignment(
             algo=algo,
             dataset=self.dataset,
             solver_name=self.name,
