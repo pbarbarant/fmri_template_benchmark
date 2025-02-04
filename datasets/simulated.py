@@ -35,8 +35,8 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         self.subjects = ["sub-01", "sub-02", "sub-03"]
-        self.n_samples_alignement = 20
-        self.n_samples_decoding = 15
+        self.n_samples_alignement = 200
+        self.n_samples_decoding = 150
 
         _, mask_img = random_niimg((5, 4, 3))
         masker = NiftiMasker(mask_img=mask_img).fit()
