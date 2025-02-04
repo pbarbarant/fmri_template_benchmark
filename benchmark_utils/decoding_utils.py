@@ -219,7 +219,6 @@ def evaluate_dataset(dataset, solver_name):
         chance_level,
         cv_scores_classif,
         pearson_corrs,
-        solver_name,
     )
     return avg_score, chance_level, cv_scores_classif, pearson_corrs
 
@@ -230,9 +229,10 @@ def save_decoding_results(
     chance_level,
     cv_scores_classif,
     pearson_corrs,
-    solver_name,
 ):
-    output_dir = Path("outputs") / dataset.name / solver_name / dataset.target
+    output_dir = (
+        Path("outputs") / dataset.name / dataset.solver / dataset.target
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     results_dict = {
         "avg_score": avg_score,
