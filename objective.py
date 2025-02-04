@@ -49,7 +49,7 @@ class Objective(BaseObjective):
 
         print(f"Running on: {dataset.name}")
 
-    def evaluate_result(self, dataset, solver_name):
+    def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
         # dictionary returned by `Solver.get_result`. This defines the
         # benchmark's API to pass solvers' result. This is customizable for
@@ -67,7 +67,7 @@ class Objective(BaseObjective):
             pearson_corrs = [0.5] * n_subjects
         else:
             avg_score, chance_level, cv_scores, pearson_corrs = (
-                evaluate_dataset(dataset, solver_name)
+                evaluate_dataset(dataset)
             )
         return dict(
             value=avg_score,
