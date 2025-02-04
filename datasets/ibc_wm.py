@@ -21,7 +21,30 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    def __init__(self):
+    parameters = {
+        "target": [
+            "template",
+            "sub-01",
+            "sub-02",
+            "sub-04",
+            "sub-05",
+            "sub-06",
+            "sub-07",
+            "sub-09",
+            "sub-11",
+            "sub-12",
+            "sub-13",
+            "sub-14",
+            "sub-15",
+        ],
+    }
+
+    def get_data(self):
+        # The return arguments of this function are passed as keyword arguments
+        # to `Objective.set_data`. This defines the benchmark's
+        # API to pass data. It is customizable for each benchmark.
+
+        # The dictionary defines the keyword arguments for `Objective.set_data`
         self.subjects = [
             "sub-01",
             "sub-02",
@@ -37,13 +60,6 @@ class Dataset(BaseDataset):
             "sub-15",
         ]
         self.n_parcels = 400
-
-    def get_data(self):
-        # The return arguments of this function are passed as keyword arguments
-        # to `Objective.set_data`. This defines the benchmark's
-        # API to pass data. It is customizable for each benchmark.
-
-        # The dictionary defines the keyword arguments for `Objective.set_data`
 
         self.dataset = fetch_ibc(
             name=self.name,

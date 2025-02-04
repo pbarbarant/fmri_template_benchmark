@@ -20,18 +20,14 @@ class Dataset(BaseDataset):
     # section in objective.py
     install_pip = "pip"
     requirements = []
-
-    def __init__(self):
-        self.subjects = [
-            # "sub-04",
-            # "sub-06",
+    parameters = {
+        "target": [
+            "template",
             "sub-09",
             "sub-11",
             "sub-12",
-            # "sub-14",
-            # "sub-15",
         ]
-        self.n_parcels = 400
+    }
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -39,6 +35,12 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
+        self.subjects = [
+            "sub-09",
+            "sub-11",
+            "sub-12",
+        ]
+        self.n_parcels = 400
 
         self.dataset = fetch_ibc(
             name=self.name,
