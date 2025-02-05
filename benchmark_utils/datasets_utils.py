@@ -12,7 +12,7 @@ from nilearn.datasets import (
     fetch_atlas_schaefer_2018,
     fetch_atlas_surf_destrieux,
     load_fsaverage,
-    load_mni152_brain_mask,
+    load_mni152_gm_mask,
 )
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
@@ -28,6 +28,7 @@ from benchmark_utils.conf import (
     MEMORY,
     NEUROMOD_PATH,
     NSD_PATH,
+    N_JOBS,
     RAIDERS_PATH,
 )
 
@@ -136,23 +137,21 @@ def fetch_clustering_img(
 
 
 def fit_mni152_masker(resolution: int = 3) -> MultiNiftiMasker:
-    mask_img = load_mni152_brain_mask(resolution=resolution)
+    mask_img = load_mni152_gm_mask(resolution=resolution)
     return MultiNiftiMasker(
         mask_img=mask_img, memory=MEMORY, memory_level=1
     ).fit()
 
 
-def fit_masker(
-    imgs, clustering_img, detrend=False, t_r=None
-) -> MultiNiftiMasker:
-    mask_img = image.math_img("img > 0", img=clustering_img)
+def fit_masker(imgs, detrend=False, t_r=None) -> MultiNiftiMasker:
     return MultiNiftiMasker(
-        mask_img=mask_img,
+        mask_strategy="gm-template",
         memory=MEMORY,
         memory_level=1,
         standardize=True,
         detrend=detrend,
         t_r=t_r,
+        n_jobs=N_JOBS,
     ).fit(imgs)
 
 
@@ -288,7 +287,6 @@ def fetch_ibc(
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
-        clustering_img,
     )
 
     return Dataset(
@@ -327,6 +325,7 @@ def load_surface_img(
 @MEMORY.cache
 def fetch_ibc_surf(
     name: str = "IBC",
+    target: str = "template",
     subjects: List[str] = None,
     task: str = None,
 ) -> Dataset:
@@ -375,6 +374,7 @@ def fetch_ibc_surf(
         masker=masker,
         clustering_img=clustering_img,
         is_surf=True,
+        target=target,
     )
 
 
@@ -500,7 +500,6 @@ def fetch_hcp(
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subject_list],
-        clustering_img,
     )
 
     return Dataset(
@@ -516,6 +515,7 @@ def fetch_hcp(
 @MEMORY.cache
 def fetch_forrest(
     subjects: List[str] = None,
+    target: str = "template",
     n_parcels: int = 400,
 ) -> Dataset:
     dict_alignment = dict()
@@ -538,7 +538,6 @@ def fetch_forrest(
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
-        clustering_img,
     )
 
     return Dataset(
@@ -548,12 +547,14 @@ def fetch_forrest(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        target=target,
     )
 
 
 @MEMORY.cache
 def fetch_nsd(
     name: str = "NSD",
+    target: str = "template",
     subjects: List[str] = None,
     n_parcels: int = 400,
 ) -> Dataset:
@@ -575,7 +576,6 @@ def fetch_nsd(
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
-        clustering_img,
     )
 
     return Dataset(
@@ -585,6 +585,7 @@ def fetch_nsd(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        target=target,
     )
 
 
@@ -604,6 +605,7 @@ def load_budapest_img_labels(
 @MEMORY.cache
 def fetch_budapest(
     n_parcels: int = 400,
+    target: str = "template",
     lo_run: int = 1,
 ) -> Dataset:
     # Fetch subjects
@@ -639,7 +641,6 @@ def fetch_budapest(
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
-        clustering_img,
         detrend=True,
         t_r=1.0,
     )
@@ -652,6 +653,7 @@ def fetch_budapest(
         masker=masker,
         clustering_img=clustering_img,
         paradigm="movie",
+        target=target,
     )
 
 
@@ -674,6 +676,7 @@ def load_raiders_img_labels(
 def fetch_raiders(
     n_parcels: int = 400,
     lo_run: int = 1,
+    target: str = "template",
 ) -> Dataset:
     # Fetch subjects
     subjects = sorted(
@@ -708,7 +711,6 @@ def fetch_raiders(
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
-        clustering_img,
         detrend=True,
         t_r=1.0,
     )
@@ -725,7 +727,7 @@ def fetch_raiders(
 
 
 @MEMORY.cache
-def fetch_neuromod(n_parcels: int) -> Dataset:
+def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
     DATA_PATH = Path(NEUROMOD_PATH)
     subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
 
@@ -748,7 +750,6 @@ def fetch_neuromod(n_parcels: int) -> Dataset:
     )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
-        clustering_img,
     )
 
     return Dataset(
@@ -758,4 +759,5 @@ def fetch_neuromod(n_parcels: int) -> Dataset:
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        target=target,
     )
