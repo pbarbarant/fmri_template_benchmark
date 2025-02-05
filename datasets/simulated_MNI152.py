@@ -12,6 +12,8 @@ with safe_import_context() as import_ctx:
         sample_dataset,
     )
 
+SUBJECTS = ["sub-01", "sub-02", "sub-03"]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -23,18 +25,15 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    def __init__(
-        self,
-    ):
-        self.subjects = ["sub-01", "sub-02", "sub-03"]
-        self.n_samples_alignement = 20
-        self.n_samples_decoding = 15
-        self.n_parcels = 400
+    parameters = {"target": ["template"] + SUBJECTS}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
         # to `Objective.set_data`. This defines the benchmark's
         # API to pass data. It is customizable for each benchmark.
+        self.n_samples_alignement = 20
+        self.n_samples_decoding = 15
+        self.n_parcels = 400
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         masker = fit_mni152_masker()
@@ -44,9 +43,10 @@ class Dataset(BaseDataset):
 
         self.dataset = sample_dataset(
             name=self.name,
+            target=self.target,
             masker=masker,
             clustering_img=clustering_img,
-            subjects=self.subjects,
+            subjects=SUBJECTS,
             n_samples_alignement=self.n_samples_alignement,
             n_samples_decoding=self.n_samples_decoding,
         )
