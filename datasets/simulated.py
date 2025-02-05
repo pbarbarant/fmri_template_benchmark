@@ -26,9 +26,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {
-        "target": ["template"] + SUBJECTS,
-    }
+    parameters = {"target": ["template"]}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -36,9 +34,6 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        self.subjects = SUBJECTS
-        self.n_samples_alignement = 200
-        self.n_samples_decoding = 150
 
         _, mask_img = random_niimg((5, 4, 3))
         masker = NiftiMasker(mask_img=mask_img).fit()
@@ -48,9 +43,6 @@ class Dataset(BaseDataset):
             target=self.target,
             masker=masker,
             clustering_img=mask_img,
-            subjects=self.subjects,
-            n_samples_alignement=self.n_samples_alignement,
-            n_samples_decoding=self.n_samples_decoding,
         )
 
         check_init_dataset(self.dataset)
