@@ -18,6 +18,7 @@ from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.surface import PolyMesh, SurfaceImage
 from tqdm import tqdm
+from fmralign.tests.utils import random_niimg
 
 from benchmark_utils.conf import (
     BUDAPEST_PATH,
@@ -155,24 +156,6 @@ def fit_masker(imgs, detrend=False, t_r=None) -> MultiNiftiMasker:
     ).fit(imgs)
 
 
-def _sample_labels(n_samples: int) -> np.ndarray:
-    return np.arange(3).reshape(1, -1).repeat(n_samples // 3, axis=0).flatten()
-
-
-def _sample_labeled_image(
-    n_samples: int, masker: MultiNiftiMasker
-) -> LabeledImage:
-    mask_img = masker.mask_img_
-    n_voxels = masker.transform(mask_img).shape[1]
-    data = np.random.randn(n_samples, n_voxels)
-    img = masker.inverse_transform(data)
-    y = _sample_labels(n_samples)
-    return LabeledImage(
-        img=img,
-        y=y,
-    )
-
-
 def sample_movie_segment(
     n_segments: int, masker: MultiNiftiMasker
 ) -> LabeledImage:
@@ -193,21 +176,28 @@ def sample_dataset(
     target: str,
     masker: MultiNiftiMasker,
     clustering_img: Nifti1Image,
-    subjects: List[str],
-    n_samples_alignement: int,
-    n_samples_decoding: int,
 ) -> Dataset:
     print(f"Generating fold {name}")
     dict_alignment = dict()
     dict_decoding = dict()
-    for subject in subjects:
-        # Generate random surface images for each subject.
-        dict_alignment[subject] = _sample_labeled_image(
-            n_samples_alignement, masker
-        ).img
-        dict_decoding[subject] = _sample_labeled_image(
-            n_samples_decoding, masker
-        )
+    subjects = ["sub-01", "sub-02", "sub-03"]
+    img_shape = clustering_img.shape
+
+    img, _ = random_niimg((*img_shape, 20))
+    y = (np.arange(20) >= 10).astype(int)
+
+    dict_alignment["sub-01"] = img
+    dict_decoding["sub-01"] = LabeledImage(img=img, y=y)
+
+    dict_alignment["sub-02"] = image.math_img("2*img", img=img)
+    dict_decoding["sub-02"] = LabeledImage(
+        img=image.math_img("2*img", img=img), y=y
+    )
+
+    dict_alignment["sub-03"] = image.math_img("3*img", img=img)
+    dict_decoding["sub-03"] = LabeledImage(
+        img=image.math_img("3*img", img=img), y=y
+    )
 
     return Dataset(
         name=name,
