@@ -127,6 +127,11 @@ def compute_template(
     dataset.template = template
     dataset.dict_aligned = dict_aligned
 
+    assert np.allclose(
+        dataset.dict_alignment["sub-02"].get_fdata(),
+        dataset.template.img.get_fdata(),
+    )
+
     return dataset
 
 
