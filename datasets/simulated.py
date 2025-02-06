@@ -4,9 +4,6 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from fmralign.tests.utils import random_niimg
-    from nilearn.maskers import NiftiMasker
-
     from benchmark_utils.datasets_utils import (
         check_init_dataset,
         log_dataset_info,
@@ -35,14 +32,9 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        _, mask_img = random_niimg((2, 1, 1))
-        masker = NiftiMasker(mask_img=mask_img).fit()
-
         self.dataset = sample_dataset(
             name=self.name,
             target=self.target,
-            masker=masker,
-            clustering_img=mask_img,
         )
 
         check_init_dataset(self.dataset)
