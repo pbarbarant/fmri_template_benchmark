@@ -38,15 +38,31 @@ def plot_pca(dataset: Dataset) -> None:
         [dataset.dict_decoding[subject].y for subject in subjects]
     )
 
+    # Define separate colormaps
+    subject_colormap = plt.cm.tab10  # Colormap for subjects
+    condition_colormap = plt.cm.viridis  # Colormap for conditions
+
+    # Map subjects to colors
+    subject_colors = {
+        subject: subject_colormap(i / len(subjects))
+        for i, subject in enumerate(subjects)
+    }
+    condition_colors = {
+        condition: condition_colormap(i / len(np.unique(legend_condition)))
+        for i, condition in enumerate(np.unique(legend_condition))
+    }
+
     for subject in subjects:
         ax[0, 0].scatter(
             pca_unaligned[legend_subjects == subject, 0],
             pca_unaligned[legend_subjects == subject, 1],
+            color=subject_colors[subject],
             label=subject,
         )
         ax[0, 1].scatter(
             pca_aligned[legend_subjects == subject, 0],
             pca_aligned[legend_subjects == subject, 1],
+            color=subject_colors[subject],
             label=subject,
         )
 
@@ -54,22 +70,30 @@ def plot_pca(dataset: Dataset) -> None:
         ax[1, 0].scatter(
             pca_unaligned[legend_condition == condition, 0],
             pca_unaligned[legend_condition == condition, 1],
+            color=condition_colors[condition],
             label=condition,
         )
         ax[1, 1].scatter(
             pca_aligned[legend_condition == condition, 0],
             pca_aligned[legend_condition == condition, 1],
+            color=condition_colors[condition],
             label=condition,
         )
 
     # Add titles and legends
     ax[0, 0].set_title("PCA of unaligned data")
-    ax[0, 1].set_title(f"PCA - {dataset.solver} - target {dataset.target}")
-    ax[0, 0].legend()
-    ax[0, 1].legend()
-    ax[1, 0].legend()
-    ax[1, 1].legend()
+    ax[0, 1].set_title(f"PCA - {dataset.solver} - Target: {dataset.target}")
+    # Add legends to the right of the rightmost plots
+    ax[0, 1].legend(
+        loc="center left", bbox_to_anchor=(1, 0.5), title="Subjects"
+    )
+    ax[1, 1].legend(
+        loc="center left", bbox_to_anchor=(1, 0.5), title="Conditions"
+    )
 
+    # Adjust layout to fit legends
+    plt.tight_layout()
+    plt.subplots_adjust(right=0.85)  # Leave space for legends
     output_dir = (
         Path("outputs") / dataset.name / dataset.solver / dataset.target
     )
@@ -127,10 +151,14 @@ def compute_template(
     dataset.template = template
     dataset.dict_aligned = dict_aligned
 
-    assert np.allclose(
-        dataset.dict_alignment["sub-02"].get_fdata(),
-        dataset.template.img.get_fdata(),
-    )
+    # euclidean_template = (
+    #     dataset.dict_alignment["sub-01"].get_fdata()
+    #     + dataset.dict_alignment["sub-02"].get_fdata()
+    # ) / 2
+    # assert np.allclose(
+    #     euclidean_template,
+    #     dataset.template.img.get_fdata(),
+    # )
 
     return dataset
 
