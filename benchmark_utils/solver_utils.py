@@ -18,8 +18,11 @@ def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:
         dict_subjects[subject].img for subject in subjects
     ]  # Use subjects passed as parameter
     data = np.concatenate([masker.transform(img) for img in imgs], axis=0)
-    pca = PCA(n_components=2)
-    return pca.fit_transform(data)
+    if data.shape[1] == 2:
+        return data
+    else:
+        pca = PCA(n_components=2)
+        return pca.fit_transform(data)
 
 
 def plot_pca(dataset: Dataset) -> None:
