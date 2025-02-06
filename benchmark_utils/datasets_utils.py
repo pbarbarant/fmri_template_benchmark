@@ -174,29 +174,49 @@ def sample_movie_segment(
 def sample_dataset(
     name: str,
     target: str,
-    masker: MultiNiftiMasker,
-    clustering_img: Nifti1Image,
 ) -> Dataset:
-    print(f"Generating fold {name}")
     dict_alignment = dict()
     dict_decoding = dict()
-    subjects = ["sub-01", "sub-02", "sub-03"]
-    img_shape = clustering_img.shape
+    subjects = ["sub-01", "sub-02"]
 
-    img, _ = random_niimg((*img_shape, 20))
-    y = (np.arange(20) >= 10).astype(int)
+    # Generate a gaussian mixture for sub-01
+    mean_1 = np.array([10, 0])
+    mean_2 = np.array([-20, 0])
+    data1 = np.random.randn(100, 2) + mean_1
+    data2 = np.random.randn(100, 2) + mean_2
+    data_sub1 = np.concatenate([data1, data2], axis=0)
 
-    dict_alignment["sub-01"] = img
-    dict_decoding["sub-01"] = LabeledImage(img=img, y=y)
+    # Generate a gaussian mixture for sub-02
+    mean_3 = np.array([0, 10])
+    mean_4 = np.array([0, -20])
+    data3 = np.random.randn(100, 2) + mean_3
+    data4 = np.random.randn(100, 2) + mean_4
+    data_sub2 = np.concatenate([data3, data4], axis=0)
 
-    dict_alignment["sub-02"] = image.math_img("2*img", img=img)
-    dict_decoding["sub-02"] = LabeledImage(
-        img=image.math_img("2*img", img=img), y=y
-    )
+    # Generate the labels
+    y = np.arange(200) >= 100
 
-    dict_alignment["sub-03"] = image.math_img("3*img", img=img)
-    dict_decoding["sub-03"] = LabeledImage(
-        img=image.math_img("3*img", img=img), y=y
+    # Reshape the data to (2, 1, 1, 200)
+    data_sub1_reshaped = data_sub1.T.reshape(2, 1, 1, 200)
+    data_sub2_reshaped = data_sub2.T.reshape(2, 1, 1, 200)
+
+    # Convert to NIfTI images
+    img1 = Nifti1Image(data_sub1_reshaped, affine=np.eye(4))
+    img2 = Nifti1Image(data_sub2_reshaped, affine=np.eye(4))
+
+    dict_alignment["sub-01"] = img1
+    dict_decoding["sub-01"] = LabeledImage(img=img1, y=y)
+
+    dict_alignment["sub-02"] = img2
+    dict_decoding["sub-02"] = LabeledImage(img2, y=y)
+
+    # Generate mask of all 1s
+    mask_data = np.ones((2, 1, 1))
+    mask_img = Nifti1Image(mask_data, affine=np.eye(4))
+
+    # Define and fit the masker
+    masker = MultiNiftiMasker(mask_img=mask_img, standardize=False).fit(
+        [img1, img2]
     )
 
     return Dataset(
@@ -205,7 +225,7 @@ def sample_dataset(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         masker=masker,
-        clustering_img=clustering_img,
+        clustering_img=mask_img,
         target=target,
     )
 
