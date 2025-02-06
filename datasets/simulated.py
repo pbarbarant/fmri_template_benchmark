@@ -13,7 +13,7 @@ with safe_import_context() as import_ctx:
         sample_dataset,
     )
 
-SUBJECTS = ["sub-01", "sub-02", "sub-03"]
+SUBJECTS = ["sub-01", "sub-02"]
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -35,7 +35,7 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        _, mask_img = random_niimg((5, 4, 3))
+        _, mask_img = random_niimg((2, 1, 1))
         masker = NiftiMasker(mask_img=mask_img).fit()
 
         self.dataset = sample_dataset(
