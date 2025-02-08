@@ -14,11 +14,10 @@ from nilearn.datasets import (
     load_fsaverage,
     load_mni152_gm_mask,
 )
-from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
+from nilearn.maskers import NiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.surface import PolyMesh, SurfaceImage
 from tqdm import tqdm
-from fmralign.tests.utils import random_niimg
 
 from benchmark_utils.conf import (
     BUDAPEST_PATH,
@@ -46,7 +45,7 @@ class Dataset:
     subjects: List[str]
     dict_alignment: Dict[str, Nifti1Image]
     dict_decoding: Dict[str, LabeledImage]
-    masker: MultiNiftiMasker
+    masker: NiftiMasker | SurfaceMasker
     clustering_img: Nifti1Image
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
     template: Optional[LabeledImage] = None
@@ -137,16 +136,13 @@ def fetch_clustering_img(
     return int_img
 
 
-def fit_mni152_masker(resolution: int = 3) -> MultiNiftiMasker:
+def fit_mni152_masker(resolution: int = 3) -> NiftiMasker:
     mask_img = load_mni152_gm_mask(resolution=resolution)
-    return MultiNiftiMasker(
-        mask_img=mask_img, memory=MEMORY, memory_level=1
-    ).fit()
+    return NiftiMasker(mask_img=mask_img, memory=MEMORY, memory_level=1).fit()
 
 
-def fit_masker(imgs, detrend=False, t_r=None) -> MultiNiftiMasker:
-    return MultiNiftiMasker(
-        mask_strategy="gm-template",
+def fit_masker(imgs, detrend=False, t_r=None) -> NiftiMasker:
+    return NiftiMasker(
         memory=MEMORY,
         memory_level=1,
         standardize=True,
@@ -156,9 +152,7 @@ def fit_masker(imgs, detrend=False, t_r=None) -> MultiNiftiMasker:
     ).fit(imgs)
 
 
-def sample_movie_segment(
-    n_segments: int, masker: MultiNiftiMasker
-) -> LabeledImage:
+def sample_movie_segment(n_segments: int, masker: NiftiMasker) -> LabeledImage:
     mask_img = masker.mask_img_
     n_voxels = masker.transform(mask_img).shape[1]
     segment_len = 5
@@ -215,7 +209,7 @@ def sample_dataset(
     mask_img = Nifti1Image(mask_data, affine=np.eye(4))
 
     # Define and fit the masker
-    masker = MultiNiftiMasker(mask_img=mask_img, standardize=False).fit(
+    masker = NiftiMasker(mask_img=mask_img, standardize=False).fit(
         [img1, img2]
     )
 
