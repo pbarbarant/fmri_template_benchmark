@@ -72,7 +72,6 @@ def get_results_dataframe(
 
 
 df = get_results_dataframe(data_path, score="cv_scores_classif")
-# Expand the lists in df["cv_scores_classif"]
 
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
