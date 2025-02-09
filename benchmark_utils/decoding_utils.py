@@ -47,7 +47,9 @@ def compute_X_y(dataset):
             [dict_aligned[subject].img for subject in dataset.subjects]
         )
     X = masker.transform(imgs)
-    y = np.concatenate([dict_aligned[subject].y for subject in subject_list])
+    y = np.concatenate(
+        [dict_aligned[subject].y for subject in dataset.subjects]
+    )
     return X, y
 
 
