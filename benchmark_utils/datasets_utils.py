@@ -286,12 +286,10 @@ def fetch_ibc(
             y=decoding_df.contrast.to_numpy(),
         )
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subjects[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=name,
@@ -499,12 +497,10 @@ def fetch_hcp(
             y=sub_decoding_df.contrast.to_numpy(),
         )
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subject_list[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subject_list],
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=name,
@@ -537,12 +533,10 @@ def fetch_forrest(
             ).to_numpy(),
         )
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subjects[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name="Forrest",
@@ -575,12 +569,10 @@ def fetch_nsd(
             ).values.flatten(),
         )
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subjects[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=name,
@@ -640,14 +632,12 @@ def fetch_budapest(
                 alignment_imgs.append(img)
         dict_alignment[subject] = image.concat_imgs(alignment_imgs)
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subjects[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
         detrend=True,
         t_r=1.0,
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=f"Budapest_run-{lo_run:02d}",
@@ -710,14 +700,12 @@ def fetch_raiders(
                 alignment_imgs.append(img)
         dict_alignment[subject] = image.concat_imgs(alignment_imgs)
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subjects[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
         detrend=True,
         t_r=1.0,
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=f"Raiders_run-{lo_run:02d}",
@@ -749,12 +737,10 @@ def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
             ).values.flatten(),
         )
 
-    clustering_img = fetch_clustering_img(
-        dict_alignment[subjects[0]], n_parcels
-    )
     masker = fit_masker(
         [dict_alignment[subject] for subject in subjects],
     )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name="Neuromod",
