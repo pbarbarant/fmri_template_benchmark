@@ -25,6 +25,7 @@ class Objective(BaseObjective):
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
         "debug_mode": [False],
+        "max_iter": [1000],
     }
 
     # List of packages needed to run the benchmark.
@@ -66,9 +67,13 @@ class Objective(BaseObjective):
             avg_score = 0.5
         else:
             if dataset.target == "template":
-                avg_score = evaluate_template_dataset(dataset)
+                avg_score = evaluate_template_dataset(
+                    dataset, max_iter=self.max_iter
+                )
             else:
-                avg_score = evaluate_subject_dataset(dataset)
+                avg_score = evaluate_subject_dataset(
+                    dataset, max_iter=self.max_iter
+                )
 
         return dict(value=avg_score)
 
