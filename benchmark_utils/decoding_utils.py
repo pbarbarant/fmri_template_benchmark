@@ -9,7 +9,6 @@ from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.svm import LinearSVC
-from sklearn.feature_selection import SelectPercentile
 from sklearn.model_selection import (
     LeaveOneGroupOut,
     cross_val_score,
@@ -35,7 +34,6 @@ def compute_batched_groups(subject_dict, n_groups=10):
 
 
 def compute_X_y(dataset):
-    subject_list = dataset.subjects
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
     if dataset.is_surf:
@@ -94,7 +92,7 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     return np.mean(cleaned_correlations)
 
 
-def evaluate_task_dataset(dataset):
+def evaluate_task_dataset(dataset, max_iter=1000):
     # Leave one subject out cross-validation
     if dataset.name.lower().startswith("hcp"):
         groups = compute_batched_groups(dataset.dict_aligned, n_groups=10)
@@ -103,8 +101,8 @@ def evaluate_task_dataset(dataset):
 
     X, y = compute_X_y(dataset)
 
-    svc = LinearSVC(max_iter=100)
-    pipeline = make_pipeline(SelectPercentile(percentile=5), svc)
+    svc = LinearSVC(max_iter=max_iter)
+    pipeline = make_pipeline(svc)
     cv_scores_classif = cross_val_score(
         pipeline,
         X,
@@ -204,7 +202,7 @@ def evaluate_movie_dataset(dataset):
     return avg_score, chance_level, cv_scores_classif
 
 
-def evaluate_template_dataset(dataset):
+def evaluate_template_dataset(dataset, max_iter=1000):
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
     pearson_corrs = compute_pearson_corrs(dataset)
@@ -216,7 +214,7 @@ def evaluate_template_dataset(dataset):
         )
     else:
         avg_score, chance_level, cv_scores_classif = evaluate_task_dataset(
-            dataset
+            dataset, max_iter=max_iter
         )
     # Save the results
     save_decoding_results(
@@ -231,7 +229,7 @@ def evaluate_template_dataset(dataset):
     return avg_score
 
 
-def evaluate_subject_dataset(dataset):
+def evaluate_subject_dataset(dataset, max_iter=1000):
     masker = dataset.masker
     dict_aligned = dataset.dict_aligned
     # Compute the voxel-wise pearson correlation between all subjects
@@ -239,9 +237,7 @@ def evaluate_subject_dataset(dataset):
     pearson_corrs = compute_pearson_corrs(dataset)
 
     # Evaluate the decoding performance
-    pipeline = make_pipeline(
-        SelectPercentile(percentile=5), LinearSVC(max_iter=100)
-    )
+    pipeline = make_pipeline(LinearSVC(max_iter=max_iter))
     X_train = masker.transform(
         image.concat_imgs(
             [
