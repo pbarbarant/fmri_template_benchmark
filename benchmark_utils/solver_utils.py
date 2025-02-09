@@ -154,15 +154,6 @@ def compute_template(
     dataset.template = template
     dataset.dict_aligned = dict_aligned
 
-    # euclidean_template = (
-    #     dataset.dict_alignment["sub-01"].get_fdata()
-    #     + dataset.dict_alignment["sub-02"].get_fdata()
-    # ) / 2
-    # assert np.allclose(
-    #     euclidean_template,
-    #     dataset.template.img.get_fdata(),
-    # )
-
     return dataset
 
 
