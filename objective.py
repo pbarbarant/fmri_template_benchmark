@@ -25,7 +25,7 @@ class Objective(BaseObjective):
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
         "debug_mode": [False],
-        "max_iter": [1000],
+        "max_iter": [100],
     }
 
     # List of packages needed to run the benchmark.
