@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from fmralign.template_alignment import TemplateAlignment
 from fmralign.pairwise_alignment import PairwiseAlignment
 from fmralign.sparse_template_alignment import SparseTemplateAlignment
@@ -150,6 +151,8 @@ def compute_template(
         save_template_gii(template, dataset.name, dataset.solver)
     else:
         save_template_nii(template, dataset.name, dataset.solver)
+    # Save the labels as csv
+    save_template_labels(template, dataset.name, dataset.solver)
 
     dataset.template = template
     dataset.dict_aligned = dict_aligned
@@ -222,3 +225,14 @@ def save_template_gii(
     output_dir.mkdir(exist_ok=True, parents=True)
     template_img = template.img
     template_img.data.to_filename(output_dir / "template_data.gii")
+
+
+def save_template_labels(
+    template: LabeledImage, dataset_name: str, solver_name: str
+) -> None:
+    output_dir = Path("outputs") / dataset_name / solver_name
+    output_dir.mkdir(exist_ok=True, parents=True)
+    labels = template.y
+    # Convert labels to a DataFrame
+    df = pd.DataFrame(labels)
+    df.to_csv(output_dir / "labels.csv", index=False, header=False)
