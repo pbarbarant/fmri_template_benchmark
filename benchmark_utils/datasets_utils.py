@@ -667,8 +667,8 @@ def load_raiders_img_labels(
 
 def fetch_raiders(
     n_parcels: int = 400,
-    lo_run: int = 1,
     target: str = "template",
+    lo_run: int = 1,
 ) -> Dataset:
     # Fetch subjects
     subjects = sorted(
@@ -713,6 +713,7 @@ def fetch_raiders(
         masker=masker,
         clustering_img=clustering_img,
         paradigm="movie",
+        target=target,
     )
 
 
