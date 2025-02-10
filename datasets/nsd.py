@@ -23,7 +23,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {"target": ["template"] + SUBJECTS}
+    parameters = {"target": ["template"]}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -35,6 +35,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_nsd(
             name=self.name,
+            target=self.target,
             subjects=SUBJECTS,
             n_parcels=self.n_parcels,
         )
