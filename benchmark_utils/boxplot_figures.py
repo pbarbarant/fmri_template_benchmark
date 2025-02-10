@@ -38,9 +38,6 @@ def get_results_dataframe(
 
     df = pd.DataFrame(res_list)
 
-    # Remove the simulated data
-    df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
-
     # For anatomical keep only the template target
     df = df[
         ~((df["solver_name"] == "Anatomical") & (df["target"] != "template"))
@@ -70,6 +67,11 @@ def get_results_dataframe(
         if x["solver_name"] == "Anatomical (template)"
         else x["solver_name"],
         axis=1,
+    )
+
+    # Rename ot by Optimal Transport
+    df["solver_name"] = df["solver_name"].str.replace(
+        "ot", "Optimal Transport"
     )
 
     # Sort alphabetically by dataset name and solver name
