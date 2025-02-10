@@ -41,6 +41,11 @@ def get_results_dataframe(
     # Remove the simulated data
     df.drop(df[df["data_name"].str.contains("Simulated")].index, inplace=True)
 
+    # For anatomical keep only the template target
+    df = df[
+        ~((df["solver_name"] == "Anatomical") & (df["target"] != "template"))
+    ]
+
     # Add a type column to indicate tasks or movie
     df["type"] = df["data_name"].apply(
         lambda x: "movie"
@@ -55,6 +60,14 @@ def get_results_dataframe(
     df["solver_name"] = df.apply(
         lambda x: x["solver_name"] + " (template)"
         if x["target"] == "template"
+        else x["solver_name"] + " (pairwise)",
+        axis=1,
+    )
+
+    # Remove the (template) suffix for the anatomical alignment
+    df["solver_name"] = df.apply(
+        lambda x: "Anatomical"
+        if x["solver_name"] == "Anatomical (template)"
         else x["solver_name"],
         axis=1,
     )
@@ -81,26 +94,33 @@ sns.set_context("paper", font_scale=1.3)
 def create_accuracy_plot(data, title, fig_height=7):
     fig, ax = plt.subplots(figsize=(12, fig_height))
 
-    sns.boxplot(
-        data=data,
-        x="cv_scores_classif",
-        y="data_name",
-        hue="solver_name",
-        showfliers=False,
-        ax=ax,
-        fill=False,
-        legend=False,
-        palette="dark:k",
-    )
+    # sns.boxplot(
+    #     data=data,
+    #     x="cv_scores_classif",
+    #     y="data_name",
+    #     hue="solver_name",
+    #     showfliers=False,
+    #     ax=ax,
+    #     fill=False,
+    #     legend=False,
+    #     palette="dark:k",
+    # )
 
-    sns.stripplot(
+    # sns.stripplot(
+    #     data=data,
+    #     x="cv_scores_classif",
+    #     y="data_name",
+    #     size=4,
+    #     hue="solver_name",
+    #     dodge=True,
+    #     jitter=True,
+    #     ax=ax,
+    # )
+    sns.barplot(
         data=data,
         x="cv_scores_classif",
         y="data_name",
-        size=4,
         hue="solver_name",
-        dodge=True,
-        jitter=True,
         ax=ax,
     )
 
