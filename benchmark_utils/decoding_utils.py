@@ -70,11 +70,13 @@ def compute_pearson_corrs(dataset):
         ).fit()
     pearson_corrs = []
     for subject in dataset.subjects:
-        subject_img = dataset.dict_aligned[subject].img
-        subject_corr = pearson_corr_parcels(
-            subject_img, target_img, labels_masker
-        )
-        pearson_corrs.append(subject_corr)
+        # Do not compare a subject with itself
+        if subject != target:
+            subject_img = dataset.dict_aligned[subject].img
+            subject_corr = pearson_corr_parcels(
+                subject_img, target_img, labels_masker
+            )
+            pearson_corrs.append(subject_corr)
     return pearson_corrs
 
 
