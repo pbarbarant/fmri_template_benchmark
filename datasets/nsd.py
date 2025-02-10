@@ -23,7 +23,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {"target": ["template"]}
+    parameters = {"target": ["template"] + SUBJECTS}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
