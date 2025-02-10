@@ -255,7 +255,7 @@ def sample_movie_dataset(
     )
 
 
-@MEMORY.cache
+# @MEMORY.cache
 def fetch_ibc(
     name: str = "IBC",
     target: str = "template",
@@ -269,15 +269,18 @@ def fetch_ibc(
         task_list=[task],
         acquisition="all",
     )
+    # Drop rows with with ffx acquisitions
+    df = df[~df.path.str.contains("ffx")]
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing IBC data"):
-        alignment_df = df[
-            (df.subject == subject) & (df.path.str.contains("_dir-ap"))
-        ]
-        decoding_df = df[
-            (df.subject == subject) & (df.path.str.contains("_dir-pa"))
-        ]
+        df_sub = df[(df.subject == subject)]
+        # For each contrast, keep randomly one path
+        alignment_df = df_sub.groupby(["contrast"]).apply(
+            lambda x: x.sample(1, random_state=42)
+        )
+        # Put the rest in decoding_df
+        decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
         dict_alignment[subject] = image.concat_imgs(
             alignment_df.path.to_list()
         )
