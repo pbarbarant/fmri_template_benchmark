@@ -255,7 +255,6 @@ def sample_movie_dataset(
     )
 
 
-# @MEMORY.cache
 def fetch_ibc(
     name: str = "IBC",
     target: str = "template",
@@ -327,7 +326,6 @@ def load_surface_img(
     return concatenate_surface_images(surf_imgs)
 
 
-@MEMORY.cache
 def fetch_ibc_surf(
     name: str = "IBC",
     target: str = "template",
@@ -464,9 +462,9 @@ def make_hcp_db(
     return df
 
 
-@MEMORY.cache
 def fetch_hcp(
     name: str = "HCP",
+    target: str = "template",
     n_subjects: int = None,
     task: str = None,
     n_parcels: int = 400,
@@ -512,10 +510,10 @@ def fetch_hcp(
         dict_decoding=dict_decoding,
         masker=masker,
         clustering_img=clustering_img,
+        target=target,
     )
 
 
-@MEMORY.cache
 def fetch_forrest(
     subjects: List[str] = None,
     target: str = "template",
@@ -552,7 +550,6 @@ def fetch_forrest(
     )
 
 
-@MEMORY.cache
 def fetch_nsd(
     name: str = "NSD",
     target: str = "template",
@@ -601,7 +598,6 @@ def load_budapest_img_labels(
     return image.index_img(img, indices), y
 
 
-@MEMORY.cache
 def fetch_budapest(
     n_parcels: int = 400,
     target: str = "template",
@@ -669,7 +665,6 @@ def load_raiders_img_labels(
     return image.index_img(img, indices), y
 
 
-@MEMORY.cache
 def fetch_raiders(
     n_parcels: int = 400,
     lo_run: int = 1,
@@ -721,7 +716,6 @@ def fetch_raiders(
     )
 
 
-@MEMORY.cache
 def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
     DATA_PATH = Path(NEUROMOD_PATH)
     subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
