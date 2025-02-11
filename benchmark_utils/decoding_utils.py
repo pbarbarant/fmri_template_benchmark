@@ -167,10 +167,6 @@ def evaluate_movie_dataset(dataset):
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
 
-    # Create cross-validation object on each subject
-    X, y = compute_X_y(dict_aligned, masker)
-    groups = compute_groups(dict_aligned)
-
     labels_masker = NiftiLabelsMasker(
         labels_img=dataset.clustering_img, mask_img=masker.mask_img_
     ).fit()
@@ -186,17 +182,8 @@ def evaluate_movie_dataset(dataset):
         for subject in dataset.subjects
     )
 
-    cv_scores_dummy = cross_val_score(
-        DummyClassifier(strategy="most_frequent"),
-        X,
-        y,
-        groups=groups,
-        cv=LeaveOneGroupOut(),
-        n_jobs=N_JOBS,
-    )
-
     avg_score = np.mean(cv_scores_classif)
-    chance_level = np.mean(cv_scores_dummy)
+    chance_level = 1 / len(dict_aligned[dataset.subjects[0]].y)
 
     print(f"Average decoding accuracy: {avg_score:.2f}")
     print(f"Chance level: {chance_level:.2f}")
