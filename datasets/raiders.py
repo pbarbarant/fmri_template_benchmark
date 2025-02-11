@@ -10,6 +10,19 @@ with safe_import_context() as import_ctx:
         log_dataset_info,
     )
 
+SUBJECTS = [
+    "sub-rid000005",
+    "sub-rid000011",
+    "sub-rid000014",
+    "sub-rid000015",
+    "sub-rid000028",
+    "sub-rid000029",
+    "sub-rid000033",
+    "sub-rid000038",
+    "sub-rid000042",
+    "sub-rid000043",
+]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -19,7 +32,10 @@ class Dataset(BaseDataset):
     # List of parameters to generate the datasets. The benchmark will consider
     # the cross product for each key in the dictionary.
     # Any parameters 'param' defined here is available as `self.param`.
-    parameters = {"left_out_run": [1, 2, 3, 4, 5, 6, 7, 8]}
+    parameters = {
+        "left_out_run": [1, 2, 3, 4, 5, 6, 7, 8],
+        "target": ["template"],
+    }
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
@@ -34,6 +50,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_raiders(
             n_parcels=400,
+            target=self.target,
             lo_run=self.left_out_run,
         )
 
