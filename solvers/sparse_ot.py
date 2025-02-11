@@ -76,7 +76,7 @@ class Solver(BaseSolver):
         self.dataset = compute_alignment(
             algo=algo,
             dataset=self.dataset,
-            solver_name=self.name,
+            solver_name=self.name + f"_{self.reg}",
         )
 
     def get_result(self):
