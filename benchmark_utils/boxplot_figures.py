@@ -38,6 +38,9 @@ def get_results_dataframe(
 
     df = pd.DataFrame(res_list)
 
+    # Remove the simulated data
+    df = df[~df["data_name"].str.contains("Simulated")]
+
     # For anatomical keep only the template target
     df = df[
         ~((df["solver_name"] == "Anatomical") & (df["target"] != "template"))
@@ -93,31 +96,9 @@ plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 
-def create_accuracy_plot(data, title, fig_height=7):
+def create_accuracy_plot(data, title, fig_height=10):
     fig, ax = plt.subplots(figsize=(12, fig_height))
 
-    # sns.boxplot(
-    #     data=data,
-    #     x="cv_scores_classif",
-    #     y="data_name",
-    #     hue="solver_name",
-    #     showfliers=False,
-    #     ax=ax,
-    #     fill=False,
-    #     legend=False,
-    #     palette="dark:k",
-    # )
-
-    # sns.stripplot(
-    #     data=data,
-    #     x="cv_scores_classif",
-    #     y="data_name",
-    #     size=4,
-    #     hue="solver_name",
-    #     dodge=True,
-    #     jitter=True,
-    #     ax=ax,
-    # )
     sns.barplot(
         data=data,
         x="cv_scores_classif",
