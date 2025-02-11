@@ -11,9 +11,13 @@ with safe_import_context() as import_ctx:
     )
 
 SUBJECTS = [
+    "sub-04",
+    "sub-06",
+    "sub-08",
     "sub-09",
     "sub-11",
     "sub-12",
+    "sub-14",
 ]
 
 
@@ -26,7 +30,7 @@ class Dataset(BaseDataset):
     # section in objective.py
     install_pip = "pip"
     requirements = []
-    parameters = {"target": ["template"] + SUBJECTS}
+    parameters = {"target": ["template"]}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
