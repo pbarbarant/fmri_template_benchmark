@@ -10,6 +10,8 @@ with safe_import_context() as import_ctx:
         log_dataset_info,
     )
 
+SUBJECTS = ["sub-01", "sub-02", "sub-03", "sub-05"]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -21,8 +23,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    def __init__(self):
-        self.n_parcels = 400
+    parameters = {"target": ["template"] + SUBJECTS}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -30,9 +31,11 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
+        self.n_parcels = 400
 
         self.dataset = fetch_neuromod(
             n_parcels=self.n_parcels,
+            target=self.target,
         )
 
         check_init_dataset(self.dataset)
