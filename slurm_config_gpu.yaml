@@ -1,5 +1,5 @@
-slurm_time: 06:00:00        # max runtime 1 hour
-slurm_partition: gpu-best        # Partition used for the jobs
+slurm_time: 00:20:00        # max runtime 20 minutes
+slurm_partition: gpu-best   # Partition used for the jobs
 slurm_gres: gpu:1           # Use 1 GPU per job
 slurm_job_name: benchopt    # Job name
 slurm_additional_parameters:
