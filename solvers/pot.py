@@ -21,7 +21,7 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {}
+    parameters = {"reg": [0.1]}
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
@@ -48,7 +48,7 @@ class Solver(BaseSolver):
         # https://benchopt.github.io/performance_curves.html
         if self.dataset.target == "template":
             algo = TemplateAlignment(
-                alignment_method=POTAlignment(reg=0.1),
+                alignment_method=POTAlignment(reg=self.reg),
                 mask=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 n_jobs=N_JOBS,
@@ -57,7 +57,7 @@ class Solver(BaseSolver):
             )
         else:
             algo = PairwiseAlignment(
-                alignment_method=POTAlignment(reg=0.1),
+                alignment_method=POTAlignment(reg=self.reg),
                 mask=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 n_jobs=N_JOBS,
