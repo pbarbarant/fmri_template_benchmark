@@ -14,6 +14,7 @@ from nilearn.datasets import (
     load_fsaverage,
     load_mni152_gm_mask,
 )
+from fmralign._utils import _intersect_clustering_mask
 from nilearn.maskers import NiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.surface import PolyMesh, SurfaceImage
@@ -141,15 +142,33 @@ def fit_mni152_masker(resolution: int = 3) -> NiftiMasker:
     return NiftiMasker(mask_img=mask_img, memory=MEMORY, memory_level=1).fit()
 
 
-def fit_masker(imgs, detrend=False, t_r=None) -> NiftiMasker:
+def fit_masker(imgs, mask_img=None, detrend=False, t_r=None) -> NiftiMasker:
     return NiftiMasker(
         memory=MEMORY,
+        mask_img=mask_img,
         memory_level=1,
         standardize=True,
         detrend=detrend,
         t_r=t_r,
         n_jobs=N_JOBS,
     ).fit(imgs)
+
+
+def get_masker_clustering_img(dict_alignment, subjects, n_parcels):
+    masker = fit_masker(
+        [dict_alignment[subject] for subject in subjects],
+    )
+    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
+    if 0 in masker.transform(clustering_img):
+        reduced_mask = _intersect_clustering_mask(
+            clustering_img, masker.mask_img_
+        )
+        # Update the masker
+        masker = fit_masker(
+            [dict_alignment[subject] for subject in subjects],
+            mask_img=reduced_mask,
+        )
+    return masker, clustering_img
 
 
 def sample_movie_segment(n_segments: int, masker: NiftiMasker) -> LabeledImage:
@@ -288,10 +307,9 @@ def fetch_ibc(
             y=decoding_df.contrast.to_numpy(),
         )
 
-    masker = fit_masker(
-        [dict_alignment[subject] for subject in subjects],
+    masker, clustering_img = get_masker_clustering_img(
+        dict_alignment, subjects, n_parcels
     )
-    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=name,
@@ -742,6 +760,41 @@ def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
 
     return Dataset(
         name="Neuromod",
+        subjects=subjects,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        masker=masker,
+        clustering_img=clustering_img,
+        target=target,
+    )
+
+
+def fetch_ibc_rsvp(
+    name: str = "IBC_RSVP",
+    target: str = "template",
+    subjects: List[str] = None,
+    task: str = None,
+    n_parcels: int = 400,
+) -> Dataset:
+    PATH = Path("/Users/plbar/data/ibc_rsvp/3mm/")
+    dict_alignment = dict()
+    dict_decoding = dict()
+    for subject in tqdm(subjects, desc="Processing IBC data"):
+        df = pd.read_csv(PATH / f"{subject}_labels.csv", header=None)
+        img = image.load_img(PATH / f"{subject}.nii.gz")
+        # Get the first 60 images for alignment
+        dict_alignment[subject] = image.index_img(img, np.arange(60))
+        dict_decoding[subject] = LabeledImage(
+            img=image.index_img(img, np.arange(60, img.shape[-1])),
+            y=df.to_numpy().flatten()[60:],  # Skip the first 60 labels
+        )
+
+    masker, clustering_img = get_masker_clustering_img(
+        dict_alignment, subjects, n_parcels
+    )
+
+    return Dataset(
+        name=name,
         subjects=subjects,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
