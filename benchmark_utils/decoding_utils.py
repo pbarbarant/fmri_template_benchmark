@@ -12,6 +12,7 @@ from sklearn.svm import LinearSVC
 from sklearn.model_selection import (
     LeaveOneGroupOut,
     cross_val_score,
+    cross_validate,
 )
 
 from benchmark_utils.conf import N_JOBS
@@ -94,7 +95,7 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     return np.mean(cleaned_correlations)
 
 
-def save_weights(estimator, dataset, y_train):
+def save_weights(estimator, dataset, y_train, subject=None):
     masker = dataset.masker
     output_dir = (
         Path("outputs") / dataset.name / dataset.solver / dataset.target
@@ -102,9 +103,11 @@ def save_weights(estimator, dataset, y_train):
     output_dir.mkdir(parents=True, exist_ok=True)
     weights_img = masker.inverse_transform(estimator.coef_)
     weights_labels = np.unique(y_train)
-    weights_img.to_filename(output_dir / "weights.nii.gz")
+    weights_img.to_filename(output_dir / f"{subject}_weights.nii.gz")
     # Save the labels of the weights as csv
-    np.savetxt(output_dir / "weights_labels.csv", weights_labels, fmt="%s")
+    np.savetxt(
+        output_dir / f"{subject}_weights_labels.csv", weights_labels, fmt="%s"
+    )
 
 
 def evaluate_task_dataset(dataset, max_iter=1000):
@@ -117,15 +120,23 @@ def evaluate_task_dataset(dataset, max_iter=1000):
     X, y = compute_X_y(dataset)
 
     svc = LinearSVC(max_iter=max_iter)
-    pipeline = make_pipeline(svc)
-    cv_scores_classif = cross_val_score(
-        pipeline,
+    scores = cross_validate(
+        svc,
         X,
         y,
         groups=groups,
         cv=LeaveOneGroupOut(),
         n_jobs=N_JOBS,
+        return_estimator=True,
+        return_indices=True,
     )
+    cv_scores_classif = scores["test_score"]
+    for i, (estimator, indices) in enumerate(
+        zip(scores["estimator"], scores["indices"]["train"])
+    ):
+        save_weights(
+            estimator, dataset, y[indices], subject=dataset.subjects[i]
+        )
 
     avg_score = np.mean(cv_scores_classif)
     chance_level = np.mean(
@@ -263,7 +274,7 @@ def evaluate_subject_dataset(dataset, max_iter=1000):
     y_test = dict_aligned[dataset.target].y
 
     svc.fit(X_train, y_train)
-    save_weights(svc, dataset, y_train)
+    save_weights(svc, dataset, y_train, subject=dataset.target)
     avg_score = svc.score(X_test, y_test)
 
     dummy_clf = DummyClassifier(strategy="most_frequent")
