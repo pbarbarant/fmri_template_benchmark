@@ -94,6 +94,19 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     return np.mean(cleaned_correlations)
 
 
+def save_weights(estimator, dataset, y_train):
+    masker = dataset.masker
+    output_dir = (
+        Path("outputs") / dataset.name / dataset.solver / dataset.target
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    weights_img = masker.inverse_transform(estimator.coef_)
+    weights_labels = np.unique(y_train)
+    weights_img.to_filename(output_dir / "weights.nii.gz")
+    # Save the labels of the weights as csv
+    np.savetxt(output_dir / "weights_labels.csv", weights_labels, fmt="%s")
+
+
 def evaluate_task_dataset(dataset, max_iter=1000):
     # Leave one subject out cross-validation
     if dataset.name.lower().startswith("hcp"):
@@ -113,6 +126,7 @@ def evaluate_task_dataset(dataset, max_iter=1000):
         cv=LeaveOneGroupOut(),
         n_jobs=N_JOBS,
     )
+
     avg_score = np.mean(cv_scores_classif)
     chance_level = np.mean(
         cross_val_score(
@@ -226,7 +240,7 @@ def evaluate_subject_dataset(dataset, max_iter=1000):
     pearson_corrs = compute_pearson_corrs(dataset)
 
     # Evaluate the decoding performance
-    pipeline = make_pipeline(LinearSVC(max_iter=max_iter))
+    svc = LinearSVC(max_iter=max_iter)
     X_train = masker.transform(
         image.concat_imgs(
             [
@@ -248,8 +262,9 @@ def evaluate_subject_dataset(dataset, max_iter=1000):
     X_test = masker.transform(dict_aligned[dataset.target].img)
     y_test = dict_aligned[dataset.target].y
 
-    pipeline.fit(X_train, y_train)
-    avg_score = pipeline.score(X_test, y_test)
+    svc.fit(X_train, y_train)
+    save_weights(svc, dataset, y_train)
+    avg_score = svc.score(X_test, y_test)
 
     dummy_clf = DummyClassifier(strategy="most_frequent")
     dummy_clf.fit(X_train, y_train)
