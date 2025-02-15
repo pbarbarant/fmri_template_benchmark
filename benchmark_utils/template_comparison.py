@@ -22,7 +22,8 @@ DATASET = "IBC_FaceBody"
 VMIN = -1
 VMAX = 1
 THRESHOLD = 0.25
-contrast_idx = 19
+HEMI = "right"
+CONTRAST_IDX = 19
 
 mesh = "fsaverage5"
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh)
@@ -46,7 +47,7 @@ def plot_surface_map(surface_image, cmap="coolwarm", **kwargs):
     plotting.plot_surf_stat_map(
         stat_map=surface_image,
         surf_mesh=fsaverage_meshes["inflated"],
-        hemi="left",
+        hemi=HEMI,
         view="ventral",
         colorbar=False,
         cmap=cmap,
@@ -60,7 +61,7 @@ fig = plt.figure(figsize=(5, 3))
 grid_spec = gridspec.GridSpec(1, 3, figure=fig, wspace=0.00)
 ax0 = fig.add_subplot(grid_spec[0, 0], projection="3d")
 surf_euclidean = load_images_and_project_to_surface(
-    euclidean_path, contrast_idx
+    euclidean_path, CONTRAST_IDX
 )
 plot_surface_map(
     surf_euclidean,
@@ -75,7 +76,7 @@ ax0.view_init(elev=270, azim=-90)
 
 ax1 = fig.add_subplot(grid_spec[0, 1], projection="3d")
 surf_procrustes = load_images_and_project_to_surface(
-    procrustes_path, contrast_idx
+    procrustes_path, CONTRAST_IDX
 )
 plot_surface_map(
     surf_procrustes,
@@ -88,7 +89,7 @@ ax1.set_title("Procrustes")
 ax1.view_init(elev=270, azim=-90)
 
 ax2 = fig.add_subplot(grid_spec[0, 2], projection="3d")
-surf_ot = load_images_and_project_to_surface(ot_path, contrast_idx)
+surf_ot = load_images_and_project_to_surface(ot_path, CONTRAST_IDX)
 plot_surface_map(
     surf_ot,
     axes=ax2,
@@ -119,4 +120,6 @@ plt.show()
 # Save as PDF
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
-fig.savefig(figures_path / "templates_comparison.pdf", bbox_inches="tight")
+fig.savefig(
+    figures_path / f"templates_comparison_{HEMI}.pdf", bbox_inches="tight"
+)
