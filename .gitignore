@@ -9,6 +9,7 @@ memory_cache
 **/outputs*
 joblib/
 benchopt_run/
+copy_outputs/
 
 # IDE specific folders
 .vscode
