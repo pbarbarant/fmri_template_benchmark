@@ -95,14 +95,14 @@ def pearson_corr_parcels(img1, img2, labels_masker):
     return np.mean(cleaned_correlations)
 
 
-def save_weights(estimator, dataset, y_train, subject=None):
+def save_weights(estimator, dataset, subject=None):
     masker = dataset.masker
     output_dir = (
         Path("outputs") / dataset.name / dataset.solver / dataset.target
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     weights_img = masker.inverse_transform(estimator.coef_)
-    weights_labels = np.unique(y_train)
+    weights_labels = estimator.classes_
     weights_img.to_filename(output_dir / f"{subject}_weights.nii.gz")
     # Save the labels of the weights as csv
     np.savetxt(
@@ -128,15 +128,10 @@ def evaluate_task_dataset(dataset, max_iter=1000):
         cv=LeaveOneGroupOut(),
         n_jobs=N_JOBS,
         return_estimator=True,
-        return_indices=True,
     )
     cv_scores_classif = scores["test_score"]
-    for i, (estimator, indices) in enumerate(
-        zip(scores["estimator"], scores["indices"]["train"])
-    ):
-        save_weights(
-            estimator, dataset, y[indices], subject=dataset.subjects[i]
-        )
+    for i, estimator in enumerate(scores["estimator"]):
+        save_weights(estimator, dataset, subject=dataset.subjects[i])
 
     avg_score = np.mean(cv_scores_classif)
     chance_level = np.mean(
@@ -274,7 +269,7 @@ def evaluate_subject_dataset(dataset, max_iter=1000):
     y_test = dict_aligned[dataset.target].y
 
     svc.fit(X_train, y_train)
-    save_weights(svc, dataset, y_train, subject=dataset.target)
+    save_weights(svc, dataset, subject=dataset.target)
     avg_score = svc.score(X_test, y_test)
 
     dummy_clf = DummyClassifier(strategy="most_frequent")
