@@ -32,7 +32,7 @@ THRESHOLD_CONTRAST = 0.25
 IDX_WEIGHTS = 4
 IDX_CONTRAST = 19
 
-mesh = "fsaverage6"
+mesh = "fsaverage7"
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh)
 
 euclidean_path = data_path / DATASET / "Anatomical"
@@ -155,6 +155,7 @@ plot_surface_map(
     threshold=THRESHOLD_CONTRAST,
 )
 ax4.view_init(elev=270, azim=-90)
+# Set square aspect ratio
 ax4.text2D(
     0.05,
     0.2,
@@ -173,6 +174,7 @@ plot_surface_map(
     vmax=VMAX_WEIGHTS,
     threshold=THRESHOLD_WEIGHTS,
 )
+# Zoom in to see the weights
 ax5.view_init(elev=270, azim=-90)
 
 # Add colorbar for contrasts
