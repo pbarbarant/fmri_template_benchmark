@@ -131,7 +131,9 @@ def log_dataset_info(dataset: Dataset) -> None:
 def fetch_clustering_img(
     target_img: Nifti1Image, n_rois: int = 400
 ) -> Nifti1Image:  # -> FileBasedImage | Nifti1Image | Any:# -> FileBasedImage | Nifti1Image | Any:
-    clustering_img = fetch_atlas_schaefer_2018(n_rois=n_rois)["maps"]
+    clustering_img = fetch_atlas_schaefer_2018(
+        n_rois=n_rois, data_dir=MEMORY.location / "atlas"
+    )["maps"]
     resampled_img = image.resample_to_img(clustering_img, target_img)
     int_img = image.math_img("img.astype(int)", img=resampled_img)
     return int_img
