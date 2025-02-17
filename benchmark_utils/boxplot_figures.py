@@ -46,6 +46,9 @@ def get_results_dataframe(
         ~((df["solver_name"] == "Anatomical") & (df["target"] != "template"))
     ]
 
+    # Remove the "IBC " prefix on the dataset names
+    df["data_name"] = df["data_name"].str.replace("IBC", "")
+
     # Add a type column to indicate tasks or movie
     df["type"] = df["data_name"].apply(
         lambda x: "movie"
@@ -58,9 +61,9 @@ def get_results_dataframe(
 
     # Add (template) to the solver name if target is template
     df["solver_name"] = df.apply(
-        lambda x: x["solver_name"] + " (template)"
+        lambda x: x["solver_name"] + "\n(template)"
         if x["target"] == "template"
-        else x["solver_name"] + " (pairwise)",
+        else x["solver_name"] + "\n(pairwise)",
         axis=1,
     )
 
@@ -96,24 +99,41 @@ plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 
-def create_accuracy_plot(data, title, fig_height=10):
-    fig, ax = plt.subplots(figsize=(12, fig_height))
-
+def create_accuracy_plot(data, figsize=(12, 7)):
+    fig, ax = plt.subplots(figsize=figsize)
+    original_palette = sns.color_palette("Paired")
+    shifted_palette = original_palette[1:] + original_palette[:1]
     sns.barplot(
         data=data,
         x="cv_scores_classif",
         y="data_name",
         hue="solver_name",
         ax=ax,
+        palette=shifted_palette,
     )
 
     ax.set_xlabel("Accuracy", fontweight="bold")
     ax.set_ylabel("Dataset", fontweight="bold")
-    ax.set_title(title, fontweight="bold", fontsize="large")
 
-    for i, data_name in enumerate(data["data_name"].unique()):
+    for i in range(len((data["data_name"].unique()))):
         if i % 2 == 0:
             ax.axhspan(i - 0.5, i + 0.5, color="gray", alpha=0.05)
+
+    # Add a vertical line at chance level
+    chance_levels = (
+        data.groupby("data_name")["chance_level"]
+        .unique()
+        .apply(lambda x: x[0])
+    ).to_list()
+    for i, chance_level in enumerate(chance_levels):
+        ax.vlines(
+            chance_level,
+            i - 0.5,
+            i + 0.5,
+            color="k",
+            linestyles="--",
+            alpha=0.5,
+        )
 
     ax.set_yticklabels(
         [name.replace("_", " ") for name in data["data_name"].unique()]
@@ -129,11 +149,11 @@ def create_accuracy_plot(data, title, fig_height=10):
 movie_data = df[df["type"] == "movie"]
 task_data = df[df["type"] == "task"]
 
-fig1 = create_accuracy_plot(
-    movie_data, "Movie Prediction Accuracies", fig_height=3
-)
-fig2 = create_accuracy_plot(task_data, "Task Prediction Accuracies")
-fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
+# fig1 = create_accuracy_plot(
+#     movie_data, "Movie Prediction Accuracies",
+# )
+fig2 = create_accuracy_plot(task_data, figsize=(3.15, 8))
+# fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
 fig2.savefig(figures_path / "boxplot_task_accuracy.pdf", bbox_inches="tight")
 
 plt.show()
@@ -146,7 +166,7 @@ plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 # Create the figure and axes with a specific size
-fig, ax = plt.subplots(figsize=(12, 7))
+fig, ax = plt.subplots(figsize=(3.15, 5))
 
 # Create the box plot
 sns.boxplot(
@@ -160,6 +180,8 @@ sns.boxplot(
     legend=False,
     palette="dark:k",
 )
+original_palette = sns.color_palette("Paired")
+shifted_palette = original_palette[1:] + original_palette[:1]
 # Create the scatter plot
 sns.stripplot(
     data=df,
@@ -169,16 +191,12 @@ sns.stripplot(
     hue="solver_name",
     dodge=True,
     jitter=True,
+    palette=shifted_palette,
 )
 
 # Customize the plot
 ax.set_xlabel("Pearson Correlation", fontweight="bold")
 ax.set_ylabel("Dataset", fontweight="bold")
-ax.set_title(
-    "Average parcel-wise Pearson correlation to the template",
-    fontweight="bold",
-    fontsize="large",
-)
 # Set the legend title
 ax.legend(title="Alignment method", title_fontsize="large")
 
