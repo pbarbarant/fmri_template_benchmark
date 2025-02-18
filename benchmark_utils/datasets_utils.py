@@ -297,7 +297,7 @@ def fetch_ibc(
         df_sub = df[(df.subject == subject)]
         # For each contrast, keep randomly one path
         alignment_df = df_sub.groupby(["contrast"]).apply(
-            lambda x: x.sample(1, random_state=42)
+            lambda x: x.sample(1, random_state=0)
         )
         # Put the rest in decoding_df
         decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
