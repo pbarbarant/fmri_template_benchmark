@@ -43,7 +43,7 @@ def get_results_dataframe(
 
     # For anatomical keep only the template target
     df = df[
-        ~((df["solver_name"] == "Anatomical") & (df["target"] != "template"))
+        ~((df["solver_name"] == "Anatomical") & (df["target"] == "template"))
     ]
 
     # Remove the "IBC " prefix on the dataset names
@@ -68,17 +68,17 @@ def get_results_dataframe(
     )
 
     # Remove the (template) suffix for the anatomical alignment
-    df["solver_name"] = df.apply(
-        lambda x: "Anatomical"
-        if x["solver_name"] == "Anatomical (template)"
-        else x["solver_name"],
-        axis=1,
+    df["solver_name"] = df["solver_name"].str.replace(
+        "Anatomical\n(pairwise)", "Anatomical"
     )
 
     # Rename ot by Optimal Transport
     df["solver_name"] = df["solver_name"].str.replace(
         "ot", "Optimal Transport"
     )
+
+    # Rename Wm by WM
+    df["data_name"] = df["data_name"].str.replace("Wm", "WM")
 
     # Sort alphabetically by dataset name and solver name
     df.sort_values(by=["data_name", "solver_name"], inplace=True)
@@ -146,11 +146,12 @@ def create_accuracy_plot(data, figsize=(12, 7)):
 
 
 # Create separate plots
-movie_data = df[df["type"] == "movie"]
+# movie_data = df[df["type"] == "movie"]
 task_data = df[df["type"] == "task"]
 
 # fig1 = create_accuracy_plot(
-#     movie_data, "Movie Prediction Accuracies",
+#     movie_data,
+#     "Movie Prediction Accuracies",
 # )
 fig2 = create_accuracy_plot(task_data, figsize=(3.15, 8))
 # fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
