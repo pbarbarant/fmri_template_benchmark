@@ -154,6 +154,7 @@ def compute_template(
     # Save the labels as csv
     save_template_labels(template, dataset.name, dataset.solver)
 
+    dataset.parcel_masker = algo.parcel_masker
     dataset.template = template
     dataset.dict_aligned = dict_aligned
 
@@ -184,6 +185,7 @@ def compute_pairwise(
             )
 
     dataset.dict_aligned = dict_aligned
+    dataset.parcel_masker = algo.parcel_masker
     return dataset
 
 
