@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 from joblib import Parallel, delayed, dump
 from nilearn import image
-from nilearn.maskers import NiftiLabelsMasker, SurfaceLabelsMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
@@ -61,37 +60,32 @@ def compute_pearson_corrs(dataset):
         target_img = dataset.dict_aligned[target].img
     clustering_img = dataset.clustering_img
     masker = dataset.masker
-    if dataset.is_surf:
-        labels_masker = SurfaceLabelsMasker(
-            labels_img=clustering_img, mask_img=masker.mask_img_
-        ).fit()
-    else:
-        labels_masker = NiftiLabelsMasker(
-            labels_img=clustering_img, mask_img=masker.mask_img_
-        ).fit()
+    parcel_masker = dataset.parcel_masker
     pearson_corrs = []
     for subject in dataset.subjects:
         # Do not compare a subject with itself
         if subject != target:
             subject_img = dataset.dict_aligned[subject].img
             subject_corr = pearson_corr_parcels(
-                subject_img, target_img, labels_masker
+                subject_img, target_img, parcel_masker
             )
             pearson_corrs.append(subject_corr)
     return pearson_corrs
 
 
-def pearson_corr_parcels(img1, img2, labels_masker):
+def pearson_corr_parcels(img1, img2, parcel_masker):
     """Compute the Pearson correlation between two images
     by averaging the signal in each parcel."""
-    data1 = labels_masker.transform(img1)
-    data2 = labels_masker.transform(img2)
-    n_parcels = data1.shape[1]
-    correlations = [
-        pearsonr(data1[:, i], data2[:, i])[0] for i in range(n_parcels)
-    ]
+    n_samples = img1.shape[-1]
+    parceled_data1, parceled_data2 = parcel_masker.transform([img1, img2])
+    data1, data2 = parceled_data1.to_list(), parceled_data2.to_list()
+    correlations = np.zeros((len(data1), n_samples))
+    for i, (d1, d2) in enumerate(zip(data1, data2)):
+        for j in range(n_samples):
+            correlations[i, j] = pearsonr(d1[j, :], d2[j, :])[0]
+
     # Remove NaN values
-    cleaned_correlations = [c for c in correlations if not np.isnan(c)]
+    cleaned_correlations = np.nan_to_num(correlations)
     return np.mean(cleaned_correlations)
 
 
@@ -150,7 +144,7 @@ def evaluate_task_dataset(dataset, max_iter=1000):
     return avg_score, chance_level, cv_scores_classif
 
 
-def classify_subject_movie(template_img, img, y, labels_masker):
+def classify_subject_movie(template_img, img, y, parcel_masker):
     segments_ids = np.unique(y)
     res = []
     # Get the list of segments for the template
@@ -174,7 +168,7 @@ def classify_subject_movie(template_img, img, y, labels_masker):
             # Compute the Pearson correlation with each segment of the template
             corr_list.append(
                 pearson_corr_parcels(
-                    segment_template, segment_subject, labels_masker
+                    segment_template, segment_subject, parcel_masker
                 )
             )
         # Predict the segment with the highest correlation
@@ -187,9 +181,7 @@ def evaluate_movie_dataset(dataset):
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
 
-    labels_masker = NiftiLabelsMasker(
-        labels_img=dataset.clustering_img, mask_img=masker.mask_img_
-    ).fit()
+    parcel_masker = dataset.parcel_masker
 
     # Parallelize the classification of each subject
     cv_scores_classif = Parallel(n_jobs=N_JOBS, verbose=11)(
@@ -197,7 +189,7 @@ def evaluate_movie_dataset(dataset):
             dataset.template.img,
             dict_aligned[subject].img,
             dataset.template.y,
-            labels_masker,
+            parcel_masker,
         )
         for subject in dataset.subjects
     )

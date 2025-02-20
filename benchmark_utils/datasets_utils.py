@@ -15,6 +15,7 @@ from nilearn.datasets import (
     load_mni152_gm_mask,
 )
 from fmralign._utils import _intersect_clustering_mask
+from fmralign.preprocessing import ParcellationMasker
 from nilearn.maskers import NiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.surface import PolyMesh, SurfaceImage
@@ -48,6 +49,7 @@ class Dataset:
     dict_decoding: Dict[str, LabeledImage]
     masker: NiftiMasker | SurfaceMasker
     clustering_img: Nifti1Image
+    parcel_masker: Optional[ParcellationMasker] = None
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
     template: Optional[LabeledImage] = None
     is_surf: bool = False
