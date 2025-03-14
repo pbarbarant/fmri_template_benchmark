@@ -49,7 +49,7 @@ class Solver(BaseSolver):
         if self.dataset.target == "template":
             algo = TemplateAlignment(
                 alignment_method=POTAlignment(reg=self.reg),
-                mask=self.dataset.masker,
+                masker=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 n_jobs=N_JOBS,
                 n_iter=10,
@@ -58,7 +58,7 @@ class Solver(BaseSolver):
         else:
             algo = PairwiseAlignment(
                 alignment_method=POTAlignment(reg=self.reg),
-                mask=self.dataset.masker,
+                masker=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 n_jobs=N_JOBS,
                 verbose=11,

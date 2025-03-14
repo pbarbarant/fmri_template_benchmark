@@ -54,7 +54,7 @@ class Solver(BaseSolver):
         )
         if self.dataset.target == "template":
             algo = SparseTemplateAlignment(
-                mask=self.dataset.masker,
+                masker=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 device=self.device,
                 n_jobs=N_JOBS,
@@ -63,7 +63,7 @@ class Solver(BaseSolver):
             )
         else:
             algo = SparsePairwiseAlignment(
-                mask=self.dataset.masker,
+                masker=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 device=self.device,
                 n_jobs=N_JOBS,
