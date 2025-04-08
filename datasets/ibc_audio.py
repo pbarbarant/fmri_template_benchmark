@@ -44,7 +44,7 @@ class Dataset(BaseDataset):
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
         self.dataset = fetch_ibc(
-            name=self.name,
+            name=self.name + f"_{self.n_parcels}",
             target=self.target,
             subjects=SUBJECTS,
             task="Audio",
