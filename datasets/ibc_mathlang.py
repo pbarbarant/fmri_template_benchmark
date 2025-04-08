@@ -34,13 +34,12 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {"target": ["template"] + SUBJECTS}
+    parameters = {"target": ["template"] + SUBJECTS, "n_parcels": [200, 400]}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
         # to `Objective.set_data`. This defines the benchmark's
         # API to pass data. It is customizable for each benchmark.
-        self.n_parcels = 400
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
