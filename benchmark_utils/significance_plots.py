@@ -3,12 +3,14 @@ import glob
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
-import scienceplots  # noqa: F401
+# import scienceplots  # noqa: F401
 import seaborn as sns
 from joblib import load
+import pandas as pd
+import numpy as np
+from scipy.stats import ttest_ind, ttest_rel, wilcoxon, t, f_oneway, kruskal
 
-plt.rcParams["figure.dpi"] = 500
+plt.rcParams["figure.dpi"] = 300
 
 data_path = Path(__file__).parent.parent / "copy_outputs"
 figures_path = data_path.parent / "copy_outputs" / "figures"
@@ -91,38 +93,59 @@ def get_results_dataframe(
 df_acc = get_results_dataframe(data_path, score="cv_scores_classif")
 
 # Set the style and font scale for better readability
-plt.style.use(["science", "nature", "no-latex"])
-sns.set_context("paper", font_scale=1.3)
+# plt.style.use(["science", "nature", "no-latex"])
+# sns.set_context("paper", font_scale=1.3)
 
-from scipy.stats import ttest_ind
-import pandas as pd
-import numpy as np
+def corrected_dependent_ttest(data1, data2):
+    n = len(data1)
+    n_test_folds = 1
+    n_training_folds = len(data1) - n_test_folds
+    differences = data1 - data2
+    sd = np.std(differences)
+    divisor = 1 / n * np.sum(differences)
+    test_training_ratio = n_test_folds / n_training_folds  
+    denominator = np.sqrt(1 / n + test_training_ratio) * sd
+    t_stat = divisor / denominator
+    # degrees of freedom
+    df = n - 1
+    # calculate the p-value
+    p = (1.0 - t.cdf(abs(t_stat), df)) * 2.0
+    return t_stat, p
 
-# Prepare a dataframe to store the p-values
-pvals = []
+def get_p_values(df, method):
+    # Prepare a dataframe to store the p-values
+    pvals = []
 
-# Iterate over each dataset
-for dataset in df_acc['data_name'].unique():
-    subset = df_acc[df_acc['data_name'] == dataset]
-    solvers = subset['solver_name'].unique()
-    
-    # Pairwise comparison between solvers
-    for i in range(len(solvers)):
-        for j in range(i+1, len(solvers)):
-            solver1 = solvers[i]
-            solver2 = solvers[j]
-            scores1 = subset[subset['solver_name'] == solver1]['cv_scores_classif'].to_numpy(np.float64)
-            scores2 = subset[subset['solver_name'] == solver2]['cv_scores_classif'].to_numpy(np.float64)
-            tstat, pval = ttest_ind(scores1, scores2)
-            pvals.append({
-                'data_name': dataset,
-                'solver1': solver1,
-                'solver2': solver2,
-                'pval': pval
-            })
+    # Iterate over each dataset
+    for dataset in df['data_name'].unique():
+        subset = df[df['data_name'] == dataset]
+        solvers = subset['solver_name'].unique()
+        
+        # Pairwise comparison between solvers
+        for i in range(len(solvers)):
+            for j in range(i+1, len(solvers)):
+                solver1 = solvers[i]
+                solver2 = solvers[j]
+                scores1 = subset[subset['solver_name'] == solver1]['cv_scores_classif'].to_numpy(np.float64)
+                scores2 = subset[subset['solver_name'] == solver2]['cv_scores_classif'].to_numpy(np.float64)
+                if len(scores1) == len(scores2):
+                    tstat, pval = method(scores1, scores2)
+                    pvals.append({
+                        'data_name': dataset,
+                        'solver1': solver1,
+                        'solver2': solver2,
+                        'pval': pval
+                    })
+                else:
+                    print(f"Warning: Different number of scores for {solver1} and {solver2} in dataset {dataset}. Skipping comparison.")
+                    continue
 
-pval_df = pd.DataFrame(pvals)
+    pval_df = pd.DataFrame(pvals)
 
+    return pval_df
+
+# Get p-values using Wilcoxon test
+pval_df = get_p_values(df_acc, corrected_dependent_ttest)
 
 # First, get all unique datasets and solvers
 datasets = pval_df['data_name'].unique()
@@ -151,17 +174,17 @@ def starify(p):
     if pd.isna(p):
         return ""
     elif p < 0.001:
-        return '***'
+        return '<0.001'
     elif p < 0.01:
-        return '**'
+        return '<0.01'
     elif p < 0.05:
-        return '*'
+        return '<0.05'
     else:
         return 'ns'
 
 star_matrices = {}
 for dataset, matrix in pval_matrices.items():
-    stars = matrix.applymap(starify)
+    stars = matrix.map(starify)
     star_matrices[dataset] = stars
 
 
@@ -195,9 +218,10 @@ for i, (dataset, matrix) in enumerate(plot_matrices.items()):
         linewidths=0.5,
         linecolor='gray',
         ax=ax,
-        square=True
+        square=True,
+        annot_kws={"fontsize":8}
     )
-    ax.set_title(f"P-value Matrix: {dataset}", fontsize=14)
+    ax.set_title(f"Dataset: {dataset}", fontsize=14)
     ax.set_xlabel("Solver")
     ax.set_ylabel("Solver")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
@@ -208,3 +232,6 @@ for j in range(i + 1, len(axes)):
 
 plt.tight_layout()
 plt.show()
+
+# Save the figure
+plt.savefig(figures_path / "significance_plots.pdf", dpi=300)
