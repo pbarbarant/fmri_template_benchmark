@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ttest_ind, ttest_rel, wilcoxon, t, f_oneway, kruskal
 
-plt.rcParams["figure.dpi"] = 300
+plt.rcParams["figure.dpi"] = 100
 
 data_path = Path(__file__).parent.parent / "copy_outputs"
 figures_path = data_path.parent / "copy_outputs" / "figures"
@@ -234,4 +234,4 @@ plt.tight_layout()
 plt.show()
 
 # Save the figure
-plt.savefig(figures_path / "significance_plots.pdf", dpi=300)
+fig.savefig(figures_path / "significance_plots.pdf", dpi=100, bbox_inches="tight")
