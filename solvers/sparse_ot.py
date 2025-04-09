@@ -70,6 +70,7 @@ class Solver(BaseSolver):
                 n_jobs=N_JOBS,
                 verbose=1,
                 reg=self.reg,
+                solver="sinkhorn_stabilized",
             )
 
         self.dataset = compute_alignment(
