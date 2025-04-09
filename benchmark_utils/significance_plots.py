@@ -51,9 +51,6 @@ def get_results_dataframe(
         r"_[0-9]+$", "", regex=True
     )
 
-    # Remove the SparseOT solver
-    df = df[~df["solver_name"].str.contains("Sparse")]
-
     # For anatomical keep only the template target
     df = df[
         ~((df["solver_name"] == "Anatomical") & (df["target"] == "template"))
