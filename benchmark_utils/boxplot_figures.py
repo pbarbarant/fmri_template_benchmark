@@ -14,9 +14,11 @@ data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
+N_PARCELS = 400
+
 
 def get_results_dataframe(
-    data_path: Path, score="cv_scores_classif"
+    data_path: Path, score="cv_scores_classif", n_parcels=400
 ) -> pd.DataFrame:
     # Glob recursively all the decoding_results.pkl files
     results_paths = glob.glob(
@@ -40,6 +42,17 @@ def get_results_dataframe(
 
     # Remove the simulated data
     df = df[~df["data_name"].str.contains("Simulated")]
+    
+    # Keep only the results for the specified number of parcels
+    df = df[df["data_name"].str.contains(f"{n_parcels}")]
+
+    # Remove parcels numbers from the dataset names
+    df["data_name"] = df["data_name"].str.replace(
+        r"_[0-9]+$", "", regex=True
+    )
+
+    # Remove the SparseOT solver
+    df = df[~df["solver_name"].str.contains("Sparse")]
 
     # For anatomical keep only the template target
     df = df[
@@ -61,15 +74,15 @@ def get_results_dataframe(
 
     # Add (template) to the solver name if target is template
     df["solver_name"] = df.apply(
-        lambda x: x["solver_name"] + "\n(template)"
+        lambda x: x["solver_name"] + " (template)"
         if x["target"] == "template"
-        else x["solver_name"] + "\n(pairwise)",
+        else x["solver_name"] + " (pairwise)",
         axis=1,
     )
 
     # Remove the (template) suffix for the anatomical alignment
     df["solver_name"] = df["solver_name"].str.replace(
-        "Anatomical\n(pairwise)", "Anatomical"
+        "Anatomical (pairwise)", "Anatomical"
     )
 
     # Rename ot by Optimal Transport
@@ -92,7 +105,7 @@ def get_results_dataframe(
     return df
 
 
-df = get_results_dataframe(data_path, score="cv_scores_classif")
+df = get_results_dataframe(data_path, score="cv_scores_classif", n_parcels=N_PARCELS)
 
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
@@ -155,10 +168,10 @@ task_data = df[df["type"] == "task"]
 # )
 fig2 = create_accuracy_plot(task_data, figsize=(3.15, 8))
 # fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
-fig2.savefig(figures_path / "boxplot_task_accuracy.pdf", bbox_inches="tight")
+fig2.savefig(figures_path / f"boxplot_task_accuracy_{N_PARCELS}.pdf", bbox_inches="tight")
 
 plt.show()
-
+# %%
 # Do the same for the Pearson correlation
 df = get_results_dataframe(data_path, score="pearson_corrs")
 
@@ -167,7 +180,9 @@ plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
 
 # Create the figure and axes with a specific size
-fig, ax = plt.subplots(figsize=(3.15, 5))
+fig, ax = plt.subplots(
+    figsize=(4.25, 6), constrained_layout=True
+)  # Increased height
 
 # Create the box plot
 sns.boxplot(
@@ -181,8 +196,10 @@ sns.boxplot(
     legend=False,
     palette="dark:k",
 )
+
 original_palette = sns.color_palette("Paired")
 shifted_palette = original_palette[1:] + original_palette[:1]
+
 # Create the scatter plot
 sns.stripplot(
     data=df,
@@ -198,11 +215,15 @@ sns.stripplot(
 # Customize the plot
 ax.set_xlabel("Pearson Correlation", fontweight="bold")
 ax.set_ylabel("Dataset", fontweight="bold")
-# Set the legend title
-ax.legend(title="Alignment method", title_fontsize="large")
 
-# Move the legend outside the plot
-sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
+# Set and move the legend ABOVE the figure (not overlapping)
+legend = ax.legend(
+    title="Alignment method",
+    title_fontsize="large",
+    loc="lower center",
+    bbox_to_anchor=(0.3, -0.55),
+    frameon=False,
+)
 
 # Add gray rectangles to separate the datasets
 for i, data_name in enumerate(df["data_name"].unique()):
@@ -214,12 +235,9 @@ ax.set_yticklabels(
     [name.replace("_", " ") for name in df["data_name"].unique()]
 )
 
-# Adjust the layout to prevent the legend from being cut off
-plt.tight_layout()
-
 # Save the figure with high resolution
 plt.savefig(
-    figures_path / "boxplot_correlation.pdf", dpi=500, bbox_inches="tight"
+    figures_path / f"boxplot_correlation_{N_PARCELS}.pdf", dpi=500, bbox_inches="tight"
 )
 
 # Display the plot
