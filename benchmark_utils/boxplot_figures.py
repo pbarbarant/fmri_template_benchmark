@@ -221,7 +221,7 @@ legend = ax.legend(
     title="Alignment method",
     title_fontsize="large",
     loc="lower center",
-    bbox_to_anchor=(0.3, -0.55),
+    bbox_to_anchor=(0.3, -0.7),
     frameon=False,
 )
 
