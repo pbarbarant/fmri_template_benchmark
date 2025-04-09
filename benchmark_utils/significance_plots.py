@@ -8,17 +8,17 @@ import seaborn as sns
 from joblib import load
 import pandas as pd
 import numpy as np
-from scipy.stats import ttest_ind, ttest_rel, wilcoxon, t, f_oneway, kruskal
+from scipy.stats import t
 
 plt.rcParams["figure.dpi"] = 100
 
-data_path = Path(__file__).parent.parent / "copy_outputs"
-figures_path = data_path.parent / "copy_outputs" / "figures"
+data_path = Path(__file__).parent.parent / "outputs"
+figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
-
+N_PARCELS = 400
 
 def get_results_dataframe(
-    data_path: Path, score="cv_scores_classif"
+    data_path: Path, score:str="cv_scores_classif", n_parcels:int=400
 ) -> pd.DataFrame:
     # Glob recursively all the decoding_results.pkl files
     results_paths = glob.glob(
@@ -42,6 +42,14 @@ def get_results_dataframe(
 
     # Remove the simulated data
     df = df[~df["data_name"].str.contains("Simulated")]
+    
+    # Keep only the results for the specified number of parcels
+    df = df[df["data_name"].str.contains(f"{n_parcels}")]
+
+    # Remove parcels numbers from the dataset names
+    df["data_name"] = df["data_name"].str.replace(
+        r"_[0-9]+$", "", regex=True
+    )
 
     # Remove the SparseOT solver
     df = df[~df["solver_name"].str.contains("Sparse")]
@@ -90,7 +98,7 @@ def get_results_dataframe(
     return df
 
 
-df_acc = get_results_dataframe(data_path, score="cv_scores_classif")
+df_acc = get_results_dataframe(data_path, score="cv_scores_classif", n_parcels=N_PARCELS)
 
 # Set the style and font scale for better readability
 # plt.style.use(["science", "nature", "no-latex"])
@@ -234,4 +242,4 @@ plt.tight_layout()
 plt.show()
 
 # Save the figure
-fig.savefig(figures_path / "significance_plots.pdf", dpi=100, bbox_inches="tight")
+fig.savefig(figures_path / f"significance_plots_{N_PARCELS}.pdf", dpi=100, bbox_inches="tight")
