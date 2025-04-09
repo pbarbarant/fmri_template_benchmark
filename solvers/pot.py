@@ -48,11 +48,10 @@ class Solver(BaseSolver):
         # https://benchopt.github.io/performance_curves.html
         if self.dataset.target == "template":
             algo = TemplateAlignment(
-                alignment_method=POTAlignment(reg=self.reg, tol=1e-3, solver="sinkhorn_stabilized",),
+                alignment_method=POTAlignment(reg=self.reg, tol=1e-3, solver="sinkhorn_stabilized"),
                 masker=self.dataset.masker,
                 clustering=self.dataset.clustering_img,
                 n_jobs=N_JOBS,
-                n_iter=10,
                 verbose=11,
             )
         else:
