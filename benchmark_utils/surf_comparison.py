@@ -1,217 +1,160 @@
 # %%
 from pathlib import Path
-import scienceplots  # noqa: F401
 import matplotlib.pyplot as plt
-from nilearn import image, plotting, datasets
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from nilearn.surface import SurfaceImage
-import matplotlib as mpl
 import matplotlib.gridspec as gridspec
+import matplotlib as mpl
+from nilearn import image, plotting, datasets
+from nilearn.surface import SurfaceImage
+import scienceplots
 import glob
 import numpy as np
 
-plt.rcParams["figure.dpi"] = 500
-# Set the style and font scale for better readability
+# Setup
 plt.style.use(["science", "nature", "no-latex"])
-# Increase the font size
-plt.rcParams.update({"font.size": 10})
+plt.rcParams.update({"figure.dpi": 500, "font.size": 10})
 
+# Paths
 data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
+# Constants
 N_PARCELS = 400
 DATASET = f"IBC_FaceBody_{N_PARCELS}"
+VMIN_WEIGHTS, VMAX_WEIGHTS = -0.003, 0.003
+VMIN_CONTRAST, VMAX_CONTRAST = -1, 1
+IDX_WEIGHTS, IDX_CONTRAST = 4, 19
+METHODS = ["Euclidean", "Procrustes", "Optimal Transport"]
+METHOD_PATHS = {
+    "Euclidean": data_path / DATASET / "Anatomical",
+    "Procrustes": data_path / DATASET / "Procrustes",
+    "Optimal Transport": data_path / DATASET / "ot"
+}
 
-VMIN_WEIGHTS = -0.003
-VMAX_WEIGHTS = 0.003
-VMIN_CONTRAST = -1
-VMAX_CONTRAST = 1
-
-THRESHOLD_WEIGHTS = 0.0015
-THRESHOLD_CONTRAST = 0.25
-
-IDX_WEIGHTS = 4
-IDX_CONTRAST = 19
-
-mesh = "fsaverage7"
-fsaverage_meshes = datasets.load_fsaverage(mesh=mesh)
-
-euclidean_path = data_path / DATASET / "Anatomical"
-procrustes_path = data_path / DATASET / "Procrustes"
-ot_path = data_path / DATASET / "ot"
-
+# Load meshes
+mesh = "fsaverage3"
+cache_dir = "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
+fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
+curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature", data_dir=cache_dir)
+for hemi, data in curv_sign.data.parts.items():
+    curv_sign.data.parts[hemi] = np.sign(data)
 
 def average_subjects_weights(weights_path):
-    """Util function for averaging subjects' weights."""
-    # Glob all nii.gz files
-    nii_files = glob.glob(str(weights_path / "*.nii.gz"))
-    # Load all nii files
-    imgs = [image.load_img(nii_file) for nii_file in nii_files]
+    """Average subjects' weights."""
+    imgs = [image.load_img(nii_file) for nii_file in glob.glob(str(weights_path / "*.nii.gz"))]
     data = np.mean([img.get_fdata() for img in imgs], axis=0)
     return image.new_img_like(imgs[0], data)
 
-
-def load_images_and_project_to_surface(img, idx):
-    """Util function for loading and projecting volumetric images."""
-    surface_image = SurfaceImage.from_volume(
+def project_to_surface(img, idx):
+    """Project volumetric image to surface."""
+    return SurfaceImage.from_volume(
         mesh=fsaverage_meshes["pial"],
-        volume_img=image.index_img(img, idx),
+        volume_img=image.index_img(img, idx)
     )
-    return surface_image
+    
+def get_template_img(dataset, method):
+    dataset_folder = data_path / dataset
+    template_img_path = dataset_folder / method / "template.nii.gz"
+    return image.load_img(template_img_path)
+
+def get_avg_weights_img(dataset, method):
+    method_path = data_path / dataset / method / "template"
+    weights_files = sorted(list(method_path.glob("*_weights.nii.gz")))
+    data = None
+    for weights_file in weights_files:
+        weights_img = image.load_img(weights_file)
+        if data is None:
+            data = weights_img.get_fdata()
+        else:
+            data += weights_img.get_fdata()
+    data /= len(weights_files)
+    return image.new_img_like(weights_img, data)
 
 
-def plot_surface_map(surface_image, cmap, **kwargs):
-    """Util function for plotting surfaces."""
+def get_threshold(imgs, quantile=0.90):
+    # Get the threshold for each image
+    data = np.concatenate([img.get_fdata() for img in imgs], axis=-1)
+    # Return the quantile while discarding zeros
+    return np.quantile(data[np.abs(data) > 0], quantile)
+
+def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
+    """Plot surface map."""
     plotting.plot_surf_stat_map(
         stat_map=surface_image,
         surf_mesh=fsaverage_meshes["inflated"],
-        hemi=HEMI,
-        view="lateral",
+        hemi="both",
         colorbar=False,
         cmap=cmap,
-        bg_on_data=False,
+        bg_on_data=True,
+        bg_map=curv_sign,
         darkness=0.25,
-        **kwargs,
+        axes=ax,
+        vmin=vmin,
+        vmax=vmax,
+        threshold=threshold
     )
+    ax.view_init(elev=270, azim=-90)
+    
+    
+THRESHOLD_CONTRAST = get_threshold(
+    [
+        get_template_img(DATASET, METHOD_PATHS[method].name)
+        for method in METHODS
+    ],
+    quantile=0.90
+)
 
+THRESHOLD_WEIGHTS = get_threshold(
+    [
+        get_avg_weights_img(DATASET, METHOD_PATHS[method].name)
+        for method in METHODS
+    ],
+    quantile=0.80
+)
 
+# Create figure
 fig = plt.figure(figsize=(4, 6))
-grid_spec = gridspec.GridSpec(3, 2, figure=fig, wspace=0.00, hspace=0.00)
-ax0 = fig.add_subplot(grid_spec[0, 0], projection="3d")
-plot_surface_map(
-    load_images_and_project_to_surface(
-        euclidean_path / "template.nii.gz", IDX_CONTRAST
-    ),
-    cmap="coolwarm",
-    axes=ax0,
-    vmin=VMIN_CONTRAST,
-    vmax=VMAX_CONTRAST,
-    threshold=THRESHOLD_CONTRAST,
-)
-ax0.view_init(elev=270, azim=-90)
-ax0.set_title("Template Map")
-ax0.text2D(
-    0.05,
-    0.4,
-    "Euclidean",
-    transform=ax0.transAxes,
-    rotation=90,
-)
+grid = gridspec.GridSpec(3, 2, figure=fig, wspace=0.00, hspace=0.00)
 
-# Add method vertically on the left
-ax1 = fig.add_subplot(grid_spec[0, 1], projection="3d")
-weights_euclidean = average_subjects_weights(euclidean_path / "template/")
-plot_surface_map(
-    load_images_and_project_to_surface(weights_euclidean, IDX_WEIGHTS),
-    cmap="cold_hot",
-    axes=ax1,
-    vmin=VMIN_WEIGHTS,
-    vmax=VMAX_WEIGHTS,
-    threshold=THRESHOLD_WEIGHTS,
-)
-ax1.view_init(elev=270, azim=-90)
-ax1.set_title("Classifier Weights")
+# Plot each method
+for i, method in enumerate(METHODS):
+    # Template map
+    ax_contrast = fig.add_subplot(grid[i, 0], projection="3d")
+    surface_img = project_to_surface(METHOD_PATHS[method] / "template.nii.gz", IDX_CONTRAST)
+    plot_surface(ax_contrast, surface_img, "coolwarm", VMIN_CONTRAST, VMAX_CONTRAST, THRESHOLD_CONTRAST)
+    
+    if i == 0:
+        ax_contrast.set_title("Template Map      ")
+    
+    # Label with method name
+    y_pos = 0.4 if method != "Optimal Transport" else 0.2
+    ax_contrast.text2D(-0.05, y_pos, method, transform=ax_contrast.transAxes, rotation=90)
+    
+    # Classifier weights
+    ax_weights = fig.add_subplot(grid[i, 1], projection="3d")
+    weights = average_subjects_weights(METHOD_PATHS[method] / "template/")
+    surface_img = project_to_surface(weights, IDX_WEIGHTS)
+    plot_surface(ax_weights, surface_img, "cold_hot", VMIN_WEIGHTS, VMAX_WEIGHTS, THRESHOLD_WEIGHTS)
+    
+    if i == 0:
+        ax_weights.set_title("Classifier Weights        ")
 
-ax2 = fig.add_subplot(grid_spec[1, 0], projection="3d")
-plot_surface_map(
-    load_images_and_project_to_surface(
-        procrustes_path / "template.nii.gz", IDX_CONTRAST
-    ),
-    cmap="coolwarm",
-    axes=ax2,
-    vmin=VMIN_CONTRAST,
-    vmax=VMAX_CONTRAST,
-    threshold=THRESHOLD_CONTRAST,
-)
-ax2.view_init(elev=270, azim=-90)
-ax2.text2D(
-    0.05,
-    0.4,
-    "Procrustes",
-    transform=ax2.transAxes,
-    rotation=90,
-)
-
-ax3 = fig.add_subplot(grid_spec[1, 1], projection="3d")
-weights_procrustes = average_subjects_weights(procrustes_path / "template/")
-plot_surface_map(
-    load_images_and_project_to_surface(weights_procrustes, IDX_WEIGHTS),
-    cmap="cold_hot",
-    axes=ax3,
-    vmin=VMIN_WEIGHTS,
-    vmax=VMAX_WEIGHTS,
-    threshold=THRESHOLD_WEIGHTS,
-)
-ax3.view_init(elev=270, azim=-90)
-
-ax4 = fig.add_subplot(grid_spec[2, 0], projection="3d")
-plot_surface_map(
-    load_images_and_project_to_surface(
-        ot_path / "template.nii.gz", IDX_CONTRAST
-    ),
-    cmap="coolwarm",
-    axes=ax4,
-    vmin=VMIN_CONTRAST,
-    vmax=VMAX_CONTRAST,
-    threshold=THRESHOLD_CONTRAST,
-)
-ax4.view_init(elev=270, azim=-90)
-# Set square aspect ratio
-ax4.text2D(
-    0.05,
-    0.2,
-    "Optimal Transport",
-    transform=ax4.transAxes,
-    rotation=90,
-)
-
-ax5 = fig.add_subplot(grid_spec[2, 1], projection="3d")
-weights_ot = average_subjects_weights(ot_path / "template/")
-plot_surface_map(
-    load_images_and_project_to_surface(weights_ot, IDX_WEIGHTS),
-    cmap="cold_hot",
-    axes=ax5,
-    vmin=VMIN_WEIGHTS,
-    vmax=VMAX_WEIGHTS,
-    threshold=THRESHOLD_WEIGHTS,
-)
-# Zoom in to see the weights
-ax5.view_init(elev=270, azim=-90)
-
-# Add colorbar for contrasts
-ax_contrast = fig.add_subplot(grid_spec[:, 0])
-ax_contrast.axis("off")
-divider = make_axes_locatable(ax_contrast)
-cax = fig.add_axes([0.15, 0.03, 0.3, 0.01])
-fig.add_axes(cax)
-fig.colorbar(
-    mpl.cm.ScalarMappable(
-        norm=mpl.colors.Normalize(vmin=VMIN_CONTRAST, vmax=VMAX_CONTRAST),
-        cmap="coolwarm",
-    ),
-    cax=cax,
-    orientation="horizontal",
-)
-# Add colorbar for contrasts
-ax_weights = fig.add_subplot(grid_spec[:, 1])
-ax_weights.axis("off")
-divider = make_axes_locatable(ax_weights)
-cax = fig.add_axes([0.6, 0.03, 0.3, 0.01])
-fig.add_axes(cax)
-fig.colorbar(
-    mpl.cm.ScalarMappable(
-        norm=mpl.colors.Normalize(vmin=VMIN_WEIGHTS, vmax=VMAX_WEIGHTS),
-        cmap="cold_hot",
-    ),
-    cax=cax,
-    orientation="horizontal",
-)
+# Add colorbars
+for j, (vmin, vmax, cmap, x_pos) in enumerate([
+    (VMIN_CONTRAST, VMAX_CONTRAST, "coolwarm", 0.085),
+    (VMIN_WEIGHTS, VMAX_WEIGHTS, "cold_hot", 0.54)
+]):
+    ax = fig.add_subplot(grid[:, j])
+    ax.axis("off")
+    cax = fig.add_axes([x_pos, 0.03, 0.3, 0.01])
+    fig.colorbar(
+        mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax), cmap=cmap),
+        cax=cax,
+        orientation="horizontal"
+    )
 
 plt.tight_layout()
 plt.show()
 
-# Save as PDF
-figures_path = data_path.parent / "outputs" / "figures"
-figures_path.mkdir(parents=True, exist_ok=True)
-fig.savefig(figures_path / f"surf_comparison_{HEMI}.pdf", bbox_inches="tight")
+# Save figure
+# fig.savefig(figures_path / f"surf_comparison.pdf", bbox_inches="tight")
