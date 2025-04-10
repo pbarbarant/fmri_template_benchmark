@@ -20,13 +20,15 @@ data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
-DATASET = "IBC_FaceBody"
-HEMI = "right"
+N_PARCELS = 400
+DATASET = f"IBC_FaceBody_{N_PARCELS}"
+
 VMIN_WEIGHTS = -0.003
 VMAX_WEIGHTS = 0.003
-THRESHOLD_WEIGHTS = 0.0015
 VMIN_CONTRAST = -1
 VMAX_CONTRAST = 1
+
+THRESHOLD_WEIGHTS = 0.0015
 THRESHOLD_CONTRAST = 0.25
 
 IDX_WEIGHTS = 4
