@@ -5,6 +5,8 @@ import matplotlib.gridspec as gridspec
 import matplotlib as mpl
 from nilearn import image, plotting, datasets
 from nilearn.surface import SurfaceImage
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
+from mpl_toolkits.mplot3d import proj3d
 import scienceplots
 import glob
 import numpy as np
@@ -111,33 +113,64 @@ THRESHOLD_WEIGHTS = get_threshold(
     ],
     quantile=0.80
 )
-
+# %%
 # Create figure
-fig = plt.figure(figsize=(4, 6))
-grid = gridspec.GridSpec(3, 2, figure=fig, wspace=0.00, hspace=0.00)
+fig = plt.figure(figsize=(4.5, 6))
+grid = gridspec.GridSpec(3, 2, figure=fig, wspace=0.2, hspace=0.05)
+
+# Zoom regions for weights plots (right column)
+# Format: elevation, azimuth, zoom level, position, focus region
+zoom_regions = [
+    {"elev": 270, "azim": -90, "pos": (0.42, 0.68), "focus": (-5, 15, -5, 15, -5, 15)},  # Euclidean
+    {"elev": 270, "azim": -90, "pos": (0.42, 0.42), "focus": (-5, 15, -5, 15, -5, 15)},  # Procrustes
+    {"elev": 270, "azim": -90, "pos": (0.42, 0.15), "focus": (-5, 15, -5, 15, -5, 15)}   # Optimal Transport
+]
 
 # Plot each method
 for i, method in enumerate(METHODS):
-    # Template map
+    # Template map (left column)
     ax_contrast = fig.add_subplot(grid[i, 0], projection="3d")
     surface_img = project_to_surface(METHOD_PATHS[method] / "template.nii.gz", IDX_CONTRAST)
     plot_surface(ax_contrast, surface_img, "coolwarm", VMIN_CONTRAST, VMAX_CONTRAST, THRESHOLD_CONTRAST)
     
     if i == 0:
-        ax_contrast.set_title("Template Map      ")
+        ax_contrast.set_title("Template Map ")
     
     # Label with method name
     y_pos = 0.4 if method != "Optimal Transport" else 0.2
     ax_contrast.text2D(-0.05, y_pos, method, transform=ax_contrast.transAxes, rotation=90)
     
-    # Classifier weights
+    # Classifier weights (right column)
     ax_weights = fig.add_subplot(grid[i, 1], projection="3d")
     weights = average_subjects_weights(METHOD_PATHS[method] / "template/")
     surface_img = project_to_surface(weights, IDX_WEIGHTS)
     plot_surface(ax_weights, surface_img, "cold_hot", VMIN_WEIGHTS, VMAX_WEIGHTS, THRESHOLD_WEIGHTS)
     
     if i == 0:
-        ax_weights.set_title("Classifier Weights        ")
+        ax_weights.set_title("Classifier Weights ")
+    
+    # Add zoom region indicator using 3D line plots instead of 2D Rectangle
+    zoom_settings = zoom_regions[i]
+    xmin, xmax, ymin, ymax, zmin, zmax = zoom_settings["focus"]
+    
+    # Add zoomed inset for right column plots
+    # Create a new axis for the zoomed region
+    width, height = 0.15, 0.15
+    ax_inset = fig.add_axes([zoom_settings["pos"][0], zoom_settings["pos"][1], width, height], projection='3d')
+    
+    # Plot the same surface in the inset with the same parameters
+    plot_surface(ax_inset, surface_img, "cold_hot", VMIN_WEIGHTS, VMAX_WEIGHTS, THRESHOLD_WEIGHTS)
+    
+    # Adjust the view to focus on relevant brain region
+    ax_inset.view_init(elev=zoom_settings["elev"], azim=zoom_settings["azim"] - 40)
+    
+    # Apply zoom by setting the limits based on focus region
+    ax_inset.set_xlim(xmin, xmax)
+    ax_inset.set_ylim(ymin, ymax)
+    ax_inset.set_zlim(zmin, zmax)
+    
+    # Remove axes for cleaner look
+    ax_inset.set_axis_off()
 
 # Add colorbars
 for j, (vmin, vmax, cmap, x_pos) in enumerate([
