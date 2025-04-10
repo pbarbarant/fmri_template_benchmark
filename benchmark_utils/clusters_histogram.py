@@ -24,18 +24,13 @@ METHODS = ["Anatomical", "Procrustes", "ot"]
 
 
 def get_template_img(dataset, method):
-    # Get the dataset folder path
     dataset_folder = data_path / dataset
-    # Get the path to the template image
     template_img_path = dataset_folder / method / "template.nii.gz"
     return image.load_img(template_img_path)
 
 def get_avg_weights_img(dataset, method):
-    # Get the path to the weights folder
     method_path = data_path / dataset / method / "template"
-    # Glob the weights files recursively
     weights_files = sorted(list(method_path.glob("*_weights.nii.gz")))
-    # For each contrast, average the weights accross subjects
     data = None
     for weights_file in weights_files:
         weights_img = image.load_img(weights_file)
@@ -47,17 +42,10 @@ def get_avg_weights_img(dataset, method):
     return image.new_img_like(weights_img, data)
 
 def clusters_sizes(img, idx=0, threshold=0):
-    # Get all the voxels clusters on the img
     data = img.get_fdata()
-
-    # Binarize if necessary (e.g., thresholding if not already binary)
     binary_data = data[..., idx] > threshold
-
-    # Label connected components
-    labeled_array, num_features = label(binary_data)
-
-    # Get sizes of each cluster
-    cluster_sizes = np.bincount(labeled_array.ravel())[1:]  # skip label 0 (background)
+    labeled_array, _ = label(binary_data)
+    cluster_sizes = np.bincount(labeled_array.ravel())[1:]
     return cluster_sizes
 
 def get_threshold(imgs):
