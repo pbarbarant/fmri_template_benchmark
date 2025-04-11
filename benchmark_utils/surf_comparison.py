@@ -34,7 +34,7 @@ METHOD_PATHS = {
 }
 
 # Load meshes
-mesh = "fsaverage7"
+mesh = "fsaverage6"
 cache_dir = "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
 curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature", data_dir=cache_dir)
