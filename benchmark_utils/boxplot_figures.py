@@ -8,13 +8,13 @@ import scienceplots  # noqa: F401
 import seaborn as sns
 from joblib import load
 
-plt.rcParams["figure.dpi"] = 500
+plt.rcParams["figure.dpi"] = 300
 
 data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
-N_PARCELS = 400
+N_PARCELS = 200
 
 
 def get_results_dataframe(
@@ -165,10 +165,10 @@ task_data = df[df["type"] == "task"]
 # )
 fig2 = create_accuracy_plot(task_data, figsize=(3.15, 8))
 # fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
-fig2.savefig(figures_path / f"boxplot_task_accuracy_{N_PARCELS}.pdf", bbox_inches="tight")
+fig2.savefig(figures_path / f"boxplot_task_accuracy_{N_PARCELS}.pdf", bbox_inches="tight", dpi=300)
 
 plt.show()
-# %%
+
 # Do the same for the Pearson correlation
 df = get_results_dataframe(data_path, score="pearson_corrs")
 
@@ -234,7 +234,7 @@ ax.set_yticklabels(
 
 # Save the figure with high resolution
 plt.savefig(
-    figures_path / f"boxplot_correlation_{N_PARCELS}.pdf", dpi=500, bbox_inches="tight"
+    figures_path / f"boxplot_correlation_{N_PARCELS}.pdf", dpi=300, bbox_inches="tight"
 )
 
 # Display the plot
