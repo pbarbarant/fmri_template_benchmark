@@ -13,7 +13,7 @@ import numpy as np
 
 # Setup
 plt.style.use(["science", "nature", "no-latex"])
-plt.rcParams.update({"figure.dpi": 500, "font.size": 10})
+plt.rcParams.update({"figure.dpi": 300, "font.size": 10})
 
 # Paths
 data_path = Path(__file__).parent.parent / "outputs"
@@ -34,7 +34,7 @@ METHOD_PATHS = {
 }
 
 # Load meshes
-mesh = "fsaverage3"
+mesh = "fsaverage7"
 cache_dir = "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
 curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature", data_dir=cache_dir)
@@ -81,7 +81,7 @@ def get_threshold(imgs, quantile=0.90):
 
 def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
     """Plot surface map."""
-    plotting.plot_surf_stat_map(
+    surf = plotting.plot_surf_stat_map(
         stat_map=surface_image,
         surf_mesh=fsaverage_meshes["inflated"],
         hemi="both",
@@ -96,7 +96,7 @@ def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
         threshold=threshold
     )
     ax.view_init(elev=270, azim=-90)
-    
+
     
 THRESHOLD_CONTRAST = get_threshold(
     [
@@ -113,18 +113,32 @@ THRESHOLD_WEIGHTS = get_threshold(
     ],
     quantile=0.80
 )
-# %%
+
+def draw_zoom_box(ax, xmin, xmax, ymin, ymax, z, color='k', linestyle='--', linewidth=2):
+    lines = [
+        [(xmin, ymax, z), (xmax, ymax, z)],
+        [(xmin, ymin, z), (xmax, ymin, z)],
+        [(xmax, ymin, z), (xmax, ymax, z)],
+        [(xmin, ymax, z), (xmin, ymin, z)],
+    ]
+    for line in lines:
+        ax.plot3D(*zip(*line), color=color, linestyle=linestyle, linewidth=linewidth, zorder=1e10)
+        
+        
+
 # Create figure
 fig = plt.figure(figsize=(4.5, 6))
 grid = gridspec.GridSpec(3, 2, figure=fig, wspace=0.2, hspace=0.05)
 
 # Zoom regions for weights plots (right column)
 # Format: elevation, azimuth, zoom level, position, focus region
-zoom_regions = [
-    {"elev": 270, "azim": -90, "pos": (0.42, 0.68), "focus": (-5, 15, -5, 15, -5, 15)},  # Euclidean
-    {"elev": 270, "azim": -90, "pos": (0.42, 0.42), "focus": (-5, 15, -5, 15, -5, 15)},  # Procrustes
-    {"elev": 270, "azim": -90, "pos": (0.42, 0.15), "focus": (-5, 15, -5, 15, -5, 15)}   # Optimal Transport
+pos = [
+    (0.42, 0.68),  # Euclidean
+    (0.42, 0.42),  # Procrustes
+    (0.42, 0.15),  # Optimal Transport
 ]
+xmin, xmax, ymin, ymax = 75, 125, -75, -25
+width, height = 0.15, 0.15
 
 # Plot each method
 for i, method in enumerate(METHODS):
@@ -149,45 +163,64 @@ for i, method in enumerate(METHODS):
     if i == 0:
         ax_weights.set_title("Classifier Weights ")
     
-    # Add zoom region indicator using 3D line plots instead of 2D Rectangle
-    zoom_settings = zoom_regions[i]
-    xmin, xmax, ymin, ymax, zmin, zmax = zoom_settings["focus"]
-    
     # Add zoomed inset for right column plots
     # Create a new axis for the zoomed region
-    width, height = 0.15, 0.15
-    ax_inset = fig.add_axes([zoom_settings["pos"][0], zoom_settings["pos"][1], width, height], projection='3d')
+    ax_inset = fig.add_axes([pos[i][0], pos[i][1], width, height], projection='3d')
     
     # Plot the same surface in the inset with the same parameters
     plot_surface(ax_inset, surface_img, "cold_hot", VMIN_WEIGHTS, VMAX_WEIGHTS, THRESHOLD_WEIGHTS)
-    
+
     # Adjust the view to focus on relevant brain region
-    ax_inset.view_init(elev=zoom_settings["elev"], azim=zoom_settings["azim"] - 40)
+    ax_inset.view_init(elev=270, azim=-90)
     
     # Apply zoom by setting the limits based on focus region
     ax_inset.set_xlim(xmin, xmax)
     ax_inset.set_ylim(ymin, ymax)
-    ax_inset.set_zlim(zmin, zmax)
+    # ax_inset.set_zlim(zmin, zmax)
     
-    # Remove axes for cleaner look
-    ax_inset.set_axis_off()
+    # Get z limits
+    zmin, zmax = ax_inset.get_zlim()
+    
+    # To adjust the zoom level, you can set the limits to a smaller range
+    # ax_inset.set_axis_on()
+    
+        # Draw box on the inset
+    draw_zoom_box(ax_inset, xmin-3, xmax, ymin-5, ymax+3, zmin, color='black', linestyle='-', linewidth=.5)
 
-# Add colorbars
-for j, (vmin, vmax, cmap, x_pos) in enumerate([
-    (VMIN_CONTRAST, VMAX_CONTRAST, "coolwarm", 0.085),
-    (VMIN_WEIGHTS, VMAX_WEIGHTS, "cold_hot", 0.54)
+    # Draw corresponding box on the main plot
+    draw_zoom_box(ax_weights, xmin-3, xmax, ymin-5, ymax+3, zmin, color='black', linestyle='-', linewidth=.5)
+    
+    
+# Add colorbars centered beneath each column
+for j, (vmin, vmax, cmap) in enumerate([
+    (VMIN_CONTRAST, VMAX_CONTRAST, "coolwarm"),    # Left column
+    (VMIN_WEIGHTS, VMAX_WEIGHTS, "cold_hot")       # Right column
 ]):
-    ax = fig.add_subplot(grid[:, j])
-    ax.axis("off")
-    cax = fig.add_axes([x_pos, 0.03, 0.3, 0.01])
+    # Get position info from the grid
+    grid_pos = grid[:, j].get_position(fig)
+    x_center = (grid_pos.x0 + grid_pos.x1) / 2  # Center of the column
+    
+    # Create colorbar axis beneath the column, centered horizontally
+    cbar_width = 0.3  # Width of colorbar
+    cbar_height = 0.01  # Height of colorbar
+    cbar_y = 0.1  # Distance from bottom
+    
+    # Position centered beneath the column
+    cax = fig.add_axes([
+        x_center - cbar_width/2 - 0.02,  # Center horizontally 
+        cbar_y, 
+        cbar_width, 
+        cbar_height
+    ])
+    
+    # Create the colorbar
     fig.colorbar(
         mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax), cmap=cmap),
         cax=cax,
         orientation="horizontal"
     )
 
-plt.tight_layout()
 plt.show()
 
 # Save figure
-# fig.savefig(figures_path / f"surf_comparison.pdf", bbox_inches="tight")
+fig.savefig(figures_path / f"surf_comparison.pdf", bbox_inches="tight")
