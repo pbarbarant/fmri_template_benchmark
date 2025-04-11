@@ -3,7 +3,7 @@ import glob
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-# import scienceplots  # noqa: F401
+import scienceplots  # noqa: F401
 import seaborn as sns
 from joblib import load
 import pandas as pd
@@ -97,9 +97,10 @@ def get_results_dataframe(
 
 df_acc = get_results_dataframe(data_path, score="cv_scores_classif", n_parcels=N_PARCELS)
 
+
 # Set the style and font scale for better readability
-# plt.style.use(["science", "nature", "no-latex"])
-# sns.set_context("paper", font_scale=1.3)
+plt.style.use(["science", "nature", "no-latex"])
+sns.set_context("paper", font_scale=1.3)
 
 def corrected_dependent_ttest(data1, data2):
     n = len(data1)
@@ -149,29 +150,75 @@ def get_p_values(df, method):
 
     return pval_df
 
+
+def get_accuracies_diff(df):
+    # Prepare a dataframe to store the p-values
+    acc_diff = []
+
+    # Iterate over each dataset
+    for dataset in df['data_name'].unique():
+        subset = df[df['data_name'] == dataset]
+        solvers = subset['solver_name'].unique()
+        
+        # Pairwise comparison between solvers
+        for i in range(len(solvers)):
+            for j in range(i+1,len(solvers)):
+                solver1 = solvers[i]
+                solver2 = solvers[j]
+                scores1 = subset[subset['solver_name'] == solver1]['cv_scores_classif'].to_numpy(np.float64)
+                scores2 = subset[subset['solver_name'] == solver2]['cv_scores_classif'].to_numpy(np.float64)
+                if len(scores1) == len(scores2):
+                    acc_diff.append({
+                        'data_name': dataset,
+                        'solver1': solver1,
+                        'solver2': solver2,
+                        'diff': np.mean(scores1) - np.mean(scores2)
+                    })
+                else:
+                    print(f"Warning: Different number of scores for {solver1} and {solver2} in dataset {dataset}. Skipping comparison.")
+                    continue
+
+    acc_diff_df = pd.DataFrame(acc_diff)
+
+    return acc_diff_df
+
 # Get p-values using Wilcoxon test
 pval_df = get_p_values(df_acc, corrected_dependent_ttest)
+
+# Get accuracies differences
+df_acc = get_accuracies_diff(df_acc)
 
 # First, get all unique datasets and solvers
 datasets = pval_df['data_name'].unique()
 all_solvers = pd.unique(pval_df[['solver1', 'solver2']].values.ravel())
 
 # Dictionary to hold a matrix for each dataset
-pval_matrices = {}
-
+acc_diff_matrices = {}
+# Dictionary to hold p-value matrices for each dataset
+p_value_matrices = {}
 for dataset in datasets:
-    matrix = pd.DataFrame(index=all_solvers, columns=all_solvers, dtype=float)
+    acc_matrix = pd.DataFrame(index=all_solvers, columns=all_solvers, dtype=float)
+    p_value_matrix = pd.DataFrame(index=all_solvers, columns=all_solvers, dtype=float)
     
     # Fill diagonal with NaNs or 1.0 (no comparison needed)
-    np.fill_diagonal(matrix.values, np.nan)
+    np.fill_diagonal(acc_matrix.values, np.nan)
+    np.fill_diagonal(p_value_matrix.values, np.nan)
     
-    df_subset = pval_df[pval_df['data_name'] == dataset]
+    df_subset = df_acc[df_acc['data_name'] == dataset]
     for _, row in df_subset.iterrows():
-        s1, s2, pval = row['solver1'], row['solver2'], row['pval']
-        matrix.loc[s1, s2] = pval
-        matrix.loc[s2, s1] = pval  # symmetric
+        s1, s2, diff = row['solver1'], row['solver2'], row['diff']
+        acc_matrix.loc[s1, s2] = diff
+        acc_matrix.loc[s2, s1] = -diff  # symmetric
         
-    pval_matrices[dataset] = matrix
+    # Fill the p-value matrix
+    pval_subset = pval_df[pval_df['data_name'] == dataset]
+    for _, row in pval_subset.iterrows():
+        s1, s2, pval = row['solver1'], row['solver2'], row['pval']
+        p_value_matrix.loc[s1, s2] = pval
+        p_value_matrix.loc[s2, s1] = pval  # symmetric
+        
+    p_value_matrices[dataset] = p_value_matrix
+    acc_diff_matrices[dataset] = acc_matrix
     
     
 
@@ -179,52 +226,47 @@ def starify(p):
     if pd.isna(p):
         return ""
     elif p < 0.001:
-        return '<0.001'
+        return '***'
     elif p < 0.01:
-        return '<0.01'
+        return '**'
     elif p < 0.05:
-        return '<0.05'
+        return '*'
     else:
         return 'ns'
 
 star_matrices = {}
-for dataset, matrix in pval_matrices.items():
-    stars = matrix.map(starify)
+for dataset, pval_matrix in p_value_matrices.items():
+    stars = pval_matrix.map(starify)
     star_matrices[dataset] = stars
 
 
 # Choose which to plot: raw p-values or stars
-plot_matrices = star_matrices  # or pval_matrices
+plot_matrices = star_matrices  # or acc_diff_matrices
 
 # Set up the number of plots
 num_datasets = len(plot_matrices)
 ncols = 2
 nrows = (num_datasets + ncols - 1) // ncols
 
-# Mask the upper triangle (True = hide)
-def get_lower_triangle_mask(df):
-    mask = np.triu(np.ones_like(df, dtype=bool))
-    return mask
-
 fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(6 * ncols, 5 * nrows))
 axes = axes.flatten()
 
-for i, (dataset, matrix) in enumerate(plot_matrices.items()):
+for i, (dataset, acc_matrix) in enumerate(plot_matrices.items()):
     ax = axes[i]
-    mask = get_lower_triangle_mask(matrix)
 
     sns.heatmap(
-        pval_matrices[dataset],  # underlying values for color
+        acc_diff_matrices[dataset],  # underlying values for color
         annot=plot_matrices[dataset],  # what to show (stars or numbers)
         fmt="",  # don't format numbers
-        cmap="coolwarm_r",
-        mask=mask,
+        cmap="bwr",
         cbar=True,
         linewidths=0.5,
         linecolor='gray',
         ax=ax,
         square=True,
-        annot_kws={"fontsize":8}
+        annot_kws={"fontsize":12},
+        vmin=-0.25,
+        vmax=0.25,
     )
     ax.set_title(f"Dataset: {dataset}", fontsize=14)
     ax.set_xlabel("Solver")
