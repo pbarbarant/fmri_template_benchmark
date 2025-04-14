@@ -52,7 +52,7 @@ def get_threshold(imgs):
     # Get the threshold for each image
     data = np.concatenate([img.get_fdata() for img in imgs], axis=-1)
     # Return the quantile while discarding zeros
-    return np.quantile(data[np.abs(data) > 0], 0.95)
+    return np.quantile(data[np.abs(data) > 0], 0.80)
 
 
 threshold_activations = get_threshold(

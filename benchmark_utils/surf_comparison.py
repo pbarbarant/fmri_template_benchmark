@@ -34,7 +34,7 @@ METHOD_PATHS = {
 }
 
 # Load meshes
-mesh = "fsaverage6"
+mesh = "fsaverage5"
 cache_dir = "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
 curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature", data_dir=cache_dir)
@@ -103,7 +103,7 @@ THRESHOLD_CONTRAST = get_threshold(
         get_template_img(DATASET, METHOD_PATHS[method].name)
         for method in METHODS
     ],
-    quantile=0.90
+    quantile=0.80
 )
 
 THRESHOLD_WEIGHTS = get_threshold(
