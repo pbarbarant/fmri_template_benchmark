@@ -42,6 +42,7 @@ def get_results_dataframe(
 
     # Remove the simulated data
     df = df[~df["data_name"].str.contains("Simulated")]
+    df = df[~df["solver_name"].str.contains("Ridge")]
     
     # Keep only the results for the specified number of parcels
     df = df[df["data_name"].str.contains(f"{n_parcels}")]
