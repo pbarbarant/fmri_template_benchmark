@@ -49,6 +49,7 @@ class Dataset:
     dict_decoding: Dict[str, LabeledImage]
     masker: NiftiMasker | SurfaceMasker
     clustering_img: Nifti1Image
+    time: Optional[float] = None
     parcel_masker: Optional[ParcellationMasker] = None
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
     template: Optional[LabeledImage] = None
