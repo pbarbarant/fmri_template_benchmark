@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -195,6 +196,7 @@ def compute_alignment(
     solver_name: str,
 ) -> Dataset:
     dataset.solver = solver_name
+    start_time = time()
     if isinstance(algo, (TemplateAlignment, SparseTemplateAlignment)):
         dataset = compute_template(algo, dataset)
     elif isinstance(algo, (PairwiseAlignment, SparsePairwiseAlignment)):
@@ -203,7 +205,7 @@ def compute_alignment(
         raise ValueError(
             "algo must be either TemplateAlignment or PairwiseAlignment"
         )
-
+    dataset.time = time() - start_time
     # Compute the PCA
     print("Computing PCA")
     plot_pca(dataset)
