@@ -20,7 +20,9 @@ class Dataset(BaseDataset):
     # the cross product for each key in the dictionary.
     # Any parameters 'param' defined here is available as `self.param`.
     parameters = {
+        "target": ["template"],
         "left_out_run": [1, 2, 3, 4, 5],
+        "n_parcels": [400],
     }
 
     # List of packages needed to run the dataset. See the corresponding
@@ -35,7 +37,8 @@ class Dataset(BaseDataset):
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
         self.dataset = fetch_budapest(
-            n_parcels=400,
+            target=self.target,
+            n_parcels=self.n_parcels,
             lo_run=self.left_out_run,
         )
 
