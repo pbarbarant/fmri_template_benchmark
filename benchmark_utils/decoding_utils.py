@@ -54,22 +54,35 @@ def compute_X_y(dataset):
 def compute_pearson_corrs(dataset):
     """Compute the Pearson correlation between each subject and the target."""
     target = dataset.target
+    parcel_masker = dataset.parcel_masker
+    masker = dataset.masker
+    pearson_corrs = []
     if target == "template":
         target_img = dataset.template.img
+        for subject in dataset.subjects:
+            # Do not compare a subject with itself
+            if subject != target:
+                subject_img = dataset.dict_aligned[subject].img
+                subject_corr = pearson_corr_parcels(
+                    subject_img, target_img, parcel_masker
+                )
+                pearson_corrs.append(subject_corr)
     else:
         target_img = dataset.dict_aligned[target].img
-    clustering_img = dataset.clustering_img
-    masker = dataset.masker
-    parcel_masker = dataset.parcel_masker
-    pearson_corrs = []
-    for subject in dataset.subjects:
-        # Do not compare a subject with itself
-        if subject != target:
-            subject_img = dataset.dict_aligned[subject].img
-            subject_corr = pearson_corr_parcels(
-                subject_img, target_img, parcel_masker
+        target_data = masker.transform(target_img)
+        avg_data_all_subjects = np.zeros_like(target_data)
+        for subject in dataset.subjects:
+            subject_data = masker.transform(
+                dataset.dict_aligned[subject].img
             )
-            pearson_corrs.append(subject_corr)
+            avg_data_all_subjects += subject_data / len(dataset.subjects)
+        
+        avg_img_all_subjects = masker.inverse_transform(avg_data_all_subjects)
+        pearson_corrs = [
+            pearson_corr_parcels(
+                avg_img_all_subjects, target_img, parcel_masker
+            ),
+        ]
     return pearson_corrs
 
 
@@ -298,6 +311,7 @@ def save_decoding_results(
         "chance_level": chance_level,
         "cv_scores_classif": cv_scores_classif,
         "pearson_corrs": pearson_corrs,
+        "time": dataset.time,
     }
     # Dump the results with joblib
     dump(results_dict, output_dir / "decoding_results.pkl")
