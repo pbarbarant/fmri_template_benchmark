@@ -49,6 +49,7 @@ class Dataset:
     dict_decoding: Dict[str, LabeledImage]
     masker: NiftiMasker | SurfaceMasker
     clustering_img: Nifti1Image
+    output_dir: Optional[Path] = None
     time: Optional[float] = None
     parcel_masker: Optional[ParcellationMasker] = None
     dict_aligned: Optional[Dict[str, LabeledImage]] = None
@@ -557,10 +558,9 @@ def fetch_forrest(
             ).to_numpy(),
         )
 
-    masker = fit_masker(
-        [dict_alignment[subject] for subject in subjects],
+    masker, clustering_img = get_masker_clustering_img(
+        dict_alignment, subjects, n_parcels
     )
-    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name="Forrest",
@@ -629,13 +629,13 @@ def fetch_budapest(
     # Fetch subjects
     subjects = sorted(
         [p.name for p in Path(BUDAPEST_PATH).glob("sub-*") if p.is_dir()]
-    )[:10]
+    )[:2]
 
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Budapest data"):
         alignment_imgs = []
-        for run in range(1, 6):
+        for run in range(1, 3):
             if run == lo_run:
                 img, y = load_budapest_img_labels(
                     Path(BUDAPEST_PATH)
@@ -654,12 +654,9 @@ def fetch_budapest(
                 alignment_imgs.append(img)
         dict_alignment[subject] = image.concat_imgs(alignment_imgs)
 
-    masker = fit_masker(
-        [dict_alignment[subject] for subject in subjects],
-        detrend=True,
-        t_r=1.0,
+    masker, clustering_img = get_masker_clustering_img(
+        dict_alignment, subjects, n_parcels
     )
-    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
 
     return Dataset(
         name=f"Budapest_run-{lo_run:02d}",
