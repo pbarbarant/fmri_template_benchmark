@@ -769,4 +769,3 @@ def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
         clustering_img=clustering_img,
         target=target,
     )
-

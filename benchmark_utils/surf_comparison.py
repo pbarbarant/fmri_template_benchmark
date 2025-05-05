@@ -30,34 +30,44 @@ METHODS = ["Euclidean", "Procrustes", "Optimal Transport"]
 METHOD_PATHS = {
     "Euclidean": data_path / DATASET / "Anatomical",
     "Procrustes": data_path / DATASET / "Procrustes",
-    "Optimal Transport": data_path / DATASET / "ot"
+    "Optimal Transport": data_path / DATASET / "ot",
 }
 
 # Load meshes
 mesh = "fsaverage5"
-cache_dir = "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
+cache_dir = (
+    "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
+)
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
-curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature", data_dir=cache_dir)
+curv_sign = datasets.load_fsaverage_data(
+    mesh=mesh, data_type="curvature", data_dir=cache_dir
+)
 for hemi, data in curv_sign.data.parts.items():
     curv_sign.data.parts[hemi] = np.sign(data)
 
+
 def average_subjects_weights(weights_path):
     """Average subjects' weights."""
-    imgs = [image.load_img(nii_file) for nii_file in glob.glob(str(weights_path / "*.nii.gz"))]
+    imgs = [
+        image.load_img(nii_file)
+        for nii_file in glob.glob(str(weights_path / "*.nii.gz"))
+    ]
     data = np.mean([img.get_fdata() for img in imgs], axis=0)
     return image.new_img_like(imgs[0], data)
+
 
 def project_to_surface(img, idx):
     """Project volumetric image to surface."""
     return SurfaceImage.from_volume(
-        mesh=fsaverage_meshes["pial"],
-        volume_img=image.index_img(img, idx)
+        mesh=fsaverage_meshes["pial"], volume_img=image.index_img(img, idx)
     )
-    
+
+
 def get_template_img(dataset, method):
     dataset_folder = data_path / dataset
     template_img_path = dataset_folder / method / "template.nii.gz"
     return image.load_img(template_img_path)
+
 
 def get_avg_weights_img(dataset, method):
     method_path = data_path / dataset / method / "template"
@@ -79,6 +89,7 @@ def get_threshold(imgs, quantile=0.90):
     # Return the quantile while discarding zeros
     return np.quantile(data[np.abs(data) > 0], quantile)
 
+
 def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
     """Plot surface map."""
     surf = plotting.plot_surf_stat_map(
@@ -93,17 +104,17 @@ def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
         axes=ax,
         vmin=vmin,
         vmax=vmax,
-        threshold=threshold
+        threshold=threshold,
     )
     ax.view_init(elev=270, azim=-90)
 
-    
+
 THRESHOLD_CONTRAST = get_threshold(
     [
         get_template_img(DATASET, METHOD_PATHS[method].name)
         for method in METHODS
     ],
-    quantile=0.80
+    quantile=0.80,
 )
 
 THRESHOLD_WEIGHTS = get_threshold(
@@ -111,10 +122,13 @@ THRESHOLD_WEIGHTS = get_threshold(
         get_avg_weights_img(DATASET, METHOD_PATHS[method].name)
         for method in METHODS
     ],
-    quantile=0.80
+    quantile=0.80,
 )
 
-def draw_zoom_box(ax, xmin, xmax, ymin, ymax, z, color='k', linestyle='--', linewidth=2):
+
+def draw_zoom_box(
+    ax, xmin, xmax, ymin, ymax, z, color="k", linestyle="--", linewidth=2
+):
     lines = [
         [(xmin, ymax, z), (xmax, ymax, z)],
         [(xmin, ymin, z), (xmax, ymin, z)],
@@ -122,9 +136,14 @@ def draw_zoom_box(ax, xmin, xmax, ymin, ymax, z, color='k', linestyle='--', line
         [(xmin, ymax, z), (xmin, ymin, z)],
     ]
     for line in lines:
-        ax.plot3D(*zip(*line), color=color, linestyle=linestyle, linewidth=linewidth, zorder=1e10)
-        
-        
+        ax.plot3D(
+            *zip(*line),
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            zorder=1e10,
+        )
+
 
 # Create figure
 fig = plt.figure(figsize=(4.5, 6))
@@ -144,80 +163,133 @@ width, height = 0.15, 0.15
 for i, method in enumerate(METHODS):
     # Template map (left column)
     ax_contrast = fig.add_subplot(grid[i, 0], projection="3d")
-    surface_img = project_to_surface(METHOD_PATHS[method] / "template.nii.gz", IDX_CONTRAST)
-    plot_surface(ax_contrast, surface_img, "coolwarm", VMIN_CONTRAST, VMAX_CONTRAST, THRESHOLD_CONTRAST)
-    
+    surface_img = project_to_surface(
+        METHOD_PATHS[method] / "template.nii.gz", IDX_CONTRAST
+    )
+    plot_surface(
+        ax_contrast,
+        surface_img,
+        "coolwarm",
+        VMIN_CONTRAST,
+        VMAX_CONTRAST,
+        THRESHOLD_CONTRAST,
+    )
+
     if i == 0:
         ax_contrast.set_title("Template Map ")
-    
+
     # Label with method name
     y_pos = 0.4 if method != "Optimal Transport" else 0.2
-    ax_contrast.text2D(-0.05, y_pos, method, transform=ax_contrast.transAxes, rotation=90)
-    
+    ax_contrast.text2D(
+        -0.05, y_pos, method, transform=ax_contrast.transAxes, rotation=90
+    )
+
     # Classifier weights (right column)
     ax_weights = fig.add_subplot(grid[i, 1], projection="3d")
     weights = average_subjects_weights(METHOD_PATHS[method] / "template/")
     surface_img = project_to_surface(weights, IDX_WEIGHTS)
-    plot_surface(ax_weights, surface_img, "cold_hot", VMIN_WEIGHTS, VMAX_WEIGHTS, THRESHOLD_WEIGHTS)
-    
+    plot_surface(
+        ax_weights,
+        surface_img,
+        "cold_hot",
+        VMIN_WEIGHTS,
+        VMAX_WEIGHTS,
+        THRESHOLD_WEIGHTS,
+    )
+
     if i == 0:
         ax_weights.set_title("Classifier Weights ")
-    
+
     # Add zoomed inset for right column plots
     # Create a new axis for the zoomed region
-    ax_inset = fig.add_axes([pos[i][0], pos[i][1], width, height], projection='3d')
-    
+    ax_inset = fig.add_axes(
+        [pos[i][0], pos[i][1], width, height], projection="3d"
+    )
+
     # Plot the same surface in the inset with the same parameters
-    plot_surface(ax_inset, surface_img, "cold_hot", VMIN_WEIGHTS, VMAX_WEIGHTS, THRESHOLD_WEIGHTS)
+    plot_surface(
+        ax_inset,
+        surface_img,
+        "cold_hot",
+        VMIN_WEIGHTS,
+        VMAX_WEIGHTS,
+        THRESHOLD_WEIGHTS,
+    )
 
     # Adjust the view to focus on relevant brain region
     ax_inset.view_init(elev=270, azim=-90)
-    
+
     # Apply zoom by setting the limits based on focus region
     ax_inset.set_xlim(xmin, xmax)
     ax_inset.set_ylim(ymin, ymax)
     # ax_inset.set_zlim(zmin, zmax)
-    
+
     # Get z limits
     zmin, zmax = ax_inset.get_zlim()
-    
+
     # To adjust the zoom level, you can set the limits to a smaller range
     # ax_inset.set_axis_on()
-    
-        # Draw box on the inset
-    draw_zoom_box(ax_inset, xmin-3, xmax, ymin-5, ymax+3, zmin, color='black', linestyle='-', linewidth=.5)
+
+    # Draw box on the inset
+    draw_zoom_box(
+        ax_inset,
+        xmin - 3,
+        xmax,
+        ymin - 5,
+        ymax + 3,
+        zmin,
+        color="black",
+        linestyle="-",
+        linewidth=0.5,
+    )
 
     # Draw corresponding box on the main plot
-    draw_zoom_box(ax_weights, xmin-3, xmax, ymin-5, ymax+3, zmin, color='black', linestyle='-', linewidth=.5)
-    
-    
+    draw_zoom_box(
+        ax_weights,
+        xmin - 3,
+        xmax,
+        ymin - 5,
+        ymax + 3,
+        zmin,
+        color="black",
+        linestyle="-",
+        linewidth=0.5,
+    )
+
+
 # Add colorbars centered beneath each column
-for j, (vmin, vmax, cmap) in enumerate([
-    (VMIN_CONTRAST, VMAX_CONTRAST, "coolwarm"),    # Left column
-    (VMIN_WEIGHTS, VMAX_WEIGHTS, "cold_hot")       # Right column
-]):
+for j, (vmin, vmax, cmap) in enumerate(
+    [
+        (VMIN_CONTRAST, VMAX_CONTRAST, "coolwarm"),  # Left column
+        (VMIN_WEIGHTS, VMAX_WEIGHTS, "cold_hot"),  # Right column
+    ]
+):
     # Get position info from the grid
     grid_pos = grid[:, j].get_position(fig)
     x_center = (grid_pos.x0 + grid_pos.x1) / 2  # Center of the column
-    
+
     # Create colorbar axis beneath the column, centered horizontally
     cbar_width = 0.3  # Width of colorbar
     cbar_height = 0.01  # Height of colorbar
     cbar_y = 0.1  # Distance from bottom
-    
+
     # Position centered beneath the column
-    cax = fig.add_axes([
-        x_center - cbar_width/2 - 0.02,  # Center horizontally 
-        cbar_y, 
-        cbar_width, 
-        cbar_height
-    ])
-    
+    cax = fig.add_axes(
+        [
+            x_center - cbar_width / 2 - 0.02,  # Center horizontally
+            cbar_y,
+            cbar_width,
+            cbar_height,
+        ]
+    )
+
     # Create the colorbar
     fig.colorbar(
-        mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax), cmap=cmap),
+        mpl.cm.ScalarMappable(
+            norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax), cmap=cmap
+        ),
         cax=cax,
-        orientation="horizontal"
+        orientation="horizontal",
     )
 
 plt.show()

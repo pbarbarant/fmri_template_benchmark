@@ -72,11 +72,9 @@ def compute_pearson_corrs(dataset):
         target_data = masker.transform(target_img)
         avg_data_all_subjects = np.zeros_like(target_data)
         for subject in dataset.subjects:
-            subject_data = masker.transform(
-                dataset.dict_aligned[subject].img
-            )
+            subject_data = masker.transform(dataset.dict_aligned[subject].img)
             avg_data_all_subjects += subject_data / len(dataset.subjects)
-        
+
         avg_img_all_subjects = masker.inverse_transform(avg_data_all_subjects)
         pearson_corrs = [
             pearson_corr_parcels(

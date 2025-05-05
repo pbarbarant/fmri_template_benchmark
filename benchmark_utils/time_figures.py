@@ -45,14 +45,12 @@ def get_results_dataframe(
     df = df[~df["solver_name"].str.contains("Ridge")]
     # df = df[~(df["solver_name"] == "ot")]
     df = df[~(df["solver_name"] == "Anatomical")]
-    
+
     # Keep only the results for the specified number of parcels
     df = df[df["data_name"].str.contains(f"{n_parcels}")]
 
     # Remove parcels numbers from the dataset names
-    df["data_name"] = df["data_name"].str.replace(
-        r"_[0-9]+$", "", regex=True
-    )
+    df["data_name"] = df["data_name"].str.replace(r"_[0-9]+$", "", regex=True)
 
     # For anatomical keep only the template target
     # df = df[
@@ -71,7 +69,7 @@ def get_results_dataframe(
 
     # For datasets split in runs, remove the "_run-0*" suffix
     df["data_name"] = df["data_name"].str.replace(r"_run-\d+", "", regex=True)
-    
+
     # Remove the 0.1 suffix for optimal transport
     df["solver_name"] = df["solver_name"].str.replace(
         r"ot_0.1+", "Optimal Transport (CPU)", regex=True
@@ -115,6 +113,7 @@ df = get_results_dataframe(data_path, score="time", n_parcels=N_PARCELS)
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
 sns.set_context("paper", font_scale=1.3)
+
 
 def create_accuracy_plot(data, figsize=(12, 7)):
     fig, ax = plt.subplots(figsize=figsize)
@@ -169,4 +168,3 @@ fig = create_accuracy_plot(task_data, figsize=(3.15, 8))
 fig.savefig(figures_path / "time_boxplot.pdf", bbox_inches="tight")
 
 plt.show()
-

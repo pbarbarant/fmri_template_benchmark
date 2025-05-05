@@ -187,7 +187,7 @@ def compute_pairwise(
     dataset.parcel_masker = algo.parcel_masker
     # Save the clustering
     save_clustering(dataset)
-    
+
     return dataset
 
 
@@ -225,10 +225,12 @@ def save_template(dataset: Dataset) -> None:
     else:
         template_img.to_filename(output_dir / "template.nii.gz")
 
+
 def save_clustering(dataset: Dataset) -> None:
     output_dir = dataset.output_dir
     clustering_img = dataset.clustering_img
     clustering_img.to_filename(output_dir / "clustering.nii.gz")
+
 
 def save_template_labels(dataset: Dataset) -> None:
     output_dir = dataset.output_dir
