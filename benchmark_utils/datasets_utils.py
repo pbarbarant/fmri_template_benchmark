@@ -773,37 +773,3 @@ def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
         target=target,
     )
 
-
-def fetch_ibc_rsvp(
-    name: str = "IBC_RSVP",
-    target: str = "template",
-    subjects: List[str] = None,
-    task: str = None,
-    n_parcels: int = 400,
-) -> Dataset:
-    PATH = Path("/Users/plbar/data/ibc_rsvp/3mm/")
-    dict_alignment = dict()
-    dict_decoding = dict()
-    for subject in tqdm(subjects, desc="Processing IBC data"):
-        df = pd.read_csv(PATH / f"{subject}_labels.csv", header=None)
-        img = image.load_img(PATH / f"{subject}.nii.gz")
-        # Get the first 60 images for alignment
-        dict_alignment[subject] = image.index_img(img, np.arange(60))
-        dict_decoding[subject] = LabeledImage(
-            img=image.index_img(img, np.arange(60, img.shape[-1])),
-            y=df.to_numpy().flatten()[60:],  # Skip the first 60 labels
-        )
-
-    masker, clustering_img = get_masker_clustering_img(
-        dict_alignment, subjects, n_parcels
-    )
-
-    return Dataset(
-        name=name,
-        subjects=subjects,
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        masker=masker,
-        clustering_img=clustering_img,
-        target=target,
-    )
