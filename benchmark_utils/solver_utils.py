@@ -4,6 +4,7 @@ from time import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from nibabel.nifti1 import Nifti1Image
 from fmralign.template_alignment import TemplateAlignment
 from fmralign.pairwise_alignment import PairwiseAlignment
 from fmralign.sparse_template_alignment import SparseTemplateAlignment
@@ -99,9 +100,7 @@ def plot_pca(dataset: Dataset) -> None:
     # Adjust layout to fit legends
     plt.tight_layout()
     plt.subplots_adjust(right=0.85)  # Leave space for legends
-    output_dir = (
-        Path("outputs") / dataset.name / dataset.solver / dataset.target
-    )
+    output_dir = dataset.output_dir / dataset.target
     output_dir.mkdir(exist_ok=True, parents=True)
     # Save the figure
     fig.savefig(
@@ -147,17 +146,16 @@ def compute_template(
         y=dataset.dict_decoding[subjects[0]].y,
     )
 
-    # Save the template
-    if dataset.is_surf:
-        save_template_gii(template, dataset.name, dataset.solver)
-    else:
-        save_template_nii(template, dataset.name, dataset.solver)
-    # Save the labels as csv
-    save_template_labels(template, dataset.name, dataset.solver)
-
     dataset.parcel_masker = algo.parcel_masker
     dataset.template = template
     dataset.dict_aligned = dict_aligned
+
+    # Save the clustering
+    save_clustering(dataset)
+    # Save the template
+    save_template(dataset)
+    # Save the labels as csv
+    save_template_labels(dataset)
 
     return dataset
 
@@ -187,6 +185,9 @@ def compute_pairwise(
 
     dataset.dict_aligned = dict_aligned
     dataset.parcel_masker = algo.parcel_masker
+    # Save the clustering
+    save_clustering(dataset)
+    
     return dataset
 
 
@@ -196,6 +197,9 @@ def compute_alignment(
     solver_name: str,
 ) -> Dataset:
     dataset.solver = solver_name
+    output_dir = Path("outputs") / dataset.name / solver_name
+    output_dir.mkdir(exist_ok=True, parents=True)
+    dataset.output_dir = output_dir
     start_time = time()
     if isinstance(algo, (TemplateAlignment, SparseTemplateAlignment)):
         dataset = compute_template(algo, dataset)
@@ -213,30 +217,22 @@ def compute_alignment(
     return dataset
 
 
-def save_template_nii(
-    template: LabeledImage, dataset_name: str, solver_name: str
-) -> None:
-    output_dir = Path("outputs") / dataset_name / solver_name
-    output_dir.mkdir(exist_ok=True, parents=True)
-    template_img = template.img
-    template_img.to_filename(output_dir / "template.nii.gz")
+def save_template(dataset: Dataset) -> None:
+    output_dir = dataset.output_dir
+    template_img = dataset.template.img
+    if dataset.is_surf:
+        template_img.data.to_filename(output_dir / "template_data.gii")
+    else:
+        template_img.to_filename(output_dir / "template.nii.gz")
 
+def save_clustering(dataset: Dataset) -> None:
+    output_dir = dataset.output_dir
+    clustering_img = dataset.clustering_img
+    clustering_img.to_filename(output_dir / "clustering.nii.gz")
 
-def save_template_gii(
-    template: LabeledImage, dataset_name: str, solver_name: str
-) -> None:
-    output_dir = Path("outputs") / dataset_name / solver_name
-    output_dir.mkdir(exist_ok=True, parents=True)
-    template_img = template.img
-    template_img.data.to_filename(output_dir / "template_data.gii")
-
-
-def save_template_labels(
-    template: LabeledImage, dataset_name: str, solver_name: str
-) -> None:
-    output_dir = Path("outputs") / dataset_name / solver_name
-    output_dir.mkdir(exist_ok=True, parents=True)
-    labels = template.y
+def save_template_labels(dataset: Dataset) -> None:
+    output_dir = dataset.output_dir
+    labels = dataset.template.y
     # Convert labels to a DataFrame
     df = pd.DataFrame(labels)
     df.to_csv(output_dir / "labels.csv", index=False, header=False)
