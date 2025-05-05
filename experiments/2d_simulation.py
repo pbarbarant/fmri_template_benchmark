@@ -1,9 +1,8 @@
 # %%
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from nibabel.nifti1 import Nifti1Image
 from nilearn.maskers import MultiNiftiMasker
-
 
 # Generate a gaussian mixture for sub-01
 mean_1 = np.array([20, 0])
@@ -25,8 +24,8 @@ plt.scatter(data_sub1[:, 0], data_sub1[:, 1], c=y)
 plt.scatter(data_sub2[:, 0], data_sub2[:, 1], c=y)
 
 # Compute the transport cost between voxels
-from scipy.spatial.distance import cdist
 import ot
+from scipy.spatial.distance import cdist
 
 M = cdist(data_sub1.T, data_sub2.T)
 

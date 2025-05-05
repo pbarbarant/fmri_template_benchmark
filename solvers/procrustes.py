@@ -5,8 +5,8 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from fmralign.template_alignment import TemplateAlignment
     from fmralign.pairwise_alignment import PairwiseAlignment
+    from fmralign.template_alignment import TemplateAlignment
 
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment

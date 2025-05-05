@@ -5,6 +5,8 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from fmralign._utils import _intersect_clustering_mask
+from fmralign.preprocessing import ParcellationMasker
 from ibc_public import utils_data
 from nibabel.nifti1 import Nifti1Image
 from nilearn import image
@@ -14,8 +16,6 @@ from nilearn.datasets import (
     load_fsaverage,
     load_mni152_gm_mask,
 )
-from fmralign._utils import _intersect_clustering_mask
-from fmralign.preprocessing import ParcellationMasker
 from nilearn.maskers import NiftiMasker, SurfaceMasker
 from nilearn.maskers._utils import concatenate_surface_images
 from nilearn.surface import PolyMesh, SurfaceImage
@@ -28,9 +28,9 @@ from benchmark_utils.conf import (
     IBC_PATH,
     IBC_SURF_PATH,
     MEMORY,
+    N_JOBS,
     NEUROMOD_PATH,
     NSD_PATH,
-    N_JOBS,
     RAIDERS_PATH,
 )
 

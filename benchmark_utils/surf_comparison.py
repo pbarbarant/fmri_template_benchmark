@@ -1,15 +1,16 @@
 # %%
-from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import matplotlib as mpl
-from nilearn import image, plotting, datasets
-from nilearn.surface import SurfaceImage
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
-from mpl_toolkits.mplot3d import proj3d
-import scienceplots
 import glob
+from pathlib import Path
+
+import matplotlib as mpl
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
+import scienceplots
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset, zoomed_inset_axes
+from mpl_toolkits.mplot3d import proj3d
+from nilearn import datasets, image, plotting
+from nilearn.surface import SurfaceImage
 
 # Setup
 plt.style.use(["science", "nature", "no-latex"])

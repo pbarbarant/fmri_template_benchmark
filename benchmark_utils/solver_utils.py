@@ -1,19 +1,18 @@
 from pathlib import Path
 from time import time
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from nibabel.nifti1 import Nifti1Image
-from fmralign.template_alignment import TemplateAlignment
 from fmralign.pairwise_alignment import PairwiseAlignment
-from fmralign.sparse_template_alignment import SparseTemplateAlignment
 from fmralign.sparse_pairwise_alignment import SparsePairwiseAlignment
-
-from benchmark_utils.datasets_utils import Dataset, LabeledImage
+from fmralign.sparse_template_alignment import SparseTemplateAlignment
+from fmralign.template_alignment import TemplateAlignment
+from nibabel.nifti1 import Nifti1Image
 from sklearn.decomposition import PCA
 
-from typing import Union
+from benchmark_utils.datasets_utils import Dataset, LabeledImage
 
 
 def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:

@@ -3,11 +3,11 @@ import glob
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
 from joblib import load
-import pandas as pd
-import numpy as np
 from scipy.stats import t
 
 plt.rcParams["figure.dpi"] = 100

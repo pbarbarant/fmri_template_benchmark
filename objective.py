@@ -5,8 +5,8 @@ from benchopt import BaseObjective, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchmark_utils.decoding_utils import (
-        evaluate_template_dataset,
         evaluate_subject_dataset,
+        evaluate_template_dataset,
     )
 
 

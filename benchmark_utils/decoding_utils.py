@@ -6,13 +6,13 @@ from nilearn import image
 from nilearn.maskers._utils import concatenate_surface_images
 from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
-from sklearn.pipeline import make_pipeline
-from sklearn.svm import LinearSVC
 from sklearn.model_selection import (
     LeaveOneGroupOut,
     cross_val_score,
     cross_validate,
 )
+from sklearn.pipeline import make_pipeline
+from sklearn.svm import LinearSVC
 
 from benchmark_utils.conf import N_JOBS
 

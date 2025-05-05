@@ -1,11 +1,12 @@
 # %%
 from pathlib import Path
-from tqdm import tqdm
-import scienceplots  # noqa: F401
-import matplotlib.pyplot as plt
-from nilearn import image, plotting, datasets
-from nilearn.surface import SurfaceImage
+
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import scienceplots  # noqa: F401
+from nilearn import datasets, image, plotting
+from nilearn.surface import SurfaceImage
+from tqdm import tqdm
 
 plt.rcParams["figure.dpi"] = 500
 # Set the style and font scale for better readability

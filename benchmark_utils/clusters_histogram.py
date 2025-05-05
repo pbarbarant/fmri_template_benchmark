@@ -3,13 +3,13 @@ import glob
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
 from joblib import load
 from nilearn import image
 from scipy.ndimage import label
-import numpy as np
 
 plt.rcParams["figure.dpi"] = 300
 plt.style.use(["science", "nature", "no-latex"])

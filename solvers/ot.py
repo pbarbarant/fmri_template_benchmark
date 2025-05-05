@@ -4,10 +4,10 @@ from benchopt import BaseSolver, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchopt.stopping_criterion import SingleRunCriterion
     import torch
-    from fmralign.sparse_template_alignment import SparseTemplateAlignment
+    from benchopt.stopping_criterion import SingleRunCriterion
     from fmralign.sparse_pairwise_alignment import SparsePairwiseAlignment
+    from fmralign.sparse_template_alignment import SparseTemplateAlignment
 
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment
