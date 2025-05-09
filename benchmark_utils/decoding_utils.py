@@ -84,6 +84,18 @@ def compute_pearson_corrs(dataset):
     return pearson_corrs
 
 
+def pearson_corr(data1, data2):
+    # Z-score the time series along time axis (axis=0)
+    data1_z = (data1 - data1.mean(axis=0)) / data1.std(axis=0)
+    data2_z = (data2 - data2.mean(axis=0)) / data2.std(axis=0)
+
+    # Compute element-wise product and average across time points
+    corr = np.nanmean(data1_z * data2_z, axis=0)
+
+    # Return average correlation across parcels
+    return np.nanmean(corr)
+
+
 def pearson_corr_parcels(img1, img2, parcel_masker):
     """Compute the Pearson correlation between two images
     by averaging the signal in each parcel."""
@@ -155,19 +167,21 @@ def evaluate_task_dataset(dataset, max_iter=1000):
     return avg_score, chance_level, cv_scores_classif
 
 
-def classify_subject_movie(template_img, img, y, parcel_masker):
-    segments_ids = np.unique(y)
+def classify_subject_movie(template_img, img, labels, masker):
+    segments_ids = np.unique(labels)
     res = []
     # Get the list of segments for the template
     segments_template = []
     segments_subject = []
+    template_data = masker.transform(template_img)
+    img_data = masker.transform(img)
     for segment_id in segments_ids:
         # Get the slice of indices corresponding to the segment
-        segment_slice = np.where(y == segment_id)[0]
-        # Get the image segment for the template
-        segments_template.append(image.index_img(template_img, segment_slice))
-        # Get the image segment for the subject
-        segments_subject.append(image.index_img(img, segment_slice))
+        segment_slice = np.where(labels == segment_id)[0]
+        # Get the data segment for the template
+        segments_template.append(template_data[segment_slice, :])
+        # Get the data segment for the subject
+        segments_subject.append(img_data[segment_slice, :])
 
     for i in range(len(segments_ids)):
         # For each movie segment of the subject
@@ -177,11 +191,7 @@ def classify_subject_movie(template_img, img, y, parcel_masker):
         for j in range(len(segments_ids)):
             segment_template = segments_template[j]
             # Compute the Pearson correlation with each segment of the template
-            corr_list.append(
-                pearson_corr_parcels(
-                    segment_template, segment_subject, parcel_masker
-                )
-            )
+            corr_list.append(pearson_corr(segment_template, segment_subject))
         # Predict the segment with the highest correlation
         predicted_id = segments_ids[np.argmax(corr_list)]
         res.append(predicted_id == correct_id)
@@ -191,16 +201,13 @@ def classify_subject_movie(template_img, img, y, parcel_masker):
 def evaluate_movie_dataset(dataset):
     dict_aligned = dataset.dict_aligned
     masker = dataset.masker
-
-    parcel_masker = dataset.parcel_masker
-
     # Parallelize the classification of each subject
     cv_scores_classif = Parallel(n_jobs=N_JOBS, verbose=11)(
         delayed(classify_subject_movie)(
             dataset.template.img,
             dict_aligned[subject].img,
             dataset.template.y,
-            parcel_masker,
+            masker,
         )
         for subject in dataset.subjects
     )
@@ -217,14 +224,15 @@ def evaluate_movie_dataset(dataset):
 def evaluate_template_dataset(dataset, max_iter=1000):
     # Compute the voxel-wise pearson correlation between all subjects
     # and the template
-    pearson_corrs = compute_pearson_corrs(dataset)
 
     # Evaluate the decoding performance
     if dataset.paradigm == "movie":
+        pearson_corrs = [0]
         avg_score, chance_level, cv_scores_classif = evaluate_movie_dataset(
             dataset
         )
     else:
+        pearson_corrs = compute_pearson_corrs(dataset)
         avg_score, chance_level, cv_scores_classif = evaluate_task_dataset(
             dataset, max_iter=max_iter
         )
