@@ -629,13 +629,13 @@ def fetch_budapest(
     # Fetch subjects
     subjects = sorted(
         [p.name for p in Path(BUDAPEST_PATH).glob("sub-*") if p.is_dir()]
-    )[:2]
+    )[:10]
 
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Budapest data"):
         alignment_imgs = []
-        for run in range(1, 3):
+        for run in range(1, 6):
             if run == lo_run:
                 img, y = load_budapest_img_labels(
                     Path(BUDAPEST_PATH)
