@@ -5,9 +5,7 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from fmralign.pairwise_alignment import PairwiseAlignment
-    from fmralign.template_alignment import TemplateAlignment
-
+    from benchmark_utils.solver_utils import GroupAlignment
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment
 
@@ -46,26 +44,16 @@ class Solver(BaseSolver):
         # It runs the algorithm for a given a number of iterations `n_iter`.
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
-        if self.dataset.target == "template":
-            algo = TemplateAlignment(
-                alignment_method="ridge_cv",
-                masker=self.dataset.masker,
-                clustering=self.dataset.clustering_img,
-                n_jobs=N_JOBS,
-                verbose=11,
-            )
-        else:
-            algo = PairwiseAlignment(
-                alignment_method="ridge_cv",
-                masker=self.dataset.masker,
-                clustering=self.dataset.clustering_img,
-                n_jobs=N_JOBS,
-                verbose=11,
-            )
+        algo = GroupAlignment(
+            method="ridge",
+            target=self.dataset.target,
+            n_jobs=N_JOBS,
+            verbose=11,
+        )
 
         self.dataset = compute_alignment(
-            algo=algo,
-            dataset=self.dataset,
+            algo,
+            self.dataset,
             solver_name=self.name,
         )
 
