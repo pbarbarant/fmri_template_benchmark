@@ -8,6 +8,7 @@ with safe_import_context() as import_ctx:
     from fmralign import GroupAlignment
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment
+    from fmralign.methods import OptimalTransport
 
 
 # The benchmark solvers must be named `Solver` and
@@ -45,8 +46,9 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
         algo = GroupAlignment(
-            method="ot",
+            method=OptimalTransport(reg=self.reg),
             target=self.dataset.target,
+            labels=self.dataset.labels,
             n_jobs=N_JOBS,
             verbose=11,
         )

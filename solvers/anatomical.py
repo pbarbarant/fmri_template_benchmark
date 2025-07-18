@@ -47,6 +47,7 @@ class Solver(BaseSolver):
         algo = GroupAlignment(
             method="identity",
             target=self.dataset.target,
+            labels=self.dataset.labels,
             n_jobs=N_JOBS,
             verbose=11,
         )
