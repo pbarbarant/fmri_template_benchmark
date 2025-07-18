@@ -17,43 +17,29 @@ from sklearn.svm import LinearSVC
 from benchmark_utils.conf import N_JOBS
 
 
-def compute_groups(subject_dict):
-    n_samples = next(iter(subject_dict.values())).img.shape[-1]
+def compute_groups(dataset):
+    subject_dict = dataset.dict_aligned
+    n_samples = next(iter(subject_dict.values())).shape[0]
     groups = np.concatenate(
         [np.repeat(i, n_samples) for i in range(len(subject_dict.keys()))]
     )
     return groups
 
 
-def compute_batched_groups(subject_dict, n_groups=10):
-    n_samples = next(iter(subject_dict.values())).img.shape[-1]
-    n_subjects = len(subject_dict.keys())
-    batch_len = n_samples * n_subjects // n_groups
-    groups = np.concatenate([np.repeat(i, batch_len) for i in range(n_groups)])
-    return groups
-
-
 def compute_X_y(dataset):
     dict_aligned = dataset.dict_aligned
-    masker = dataset.masker
-    if dataset.is_surf:
-        imgs = concatenate_surface_images(
-            [dict_aligned[subject].img for subject in dataset.subjects]
-        )
-    else:
-        imgs = image.concat_imgs(
-            [dict_aligned[subject].img for subject in dataset.subjects]
-        )
-    X = masker.transform(imgs)
-    y = np.concatenate(
-        [dict_aligned[subject].y for subject in dataset.subjects]
+    X = np.vstack(
+        [dict_aligned[subject] for subject in dataset.subjects]
+    )
+    y = np.hstack(
+        [dataset.dict_y[subject] for subject in dataset.subjects]
     )
     return X, y
 
 
 def compute_pearson_corrs(dataset):
     """Compute the Pearson correlation between each subject and the target."""
-    target = dataset.target
+    target = dataset.target_name
     parcel_masker = dataset.parcel_masker
     masker = dataset.masker
     pearson_corrs = []
@@ -113,14 +99,13 @@ def pearson_corr_parcels(img1, img2, parcel_masker):
 
 
 def save_weights(estimator, dataset, subject=None):
-    masker = dataset.masker
     output_dir = (
-        Path("outputs") / dataset.name / dataset.solver / dataset.target
+        Path("outputs") / dataset.name / dataset.solver / dataset.target_name
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    weights_img = masker.inverse_transform(estimator.coef_)
+    # Save the weights of the estimator
+    np.save(output_dir / f"{subject}_weights.npy", estimator.coef_)
     weights_labels = estimator.classes_
-    weights_img.to_filename(output_dir / f"{subject}_weights.nii.gz")
     # Save the labels of the weights as csv
     np.savetxt(
         output_dir / f"{subject}_weights_labels.csv", weights_labels, fmt="%s"
@@ -129,11 +114,7 @@ def save_weights(estimator, dataset, subject=None):
 
 def evaluate_task_dataset(dataset, max_iter=1000):
     # Leave one subject out cross-validation
-    if dataset.name.lower().startswith("hcp"):
-        groups = compute_batched_groups(dataset.dict_aligned, n_groups=10)
-    else:
-        groups = compute_groups(dataset.dict_aligned)
-
+    groups = compute_groups(dataset)
     X, y = compute_X_y(dataset)
 
     svc = LinearSVC(max_iter=max_iter)
@@ -167,127 +148,16 @@ def evaluate_task_dataset(dataset, max_iter=1000):
     return avg_score, chance_level, cv_scores_classif
 
 
-def classify_subject_movie(template_img, img, labels, masker):
-    segments_ids = np.unique(labels)
-    res = []
-    # Get the list of segments for the template
-    segments_template = []
-    segments_subject = []
-    template_data = masker.transform(template_img)
-    img_data = masker.transform(img)
-    for segment_id in segments_ids:
-        # Get the slice of indices corresponding to the segment
-        segment_slice = np.where(labels == segment_id)[0]
-        # Get the data segment for the template
-        segments_template.append(template_data[segment_slice, :])
-        # Get the data segment for the subject
-        segments_subject.append(img_data[segment_slice, :])
-
-    for i in range(len(segments_ids)):
-        # For each movie segment of the subject
-        segment_subject = segments_subject[i]
-        correct_id = segments_ids[i]
-        corr_list = []
-        for j in range(len(segments_ids)):
-            segment_template = segments_template[j]
-            # Compute the Pearson correlation with each segment of the template
-            corr_list.append(pearson_corr(segment_template, segment_subject))
-        # Predict the segment with the highest correlation
-        predicted_id = segments_ids[np.argmax(corr_list)]
-        res.append(predicted_id == correct_id)
-    return np.mean(res)
 
 
-def evaluate_movie_dataset(dataset):
-    dict_aligned = dataset.dict_aligned
-    masker = dataset.masker
-    # Parallelize the classification of each subject
-    cv_scores_classif = Parallel(n_jobs=N_JOBS, verbose=11)(
-        delayed(classify_subject_movie)(
-            dataset.template.img,
-            dict_aligned[subject].img,
-            dataset.template.y,
-            masker,
-        )
-        for subject in dataset.subjects
-    )
-
-    avg_score = np.mean(cv_scores_classif)
-    chance_level = 1 / len(dict_aligned[dataset.subjects[0]].y)
-
-    print(f"Average decoding accuracy: {avg_score:.2f}")
-    print(f"Chance level: {chance_level:.2f}")
-
-    return avg_score, chance_level, cv_scores_classif
-
-
-def evaluate_template_dataset(dataset, max_iter=1000):
-    # Compute the voxel-wise pearson correlation between all subjects
-    # and the template
-
+def evaluate_dataset(dataset, max_iter=1000):
+    # Compute the Pearson correlations for the dataset
+    # pearson_corrs = compute_pearson_corrs(dataset)
     # Evaluate the decoding performance
-    if dataset.paradigm == "movie":
-        pearson_corrs = [0]
-        avg_score, chance_level, cv_scores_classif = evaluate_movie_dataset(
-            dataset
-        )
-    else:
-        pearson_corrs = compute_pearson_corrs(dataset)
-        avg_score, chance_level, cv_scores_classif = evaluate_task_dataset(
-            dataset, max_iter=max_iter
-        )
-    # Save the results
-    save_decoding_results(
-        dataset,
-        avg_score,
-        chance_level,
-        cv_scores_classif,
-        pearson_corrs,
+    pearson_corrs = []
+    avg_score, chance_level, cv_scores_classif = evaluate_task_dataset(
+        dataset, max_iter=max_iter
     )
-
-    # Return only the average score for benchopt
-    return avg_score
-
-
-def evaluate_subject_dataset(dataset, max_iter=1000):
-    masker = dataset.masker
-    dict_aligned = dataset.dict_aligned
-    # Compute the voxel-wise pearson correlation between all subjects
-    # and the target
-    pearson_corrs = compute_pearson_corrs(dataset)
-
-    # Evaluate the decoding performance
-    svc = LinearSVC(max_iter=max_iter)
-    X_train = masker.transform(
-        image.concat_imgs(
-            [
-                dict_aligned[subject].img
-                for subject in dataset.subjects
-                if subject != dataset.target
-            ]
-        )
-    )
-
-    y_train = np.concatenate(
-        [
-            dict_aligned[subject].y
-            for subject in dataset.subjects
-            if subject != dataset.target
-        ]
-    )
-
-    X_test = masker.transform(dict_aligned[dataset.target].img)
-    y_test = dict_aligned[dataset.target].y
-
-    svc.fit(X_train, y_train)
-    save_weights(svc, dataset, subject=dataset.target)
-    avg_score = svc.score(X_test, y_test)
-
-    dummy_clf = DummyClassifier(strategy="most_frequent")
-    dummy_clf.fit(X_train, y_train)
-    chance_level = dummy_clf.score(X_test, y_test)
-
-    cv_scores_classif = [avg_score]
     # Save the results
     save_decoding_results(
         dataset,
@@ -309,7 +179,7 @@ def save_decoding_results(
     pearson_corrs,
 ):
     output_dir = (
-        Path("outputs") / dataset.name / dataset.solver / dataset.target
+        Path("outputs") / dataset.name / dataset.solver / dataset.target_name
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     results_dict = {
