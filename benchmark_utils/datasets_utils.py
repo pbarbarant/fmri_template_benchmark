@@ -214,7 +214,7 @@ def sample_dataset(
     )
 
 
-def fetch_ibc(
+def fetch_ibc_vol(
     name: str = "IBC",
     target_name: str = "template",
     subjects: List[str] = None,
@@ -237,22 +237,34 @@ def fetch_ibc(
     labels = apply_mask_fmri(
         load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
     ).astype(int)
-
+    missing_subjects = []
     for subject in tqdm(subjects, desc="Processing IBC data"):
-        df_sub = df[(df.subject == subject)]
-        # For each contrast, keep randomly one path
-        alignment_df = df_sub.groupby(["contrast"]).apply(
-            lambda x: x.sample(1, random_state=0)
-        )
-        # Put the rest in decoding_df
-        decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
-        dict_alignment[subject] = np.vstack(
-            masker.transform(alignment_df.path.to_list())
-        )
-        dict_decoding[subject] = np.vstack(
-            masker.transform(decoding_df.path.to_list())
-        )
-        dict_y[subject] = decoding_df.contrast.to_numpy()
+        try:
+            df_sub = df[(df.subject == subject)]
+            # For each contrast, keep randomly one path
+            alignment_df = df_sub.groupby(["contrast"]).apply(
+                lambda x: x.sample(1, random_state=0)
+            )
+            # Put the rest in decoding_df
+            decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
+            dict_alignment[subject] = np.vstack(
+                masker.transform(alignment_df.path.to_list())
+            )
+            dict_decoding[subject] = np.vstack(
+                masker.transform(decoding_df.path.to_list())
+            )
+            dict_y[subject] = decoding_df.contrast.to_numpy()
+        except ValueError as e:
+            print(f"Error processing subject {subject}: {e}")
+            # Pop the subject from the dictionaries if it fails
+            dict_alignment.pop(subject, None)
+            dict_decoding.pop(subject, None)
+            dict_y.pop(subject, None)
+            # Add the subject to the missing subjects list
+            missing_subjects.append(subject)
+            continue
+    
+    valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
     if target_name == "template":
         target = None
@@ -261,8 +273,8 @@ def fetch_ibc(
 
     return Dataset(
         name=name,
-        subjects=subjects,
-        n_subjects=len(subjects),
+        subjects=valid_subjects,
+        n_subjects=len(valid_subjects),
         labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
@@ -327,21 +339,33 @@ def fetch_ibc_surf(
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
+    missing_subjects = []
     for subject in tqdm(subjects, desc="Processing IBC data"):
-        alignment_df = df[
-            (df.subject == subject) & (df.path.str.contains("_dir-ap"))
-        ]
-        decoding_df = df[
-            (df.subject == subject) & (df.path.str.contains("_dir-pa"))
-        ]
-        dict_alignment[subject] = masker.transform(
-            load_surface_img(alignment_df.path.to_list(), mesh)
-        )
-        dict_decoding[subject] = masker.transform(
-            load_surface_img(decoding_df.path.to_list(), mesh),
-        )
-        dict_y[subject] = decoding_df[decoding_df.side == "lh"].contrast.to_numpy()
+        try:
+            alignment_df = df[
+                (df.subject == subject) & (df.path.str.contains("_dir-ap"))
+            ]
+            decoding_df = df[
+                (df.subject == subject) & (df.path.str.contains("_dir-pa"))
+            ]
+            dict_alignment[subject] = masker.transform(
+                load_surface_img(alignment_df.path.to_list(), mesh)
+            )
+            dict_decoding[subject] = masker.transform(
+                load_surface_img(decoding_df.path.to_list(), mesh),
+            )
+            dict_y[subject] = decoding_df[decoding_df.side == "lh"].contrast.to_numpy()
+        except ValueError as e:
+            print(f"Error processing subject {subject}: {e}")
+            # Pop the subject from the dictionaries if it fails
+            dict_alignment.pop(subject, None)
+            dict_decoding.pop(subject, None)
+            dict_y.pop(subject, None)
+            # Add the subject to the missing subjects list
+            missing_subjects.append(subject)
+            continue
 
+    valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
     if target_name == "template":
         target = None
@@ -350,8 +374,8 @@ def fetch_ibc_surf(
 
     return Dataset(
         name=name,
-        subjects=subjects,
-        n_subjects=len(subjects),
+        subjects=valid_subjects,
+        n_subjects=len(valid_subjects),
         labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
