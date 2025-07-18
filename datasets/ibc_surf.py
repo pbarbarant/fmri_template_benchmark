@@ -10,30 +10,35 @@ with safe_import_context() as import_ctx:
         log_dataset_info,
     )
 
+SUBJECTS = [
+    "sub-01",
+    "sub-02",
+    "sub-04",
+    "sub-05",
+    "sub-06",
+    "sub-07",
+    "sub-08",
+    "sub-09",
+    "sub-11",
+    "sub-12",
+    "sub-13",
+    "sub-14",
+    "sub-15",
+]
+
+TASKS = ["Audio", "FaceBody", "Mario", "MathLanguage", "RSVPLanguage", "HcpWm"]
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
-    name = "IBC_Surf_Audio"
+    name = "IBC_Surf"
 
     # List of packages needed to run the dataset. See the corresponding
     # section in objective.py
     install_pip = "pip"
     requirements = []
 
-    def __init__(self):
-        self.subjects = [
-            "sub-01",
-            "sub-04",
-            "sub-05",
-            "sub-06",
-            "sub-07",
-            "sub-09",
-            "sub-11",
-            "sub-12",
-            "sub-13",
-            "sub-14",
-        ]
+    parameters = {"target_name": ["template"] + SUBJECTS, "task": TASKS}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -44,11 +49,11 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_ibc_surf(
             name=self.name,
-            subjects=self.subjects,
-            task="RSVPLanguage",
+            subjects=SUBJECTS,
+            task=self.task,
         )
 
-        check_init_dataset(self.dataset)
-        log_dataset_info(self.dataset)
+        # check_init_dataset(self.dataset)
+        # log_dataset_info(self.dataset)
 
         return dict(dataset=self.dataset)
