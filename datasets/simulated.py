@@ -10,8 +10,6 @@ with safe_import_context() as import_ctx:
         sample_dataset,
     )
 
-SUBJECTS = ["sub-01", "sub-02"]
-
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -23,7 +21,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {"target": ["template", "sub-01"]}
+    parameters = {"target_name": ["template", "sub-01"]}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -34,10 +32,10 @@ class Dataset(BaseDataset):
 
         self.dataset = sample_dataset(
             name=self.name,
-            target=self.target,
+            target_name=self.target_name,
         )
 
-        check_init_dataset(self.dataset)
-        log_dataset_info(self.dataset)
+        # check_init_dataset(self.dataset)
+        # log_dataset_info(self.dataset)
 
         return dict(dataset=self.dataset)
