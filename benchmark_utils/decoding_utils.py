@@ -1,9 +1,7 @@
 from pathlib import Path
 
 import numpy as np
-from joblib import Parallel, delayed, dump
-from nilearn import image
-from nilearn.maskers._utils import concatenate_surface_images
+from joblib import dump
 from scipy.stats import pearsonr
 from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import (
@@ -11,7 +9,6 @@ from sklearn.model_selection import (
     cross_val_score,
     cross_validate,
 )
-from sklearn.pipeline import make_pipeline
 from sklearn.svm import LinearSVC
 
 from benchmark_utils.conf import N_JOBS
