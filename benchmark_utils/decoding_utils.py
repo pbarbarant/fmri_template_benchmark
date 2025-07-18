@@ -96,16 +96,12 @@ def pearson_corr_parcels(img1, img2, parcel_masker):
 
 
 def save_weights(estimator, dataset, subject=None):
-    output_dir = (
-        Path("outputs") / dataset.name / dataset.solver / dataset.target_name
-    )
-    output_dir.mkdir(parents=True, exist_ok=True)
     # Save the weights of the estimator
-    np.save(output_dir / f"{subject}_weights.npy", estimator.coef_)
+    np.save(dataset.output_dir / f"{subject}_weights.npy", estimator.coef_)
     weights_labels = estimator.classes_
     # Save the labels of the weights as csv
     np.savetxt(
-        output_dir / f"{subject}_weights_labels.csv", weights_labels, fmt="%s"
+        dataset.output_dir / f"{subject}_weights_labels.csv", weights_labels, fmt="%s"
     )
 
 
@@ -175,10 +171,6 @@ def save_decoding_results(
     cv_scores_classif,
     pearson_corrs,
 ):
-    output_dir = (
-        Path("outputs") / dataset.name / dataset.solver / dataset.target_name
-    )
-    output_dir.mkdir(parents=True, exist_ok=True)
     results_dict = {
         "avg_score": avg_score,
         "chance_level": chance_level,
@@ -187,5 +179,5 @@ def save_decoding_results(
         "time": dataset.time,
     }
     # Dump the results with joblib
-    dump(results_dict, output_dir / "decoding_results.pkl")
-    print(f"Decoding results saved in {output_dir}")
+    dump(results_dict, dataset.output_dir / "decoding_results.pkl")
+    print(f"Decoding results saved in {dataset.output_dir}")

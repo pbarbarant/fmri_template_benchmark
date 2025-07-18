@@ -88,11 +88,9 @@ def plot_pca(dataset: Dataset) -> None:
     # Adjust layout to fit legends
     plt.tight_layout()
     plt.subplots_adjust(right=0.85)  # Leave space for legends
-    output_dir = dataset.output_dir / dataset.target_name
-    output_dir.mkdir(exist_ok=True, parents=True)
     # Save the figure
     fig.savefig(
-        output_dir / "pca.png",
+        dataset.output_dir / "pca.png",
         bbox_inches="tight",
         dpi=300,
     )
@@ -104,7 +102,7 @@ def compute_alignment(
     solver_name: str,
 ) -> Dataset:
     dataset.solver = solver_name
-    output_dir = Path("outputs") / dataset.name / solver_name
+    output_dir = Path("outputs") / dataset.name / dataset.task_name / dataset.target_name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
     dataset.output_dir = output_dir
     

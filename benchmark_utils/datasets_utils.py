@@ -8,7 +8,6 @@ import pandas as pd
 from fmralign._utils import _intersect_clustering_mask
 from ibc_public import utils_data
 from nibabel.nifti1 import Nifti1Image
-from nilearn import image
 from nilearn.datasets import (
     load_mni152_gm_mask,
     fetch_atlas_schaefer_2018,
@@ -16,8 +15,10 @@ from nilearn.datasets import (
     load_fsaverage,
 )
 from nilearn.image import (
+    load_img,
     math_img,
     resample_to_img,
+    concat_imgs,
 )
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
 from nilearn.masking import apply_mask_fmri
@@ -49,6 +50,7 @@ class Dataset:
     dict_decoding: Dict[str, np.ndarray]
     dict_y: Dict[str, np.ndarray]
     target_name: str
+    task_name: str
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
@@ -152,7 +154,6 @@ def fit_masker(resolution=3, n_rois=100, n_jobs=1):
     masker = MultiNiftiMasker(
         mask_img=mask_img,
         standardize=True,
-        detrend=True,
         reports=False,
         n_jobs=n_jobs,
         verbose=11,
@@ -189,11 +190,11 @@ def sample_dataset(
     dict_alignment["sub-01"] = data_sub1
     dict_decoding["sub-01"] = data_sub1
     dict_y["sub-01"] = y
-    
+
     dict_alignment["sub-02"] = data_sub2
     dict_decoding["sub-02"] = data_sub2
     dict_y["sub-02"] = y
-    
+
     if target_name == "template":
         target = None
     else:
@@ -209,10 +210,8 @@ def sample_dataset(
         dict_y=dict_y,
         target=target,
         target_name=target_name,
+        task_name="simulated_task",
     )
-
-
-
 
 
 def fetch_ibc(
@@ -233,10 +232,12 @@ def fetch_ibc(
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
-    
+
     masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
-    labels = apply_mask_fmri(load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_).astype(int)
-    
+    labels = apply_mask_fmri(
+        load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
+    ).astype(int)
+
     for subject in tqdm(subjects, desc="Processing IBC data"):
         df_sub = df[(df.subject == subject)]
         # For each contrast, keep randomly one path
@@ -245,12 +246,14 @@ def fetch_ibc(
         )
         # Put the rest in decoding_df
         decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
-        dict_alignment[subject] = np.vstack(masker.transform(
-            alignment_df.path.to_list()
-        ))
-        dict_decoding[subject] = np.vstack(masker.transform(decoding_df.path.to_list()))
+        dict_alignment[subject] = np.vstack(
+            masker.transform(alignment_df.path.to_list())
+        )
+        dict_decoding[subject] = np.vstack(
+            masker.transform(decoding_df.path.to_list())
+        )
         dict_y[subject] = decoding_df.contrast.to_numpy()
-    
+
     if target_name == "template":
         target = None
     else:
@@ -266,6 +269,7 @@ def fetch_ibc(
         dict_y=dict_y,
         target=target,
         target_name=target_name,
+        task_name=task,
     )
 
 
@@ -288,12 +292,12 @@ def load_surface_img(
             },
         )
         surf_imgs.append(surf_img)
-    return None
+    return concat_imgs(surf_imgs)
 
 
 def fetch_ibc_surf(
     name: str = "IBC",
-    target: str = "template",
+    target_name: str = "template",
     subjects: List[str] = None,
     task: str = None,
 ) -> Dataset:
@@ -304,8 +308,25 @@ def fetch_ibc_surf(
         acquisition="all",
     )
     mesh = load_fsaverage("fsaverage5")["pial"]
+    atlas = fetch_atlas_surf_destrieux()
+    labels = np.hstack([atlas["map_left"], atlas["map_right"] + atlas["map_left"].max()]).astype(int)
+    labels_img = SurfaceImage(
+        mesh=mesh,
+        data={
+            "left": atlas["map_left"],
+            "right": atlas["map_right"],
+        },
+    )
+    masker = SurfaceMasker(
+        mask_img=labels_img,
+        standardize=True,
+        reports=False,
+        verbose=11,
+    ).fit()
+    
     dict_alignment = dict()
     dict_decoding = dict()
+    dict_y = dict()
     for subject in tqdm(subjects, desc="Processing IBC data"):
         alignment_df = df[
             (df.subject == subject) & (df.path.str.contains("_dir-ap"))
@@ -313,41 +334,33 @@ def fetch_ibc_surf(
         decoding_df = df[
             (df.subject == subject) & (df.path.str.contains("_dir-pa"))
         ]
-        dict_alignment[subject] = load_surface_img(
-            alignment_df.path.to_list(), mesh
+        dict_alignment[subject] = masker.transform(
+            load_surface_img(alignment_df.path.to_list(), mesh)
         )
-        dict_decoding[subject] = LabeledImage(
-            img=load_surface_img(decoding_df.path.to_list(), mesh),
-            y=decoding_df[decoding_df.side == "lh"].contrast.to_numpy(),
+        dict_decoding[subject] = masker.transform(
+            load_surface_img(decoding_df.path.to_list(), mesh),
         )
+        dict_y[subject] = decoding_df[decoding_df.side == "lh"].contrast.to_numpy()
 
-    atlas = fetch_atlas_surf_destrieux()
-    clustering_img = SurfaceImage(
-        mesh=mesh,
-        data={
-            "left": atlas["map_left"],
-            "right": atlas["map_right"],
-        },
-    )
 
-    masker = SurfaceMasker(
-        memory=MEMORY, memory_level=1, standardize=True
-    ).fit([dict_alignment[subject] for subject in subjects])
+    if target_name == "template":
+        target = None
+    else:
+        target = dict_alignment[target_name]
 
     return Dataset(
         name=name,
         subjects=subjects,
+        n_subjects=len(subjects),
+        labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
-        masker=masker,
-        clustering_img=clustering_img,
-        is_surf=True,
+        dict_y=dict_y,
         target=target,
+        target_name=target_name,
+        task_name=task,
+        is_surf=True,
     )
-
-
-
-
 
 
 def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
@@ -357,28 +370,17 @@ def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
     dict_alignment = dict()
     dict_decoding = dict()
     for subject in tqdm(subjects, desc="Processing Neuromod data"):
-        dict_alignment[subject] = image.load_img(
+        dict_alignment[subject] = load_img(
             DATA_PATH
             / f"{subject}_task-life_space-MNI152NLin2009cAsym_desc-postproc_bold.nii.gz"
         )
         dict_decoding[subject] = LabeledImage(
-            img=image.load_img(DATA_PATH / f"{subject}.nii.gz"),
+            img=load_img(DATA_PATH / f"{subject}.nii.gz"),
             y=pd.read_csv(
                 DATA_PATH / f"{subject}_labels.csv", header=None
             ).values.flatten(),
         )
 
-    masker = fit_masker(
-        [dict_alignment[subject] for subject in subjects],
-    )
-    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
+    masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
 
-    return Dataset(
-        name="Neuromod",
-        subjects=subjects,
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        masker=masker,
-        clustering_img=clustering_img,
-        target=target,
-    )
+    return None
