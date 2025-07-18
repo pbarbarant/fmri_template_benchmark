@@ -2,7 +2,7 @@ import glob
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
-
+import h5py
 import numpy as np
 import pandas as pd
 from fmralign._utils import _intersect_clustering_mask
@@ -21,10 +21,10 @@ from nilearn.image import (
     concat_imgs,
 )
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
-from nilearn.masking import apply_mask_fmri
+from nilearn.masking import apply_mask_fmri, unmask
 from nilearn.surface import PolyMesh, SurfaceImage
 from tqdm import tqdm
-
+import nibabel as nib
 from benchmark_utils.conf import (
     IBC_PATH,
     IBC_SURF_PATH,
@@ -361,26 +361,99 @@ def fetch_ibc_surf(
         task_name=task,
         is_surf=True,
     )
+    
+    
+def load_neuromod_labels(
+    data_path: Path,
+    subject: str,
+):
+    image_labels = np.load(
+        f"{str(data_path)}/{subject}/descriptive/"
+        f"{subject}_task-things_desc-perTrial_labels.npy", allow_pickle=True
+    )
+    y = image_labels.copy()
+    for i in range(image_labels.shape[0]):
+        y[i] = str(image_labels[i])[:-4]
+    
+    return y
+
+def load_neuromod_mask(
+    data_path: Path,
+    subject: str
+):
+    path = data_path / f"{subject}/glmsingle/output/{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR_stat-trialBetas_desc-zscore_statseries.h5"
+    h5file = h5py.File(path, "r")
+    return nib.nifti1.Nifti1Image(np.array(h5file['mask_array']), affine=np.array(h5file['mask_affine']))
+
+def load_neuromod_data(
+    data_path: Path,
+    subject: str,
+):
+    path = data_path / (
+        f"{subject}/descriptive/"
+        f"{subject}_task-things_space-T1w_stat-betas_desc-perTrial_"
+        "statseries.npy"
+    )
+    # Memory-map the array to avoid loading the full file into memory
+    return np.load(path, mmap_mode="r").astype(np.float32)
 
 
-def fetch_neuromod(n_parcels: int, target: str = "template") -> Dataset:
+def fetch_neuromod(    
+    name: str = "Neuromod",
+    target_name: str = "template",
+    subjects: List[str] = None,
+    task: str = "THINGS",
+    n_parcels: int = 400,
+):
     DATA_PATH = Path(NEUROMOD_PATH)
-    subjects = ["sub-01", "sub-02", "sub-03", "sub-05"]
+    alignment_labels = ["frog"]
+    decoding_labels = ["wallpaper", "frog"]
+
+    masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
+    labels = apply_mask_fmri(
+        load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
+    ).astype(int)
 
     dict_alignment = dict()
     dict_decoding = dict()
+    dict_y = dict()
     for subject in tqdm(subjects, desc="Processing Neuromod data"):
-        dict_alignment[subject] = load_img(
-            DATA_PATH
-            / f"{subject}_task-life_space-MNI152NLin2009cAsym_desc-postproc_bold.nii.gz"
+        individual_mask = load_neuromod_mask(
+            data_path=DATA_PATH,
+            subject=subject,
         )
-        dict_decoding[subject] = LabeledImage(
-            img=load_img(DATA_PATH / f"{subject}.nii.gz"),
-            y=pd.read_csv(
-                DATA_PATH / f"{subject}_labels.csv", header=None
-            ).values.flatten(),
+        data = load_neuromod_data(
+            data_path=DATA_PATH,
+            subject=subject,
         )
+        img_labels = load_neuromod_labels(
+            data_path=DATA_PATH,
+            subject=subject,
+        )
+        alignment_indices = np.hstack(
+            [np.where(img_labels == lbl)[0] for lbl in alignment_labels]
+        )
+        decoding_indices = np.hstack(
+            [np.where(img_labels == lbl)[0] for lbl in decoding_labels]
+        )
+        dict_alignment[subject] = masker.transform(unmask(data[alignment_indices], individual_mask))
+        dict_decoding[subject] = masker.transform(unmask(data[alignment_indices], individual_mask))
+        dict_y[subject] = img_labels[decoding_indices].flatten()
 
-    masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
+    if target_name == "template":
+        target = None
+    else:
+        target = dict_alignment[target_name]
 
-    return None
+    return Dataset(
+        name=name,
+        subjects=subjects,
+        n_subjects=len(subjects),
+        labels=labels,
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        dict_y=dict_y,
+        target=target,
+        target_name=target_name,
+        task_name=task,
+    )
