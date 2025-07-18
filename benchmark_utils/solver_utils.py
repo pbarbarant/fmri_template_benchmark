@@ -1,25 +1,15 @@
 from pathlib import Path
-from time import time
-from typing import Union
+from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from fmralign.pairwise_alignment import PairwiseAlignment
-from fmralign.sparse_pairwise_alignment import SparsePairwiseAlignment
-from fmralign.sparse_template_alignment import SparseTemplateAlignment
-from fmralign.template_alignment import TemplateAlignment
-from nibabel.nifti1 import Nifti1Image
 from sklearn.decomposition import PCA
 
-from benchmark_utils.datasets_utils import Dataset, LabeledImage
+from benchmark_utils.datasets_utils import Dataset
 
 
-def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:
-    imgs = [
-        dict_subjects[subject].img for subject in subjects
-    ]  # Use subjects passed as parameter
-    data = np.concatenate([masker.transform(img) for img in imgs], axis=0)
+def compute_pca(dict_subjects: dict) -> np.ndarray:
+    data = np.vstack(list(dict_subjects.values()))
     if data.shape[1] == 2:
         return data
     else:
@@ -29,18 +19,17 @@ def compute_pca(dict_subjects: dict, subjects, masker) -> np.ndarray:
 
 def plot_pca(dataset: Dataset) -> None:
     subjects = dataset.subjects
-    masker = dataset.masker
-    pca_unaligned = compute_pca(dataset.dict_decoding, subjects, masker)
-    pca_aligned = compute_pca(dataset.dict_aligned, subjects, masker)
+    pca_unaligned = compute_pca(dataset.dict_decoding)
+    pca_aligned = compute_pca(dataset.dict_aligned)
 
     # Create a single figure with 2 subplots
     fig, ax = plt.subplots(2, 2, figsize=(10, 10))
 
     legend_subjects = np.repeat(
-        subjects, dataset.dict_decoding[subjects[0]].y.shape[0]
+        subjects, dataset.dict_y[subjects[0]].shape[0]
     )
     legend_condition = np.concatenate(
-        [dataset.dict_decoding[subject].y for subject in subjects]
+        [dataset.dict_y[subject] for subject in subjects]
     )
 
     # Define separate colormaps
@@ -87,7 +76,7 @@ def plot_pca(dataset: Dataset) -> None:
 
     # Add titles and legends
     ax[0, 0].set_title("PCA of unaligned data")
-    ax[0, 1].set_title(f"PCA - {dataset.solver} - Target: {dataset.target}")
+    ax[0, 1].set_title(f"PCA - {dataset.solver} - Target: {dataset.target_name}")
     # Add legends to the right of the rightmost plots
     ax[0, 1].legend(
         loc="center left", bbox_to_anchor=(1, 0.5), title="Subjects"
@@ -99,7 +88,7 @@ def plot_pca(dataset: Dataset) -> None:
     # Adjust layout to fit legends
     plt.tight_layout()
     plt.subplots_adjust(right=0.85)  # Leave space for legends
-    output_dir = dataset.output_dir / dataset.target
+    output_dir = dataset.output_dir / dataset.target_name
     output_dir.mkdir(exist_ok=True, parents=True)
     # Save the figure
     fig.savefig(
@@ -109,89 +98,8 @@ def plot_pca(dataset: Dataset) -> None:
     )
 
 
-def compute_template(
-    algo: TemplateAlignment,
-    dataset: Dataset,
-) -> Dataset:
-    # Get the list of subjects
-    subjects = dataset.subjects
-
-    # Get the list of images
-    imgs = [dataset.dict_alignment[subject] for subject in subjects]
-
-    # Align the images
-    algo.fit(imgs)
-
-    # Initialize the template
-    template_data = np.zeros_like(
-        dataset.masker.transform(dataset.dict_decoding[subjects[0]].img)
-    )
-    dict_aligned = dict()
-    for i, subject in enumerate(subjects):
-        transformed_img = algo.transform(
-            dataset.dict_decoding[subject].img, subject_index=i
-        )
-        dict_aligned[subject] = LabeledImage(
-            img=transformed_img,
-            y=dataset.dict_decoding[subject].y,
-        )
-        template_data += dataset.masker.transform(transformed_img) / len(
-            subjects
-        )
-
-    # Convert the template to a LabeledImage
-    template = LabeledImage(
-        img=dataset.masker.inverse_transform(template_data),
-        y=dataset.dict_decoding[subjects[0]].y,
-    )
-
-    dataset.parcel_masker = algo.parcel_masker
-    dataset.template = template
-    dataset.dict_aligned = dict_aligned
-
-    # Save the clustering
-    save_clustering(dataset)
-    # Save the template
-    save_template(dataset)
-    # Save the labels as csv
-    save_template_labels(dataset)
-
-    return dataset
-
-
-def compute_pairwise(
-    target_subject: str,
-    algo: PairwiseAlignment,
-    dataset: Dataset,
-) -> Dataset:
-    subjects = dataset.subjects
-    dict_aligned = dict()
-    for subject in subjects:
-        if subject == target_subject:
-            dict_aligned[subject] = dataset.dict_decoding[subject]
-        else:
-            algo.fit(
-                dataset.dict_alignment[subject],
-                dataset.dict_alignment[target_subject],
-            )
-            transformed_img = algo.transform(
-                dataset.dict_decoding[subject].img
-            )
-            dict_aligned[subject] = LabeledImage(
-                img=transformed_img,
-                y=dataset.dict_decoding[subject].y,
-            )
-
-    dataset.dict_aligned = dict_aligned
-    dataset.parcel_masker = algo.parcel_masker
-    # Save the clustering
-    save_clustering(dataset)
-
-    return dataset
-
-
 def compute_alignment(
-    algo: Union[TemplateAlignment, PairwiseAlignment],
+    algo,
     dataset: Dataset,
     solver_name: str,
 ) -> Dataset:
@@ -199,41 +107,16 @@ def compute_alignment(
     output_dir = Path("outputs") / dataset.name / solver_name
     output_dir.mkdir(exist_ok=True, parents=True)
     dataset.output_dir = output_dir
-    start_time = time()
-    if isinstance(algo, (TemplateAlignment, SparseTemplateAlignment)):
-        dataset = compute_template(algo, dataset)
-    elif isinstance(algo, (PairwiseAlignment, SparsePairwiseAlignment)):
-        dataset = compute_pairwise(dataset.target, algo, dataset)
-    else:
-        raise ValueError(
-            "algo must be either TemplateAlignment or PairwiseAlignment"
-        )
-    dataset.time = time() - start_time
+    
+    # Time the alignment process
+    start_time = perf_counter()
+    algo.fit(list(dataset.dict_alignment.values()))
+    aligned_data = algo.transform(list(dataset.dict_decoding.values()), range(dataset.n_subjects))
+    dataset.dict_aligned = dict(zip(dataset.subjects, aligned_data))
+    dataset.time = perf_counter() - start_time
+    
     # Compute the PCA
     print("Computing PCA")
     plot_pca(dataset)
     print("PCA computed")
     return dataset
-
-
-def save_template(dataset: Dataset) -> None:
-    output_dir = dataset.output_dir
-    template_img = dataset.template.img
-    if dataset.is_surf:
-        template_img.data.to_filename(output_dir / "template_data.gii")
-    else:
-        template_img.to_filename(output_dir / "template.nii.gz")
-
-
-def save_clustering(dataset: Dataset) -> None:
-    output_dir = dataset.output_dir
-    clustering_img = dataset.clustering_img
-    clustering_img.to_filename(output_dir / "clustering.nii.gz")
-
-
-def save_template_labels(dataset: Dataset) -> None:
-    output_dir = dataset.output_dir
-    labels = dataset.template.y
-    # Convert labels to a DataFrame
-    df = pd.DataFrame(labels)
-    df.to_csv(output_dir / "labels.csv", index=False, header=False)
