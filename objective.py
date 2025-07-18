@@ -4,10 +4,7 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchmark_utils.decoding_utils import (
-        evaluate_subject_dataset,
-        evaluate_template_dataset,
-    )
+    from benchmark_utils.decoding_utils import evaluate_dataset
 
 
 # The benchmark objective must be named `Objective` and
@@ -66,14 +63,9 @@ class Objective(BaseObjective):
             # For debugging purposes, we can return a dummy result.
             avg_score = 0.5
         else:
-            if dataset.target == "template":
-                avg_score = evaluate_template_dataset(
-                    dataset, max_iter=self.max_iter
-                )
-            else:
-                avg_score = evaluate_subject_dataset(
-                    dataset, max_iter=self.max_iter
-                )
+            avg_score = evaluate_dataset(
+                dataset, max_iter=self.max_iter
+            )
 
         return dict(value=avg_score)
 
