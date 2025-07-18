@@ -36,7 +36,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {"target": ["template"] + SUBJECTS, "n_parcels": [400]}
+    parameters = {"target_name": ["template"] + SUBJECTS, "n_parcels": [400]}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -47,13 +47,13 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_ibc(
             name=self.name + f"_{self.n_parcels}",
-            target=self.target,
+            target_name=self.target_name,
             subjects=SUBJECTS,
             task="HcpWm",
             n_parcels=self.n_parcels,
         )
 
-        check_init_dataset(self.dataset)
-        log_dataset_info(self.dataset)
+        # check_init_dataset(self.dataset)
+        # log_dataset_info(self.dataset)
 
         return dict(dataset=self.dataset)
