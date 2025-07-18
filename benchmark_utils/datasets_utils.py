@@ -6,32 +6,30 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 from fmralign._utils import _intersect_clustering_mask
-from fmralign.preprocessing import ParcellationMasker
 from ibc_public import utils_data
 from nibabel.nifti1 import Nifti1Image
 from nilearn import image
 from nilearn.datasets import (
+    load_mni152_gm_mask,
     fetch_atlas_schaefer_2018,
     fetch_atlas_surf_destrieux,
     load_fsaverage,
-    load_mni152_gm_mask,
 )
-from nilearn.maskers import NiftiMasker, SurfaceMasker
-from nilearn.maskers._utils import concatenate_surface_images
+from nilearn.image import (
+    math_img,
+    resample_to_img,
+)
+from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
+from nilearn.masking import apply_mask_fmri
 from nilearn.surface import PolyMesh, SurfaceImage
 from tqdm import tqdm
 
 from benchmark_utils.conf import (
-    BUDAPEST_PATH,
-    FORREST_PATH,
-    HCP_PATH,
     IBC_PATH,
     IBC_SURF_PATH,
     MEMORY,
     N_JOBS,
     NEUROMOD_PATH,
-    NSD_PATH,
-    RAIDERS_PATH,
 )
 
 
@@ -45,18 +43,18 @@ class LabeledImage:
 class Dataset:
     name: str
     subjects: List[str]
-    dict_alignment: Dict[str, Nifti1Image]
-    dict_decoding: Dict[str, LabeledImage]
-    masker: NiftiMasker | SurfaceMasker
-    clustering_img: Nifti1Image
+    n_subjects: int
+    labels: np.ndarray
+    dict_alignment: Dict[str, np.ndarray]
+    dict_decoding: Dict[str, np.ndarray]
+    dict_y: Dict[str, np.ndarray]
+    target_name: str
     output_dir: Optional[Path] = None
     time: Optional[float] = None
-    parcel_masker: Optional[ParcellationMasker] = None
-    dict_aligned: Optional[Dict[str, LabeledImage]] = None
-    template: Optional[LabeledImage] = None
+    dict_aligned: Optional[Dict[str, np.ndarray]] = None
+    template: Optional[np.ndarray] = None
     is_surf: bool = False
-    paradigm: str = "task"
-    target: str = "template"
+    target: Optional[np.ndarray] = None
     solver: Optional[str] = None
 
 
@@ -132,70 +130,43 @@ def log_dataset_info(dataset: Dataset) -> None:
         )
 
 
-def fetch_clustering_img(
-    target_img: Nifti1Image, n_rois: int = 400
-) -> Nifti1Image:  # -> FileBasedImage | Nifti1Image | Any:# -> FileBasedImage | Nifti1Image | Any:
-    clustering_img = fetch_atlas_schaefer_2018(
-        n_rois=n_rois, data_dir=MEMORY.location / "atlas"
-    )["maps"]
-    resampled_img = image.resample_to_img(clustering_img, target_img)
-    int_img = image.math_img("img.astype(int)", img=resampled_img)
-    return int_img
+def load_atlas(resolution=3, n_rois=100):
+    atlas = fetch_atlas_schaefer_2018(n_rois=n_rois)
+    atlas = resample_to_img(
+        atlas.maps,
+        load_mni152_gm_mask(resolution=resolution),
+        interpolation="nearest",
+    )
+    return atlas
 
 
-def fit_mni152_masker(resolution: int = 3) -> NiftiMasker:
-    mask_img = load_mni152_gm_mask(resolution=resolution)
-    return NiftiMasker(mask_img=mask_img, memory=MEMORY, memory_level=1).fit()
+def get_mask_img(resolution=3, n_rois=100):
+    atlas = load_atlas(resolution=resolution, n_rois=n_rois)
+    gm_mask = load_mni152_gm_mask(resolution=resolution)
+    mask_img = math_img("img1*img2 > 0", img1=atlas, img2=gm_mask)
+    return mask_img
 
 
-def fit_masker(imgs, mask_img=None, detrend=False, t_r=None) -> NiftiMasker:
-    return NiftiMasker(
-        memory=MEMORY,
+def fit_masker(resolution=3, n_rois=100, n_jobs=1):
+    mask_img = get_mask_img(resolution=resolution, n_rois=n_rois)
+    masker = MultiNiftiMasker(
         mask_img=mask_img,
-        memory_level=1,
         standardize=True,
-        detrend=detrend,
-        t_r=t_r,
-        n_jobs=N_JOBS,
-    ).fit(imgs)
-
-
-def get_masker_clustering_img(dict_alignment, subjects, n_parcels):
-    masker = fit_masker(
-        [dict_alignment[subject] for subject in subjects],
-    )
-    clustering_img = fetch_clustering_img(masker.mask_img_, n_parcels)
-    if 0 in masker.transform(clustering_img):
-        reduced_mask = _intersect_clustering_mask(
-            clustering_img, masker.mask_img_
-        )
-        # Update the masker
-        masker = fit_masker(
-            [dict_alignment[subject] for subject in subjects],
-            mask_img=reduced_mask,
-        )
-    return masker, clustering_img
-
-
-def sample_movie_segment(n_segments: int, masker: NiftiMasker) -> LabeledImage:
-    mask_img = masker.mask_img_
-    n_voxels = masker.transform(mask_img).shape[1]
-    segment_len = 5
-    data = np.random.randn(n_segments * segment_len, n_voxels)
-    img = masker.inverse_transform(data)
-    y = np.arange(n_segments).repeat(segment_len)
-    return LabeledImage(
-        img=img,
-        y=y,
-    )
+        detrend=True,
+        reports=False,
+        n_jobs=n_jobs,
+        verbose=11,
+    ).fit()
+    return masker
 
 
 def sample_dataset(
     name: str,
-    target: str,
+    target_name: str,
 ) -> Dataset:
     dict_alignment = dict()
     dict_decoding = dict()
+    dict_y = dict()
     subjects = ["sub-01", "sub-02"]
 
     # Generate a gaussian mixture for sub-01
@@ -215,74 +186,38 @@ def sample_dataset(
     # Generate the labels
     y = np.arange(200) >= 100
 
-    # Reshape the data to (2, 1, 1, 200)
-    data_sub1_reshaped = data_sub1.T.reshape(2, 1, 1, 200)
-    data_sub2_reshaped = data_sub2.T.reshape(2, 1, 1, 200)
-
-    # Convert to NIfTI images
-    img1 = Nifti1Image(data_sub1_reshaped, affine=np.eye(4))
-    img2 = Nifti1Image(data_sub2_reshaped, affine=np.eye(4))
-
-    dict_alignment["sub-01"] = img1
-    dict_decoding["sub-01"] = LabeledImage(img=img1, y=y)
-
-    dict_alignment["sub-02"] = img2
-    dict_decoding["sub-02"] = LabeledImage(img2, y=y)
-
-    # Generate mask of all 1s
-    mask_data = np.ones((2, 1, 1))
-    mask_img = Nifti1Image(mask_data, affine=np.eye(4))
-
-    # Define and fit the masker
-    masker = NiftiMasker(mask_img=mask_img, standardize=False).fit(
-        [img1, img2]
-    )
+    dict_alignment["sub-01"] = data_sub1
+    dict_decoding["sub-01"] = data_sub1
+    dict_y["sub-01"] = y
+    
+    dict_alignment["sub-02"] = data_sub2
+    dict_decoding["sub-02"] = data_sub2
+    dict_y["sub-02"] = y
+    
+    if target_name == "template":
+        target = None
+    else:
+        target = dict_alignment[target_name]
 
     return Dataset(
         name=name,
         subjects=subjects,
+        n_subjects=len(subjects),
+        labels=np.ones(2),
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
-        masker=masker,
-        clustering_img=mask_img,
+        dict_y=dict_y,
         target=target,
+        target_name=target_name,
     )
 
 
-def sample_movie_dataset(
-    name,
-    masker,
-    clustering_img,
-    subjects,
-    n_segments_alignement,
-    n_segments_decoding,
-) -> Dataset:
-    print(f"Generating fold {name}")
-    dict_alignment = dict()
-    dict_decoding = dict()
-    for subject in subjects:
-        # Generate random surface images for each subject.
-        dict_alignment[subject] = sample_movie_segment(
-            n_segments_alignement, masker
-        ).img
-        dict_decoding[subject] = sample_movie_segment(
-            n_segments_decoding, masker
-        )
 
-    return Dataset(
-        name=name,
-        subjects=subjects,
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        masker=masker,
-        clustering_img=clustering_img,
-        paradigm="movie",
-    )
 
 
 def fetch_ibc(
     name: str = "IBC",
-    target: str = "template",
+    target_name: str = "template",
     subjects: List[str] = None,
     task: str = None,
     n_parcels: int = 400,
@@ -297,6 +232,11 @@ def fetch_ibc(
     df = df[~df.path.str.contains("ffx")]
     dict_alignment = dict()
     dict_decoding = dict()
+    dict_y = dict()
+    
+    masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
+    labels = apply_mask_fmri(load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_).astype(int)
+    
     for subject in tqdm(subjects, desc="Processing IBC data"):
         df_sub = df[(df.subject == subject)]
         # For each contrast, keep randomly one path
@@ -305,26 +245,27 @@ def fetch_ibc(
         )
         # Put the rest in decoding_df
         decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
-        dict_alignment[subject] = image.concat_imgs(
+        dict_alignment[subject] = np.vstack(masker.transform(
             alignment_df.path.to_list()
-        )
-        dict_decoding[subject] = LabeledImage(
-            img=image.concat_imgs(decoding_df.path.to_list()),
-            y=decoding_df.contrast.to_numpy(),
-        )
-
-    masker, clustering_img = get_masker_clustering_img(
-        dict_alignment, subjects, n_parcels
-    )
+        ))
+        dict_decoding[subject] = np.vstack(masker.transform(decoding_df.path.to_list()))
+        dict_y[subject] = decoding_df.contrast.to_numpy()
+    
+    if target_name == "template":
+        target = None
+    else:
+        target = dict_alignment[target_name]
 
     return Dataset(
         name=name,
         subjects=subjects,
+        n_subjects=len(subjects),
+        labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
-        masker=masker,
-        clustering_img=clustering_img,
+        dict_y=dict_y,
         target=target,
+        target_name=target_name,
     )
 
 
@@ -347,7 +288,7 @@ def load_surface_img(
             },
         )
         surf_imgs.append(surf_img)
-    return concatenate_surface_images(surf_imgs)
+    return None
 
 
 def fetch_ibc_surf(
