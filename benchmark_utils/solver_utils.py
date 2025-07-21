@@ -108,9 +108,8 @@ def compute_alignment(
     
     # Time the alignment process
     start_time = perf_counter()
-    algo.fit(list(dataset.dict_alignment.values()))
-    aligned_data = algo.transform(list(dataset.dict_decoding.values()), range(dataset.n_subjects))
-    dataset.dict_aligned = dict(zip(dataset.subjects, aligned_data))
+    algo.fit(dataset.dict_alignment)
+    dataset.dict_aligned = algo.transform(dataset.dict_decoding)
     dataset.time = perf_counter() - start_time
     
     # Compute the PCA
