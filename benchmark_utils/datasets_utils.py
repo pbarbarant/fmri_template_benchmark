@@ -429,9 +429,10 @@ def fetch_neuromod(
     task: str = "THINGS",
     n_parcels: int = 400,
 ):
-    DATA_PATH = Path(NEUROMOD_PATH)
-    alignment_labels = ["frog"]
-    decoding_labels = ["wallpaper", "frog"]
+    data_path = Path(NEUROMOD_PATH)
+    alignment_labels = ["cat", "dog"]
+    decoding_labels = ["cat", "dog"]
+    n_contrasts = 10
 
     masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
     labels = apply_mask_fmri(
@@ -443,25 +444,25 @@ def fetch_neuromod(
     dict_y = dict()
     for subject in tqdm(subjects, desc="Processing Neuromod data"):
         individual_mask = load_neuromod_mask(
-            data_path=DATA_PATH,
+            data_path=data_path,
             subject=subject,
         )
         data = load_neuromod_data(
-            data_path=DATA_PATH,
+            data_path=data_path,
             subject=subject,
         )
         img_labels = load_neuromod_labels(
-            data_path=DATA_PATH,
+            data_path=data_path,
             subject=subject,
         )
         alignment_indices = np.hstack(
-            [np.where(img_labels == lbl)[0] for lbl in alignment_labels]
+            [np.where(img_labels == lbl)[0][:n_contrasts] for lbl in alignment_labels]
         )
         decoding_indices = np.hstack(
-            [np.where(img_labels == lbl)[0] for lbl in decoding_labels]
+            [np.where(img_labels == lbl)[0][:n_contrasts] for lbl in decoding_labels]
         )
         dict_alignment[subject] = masker.transform(unmask(data[alignment_indices], individual_mask))
-        dict_decoding[subject] = masker.transform(unmask(data[alignment_indices], individual_mask))
+        dict_decoding[subject] = masker.transform(unmask(data[decoding_indices], individual_mask))
         dict_y[subject] = img_labels[decoding_indices].flatten()
 
     if target_name == "template":
