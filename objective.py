@@ -21,7 +21,6 @@ class Objective(BaseObjective):
     # All parameters 'p' defined here are available as 'self.p'.
     # This means the OLS objective will have a parameter `self.whiten_y`.
     parameters = {
-        "debug_mode": [False],
         "max_iter": [100],
     }
 
@@ -59,13 +58,9 @@ class Objective(BaseObjective):
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         print(f"Evaluating on: {dataset.name}")
-        if bool(self.debug_mode):
-            # For debugging purposes, we can return a dummy result.
-            avg_score = 0.5
-        else:
-            avg_score = evaluate_dataset(
-                dataset, max_iter=self.max_iter
-            )
+        avg_score = evaluate_dataset(
+            dataset, max_iter=self.max_iter
+        )
 
         return dict(value=avg_score)
 
