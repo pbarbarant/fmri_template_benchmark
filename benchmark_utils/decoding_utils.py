@@ -173,6 +173,7 @@ def save_decoding_results(
 ):
     results_dict = {
         "avg_score": avg_score,
+        "task_name": dataset.task_name,
         "chance_level": chance_level,
         "cv_scores_classif": cv_scores_classif,
         "pearson_corrs": pearson_corrs,
