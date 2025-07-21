@@ -20,7 +20,7 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {"reg": [0.1]}
+    parameters = {"reg": [0.01]}
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
