@@ -37,6 +37,15 @@ class Objective(BaseObjective):
     # Minimal version of benchopt required to run this benchmark.
     # Bump it up if the benchmark depends on a new feature of benchopt.
     min_benchopt_version = "1.6"
+    
+    def skip(self, dataset):
+        # This method is called to check if the benchmark should be skipped
+        # for a given dataset. If it returns True, the benchmark will not run.
+        # This can be used to skip datasets that are not compatible with the
+        # objective or that are known to be faulty.
+        if dataset.is_faulty:
+            return True, "Dataset is faulty, skipping evaluation."
+        return False, None
 
     def set_data(
         self,
@@ -46,7 +55,6 @@ class Objective(BaseObjective):
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
         self.dataset = dataset
-
         print(f"Running on: {dataset.name}, target: {dataset.target}")
 
     def evaluate_result(self, dataset):

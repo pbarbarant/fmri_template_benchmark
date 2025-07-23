@@ -51,6 +51,7 @@ class Dataset:
     dict_y: Dict[str, np.ndarray]
     target_name: str
     task_name: str
+    is_faulty: bool = False
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
@@ -266,10 +267,18 @@ def fetch_ibc_vol(
 
     valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
+    is_faulty = False
     if target_name == "template":
         target = None
     else:
-        target = dict_alignment[target_name]
+        if target_name not in dict_alignment:
+            print(
+                f"Target subject {target_name} data could not be loaded."
+            )
+            is_faulty = True
+            target = None
+        else:
+            target = dict_alignment[target_name]
 
     return Dataset(
         name=name,
@@ -282,6 +291,7 @@ def fetch_ibc_vol(
         target=target,
         target_name=target_name,
         task_name=task,
+        is_faulty=is_faulty,
     )
 
 
@@ -371,10 +381,18 @@ def fetch_ibc_surf(
 
     valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
+    is_faulty = False
     if target_name == "template":
         target = None
     else:
-        target = dict_alignment[target_name]
+        if target_name not in dict_alignment:
+            print(
+                f"Target subject {target_name} data could not be loaded."
+            )
+            is_faulty = True
+            target = None
+        else:
+            target = dict_alignment[target_name]
 
     return Dataset(
         name=name,
@@ -388,6 +406,7 @@ def fetch_ibc_surf(
         target_name=target_name,
         task_name=task,
         is_surf=True,
+        is_faulty=is_faulty,
     )
 
 
