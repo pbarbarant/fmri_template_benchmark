@@ -263,7 +263,7 @@ def fetch_ibc_vol(
             # Add the subject to the missing subjects list
             missing_subjects.append(subject)
             continue
-    
+
     valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
     if target_name == "template":
@@ -321,7 +321,9 @@ def fetch_ibc_surf(
     )
     mesh = load_fsaverage("fsaverage5")["pial"]
     atlas = fetch_atlas_surf_destrieux()
-    labels = np.hstack([atlas["map_left"], atlas["map_right"] + atlas["map_left"].max()]).astype(int)
+    labels = np.hstack(
+        [atlas["map_left"], atlas["map_right"] + atlas["map_left"].max()]
+    ).astype(int)
     labels_img = SurfaceImage(
         mesh=mesh,
         data={
@@ -335,7 +337,7 @@ def fetch_ibc_surf(
         reports=False,
         verbose=11,
     ).fit()
-    
+
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
@@ -354,7 +356,9 @@ def fetch_ibc_surf(
             dict_decoding[subject] = masker.transform(
                 load_surface_img(decoding_df.path.to_list(), mesh),
             )
-            dict_y[subject] = decoding_df[decoding_df.side == "lh"].contrast.to_numpy()
+            dict_y[subject] = decoding_df[
+                decoding_df.side == "lh"
+            ].contrast.to_numpy()
         except ValueError as e:
             print(f"Error processing subject {subject}: {e}")
             # Pop the subject from the dictionaries if it fails
@@ -385,29 +389,38 @@ def fetch_ibc_surf(
         task_name=task,
         is_surf=True,
     )
-    
-    
+
+
 def load_neuromod_labels(
     data_path: Path,
     subject: str,
 ):
     image_labels = np.load(
         f"{str(data_path)}/things.glmsingle/{subject}/descriptive/"
-        f"{subject}_task-things_desc-perTrial_labels.npy", allow_pickle=True
+        f"{subject}_task-things_desc-perTrial_labels.npy",
+        allow_pickle=True,
     )
     y = image_labels.copy()
     for i in range(image_labels.shape[0]):
         y[i] = str(image_labels[i])[:-4]
-    
+
     return y
 
-def load_neuromod_mask(
-    data_path: Path,
-    subject: str
-):
-    path = data_path / f"things.glmsingle/{subject}/glmsingle/output/{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR_stat-trialBetas_desc-zscore_statseries.h5"
+
+def load_neuromod_mask(data_path: Path, subject: str):
+    path = (
+        data_path
+        / (
+            f"things.glmsingle/{subject}/glmsingle/output/"
+            f"{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR"
+            "_stat-trialBetas_desc-zscore_statseries.h5"
+        )
+    )
     h5file = h5py.File(path, "r")
-    return nib.nifti1.Nifti1Image(np.array(h5file['mask_array']), affine=np.array(h5file['mask_affine']))
+    return nib.nifti1.Nifti1Image(
+        np.array(h5file["mask_array"]), affine=np.array(h5file["mask_affine"])
+    )
+
 
 def load_neuromod_data(
     data_path: Path,
@@ -423,7 +436,7 @@ def load_neuromod_data(
     return np.load(path, mmap_mode="r").astype(np.float32)
 
 
-def fetch_neuromod(    
+def fetch_neuromod(
     name: str = "Neuromod",
     target_name: str = "template",
     subjects: List[str] = None,
@@ -457,13 +470,23 @@ def fetch_neuromod(
             subject=subject,
         )
         alignment_indices = np.hstack(
-            [np.where(img_labels == lbl)[0][:n_contrasts] for lbl in alignment_labels]
+            [
+                np.where(img_labels == lbl)[0][:n_contrasts]
+                for lbl in alignment_labels
+            ]
         )
         decoding_indices = np.hstack(
-            [np.where(img_labels == lbl)[0][:n_contrasts] for lbl in decoding_labels]
+            [
+                np.where(img_labels == lbl)[0][:n_contrasts]
+                for lbl in decoding_labels
+            ]
         )
-        dict_alignment[subject] = masker.transform(unmask(data[alignment_indices], individual_mask))
-        dict_decoding[subject] = masker.transform(unmask(data[decoding_indices], individual_mask))
+        dict_alignment[subject] = masker.transform(
+            unmask(data[alignment_indices], individual_mask)
+        )
+        dict_decoding[subject] = masker.transform(
+            unmask(data[decoding_indices], individual_mask)
+        )
         dict_y[subject] = img_labels[decoding_indices].flatten()
 
     if target_name == "template":
