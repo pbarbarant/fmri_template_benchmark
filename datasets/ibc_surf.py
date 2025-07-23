@@ -49,6 +49,7 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_ibc_surf(
             name=self.name,
+            target_name=self.target_name,
             subjects=SUBJECTS,
             task=self.task,
         )
