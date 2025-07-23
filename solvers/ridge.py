@@ -46,7 +46,6 @@ class Solver(BaseSolver):
         # https://benchopt.github.io/performance_curves.html
         algo = GroupAlignment(
             method="ridge",
-            target=self.dataset.target,
             labels=self.dataset.labels,
             n_jobs=N_JOBS,
             verbose=11,

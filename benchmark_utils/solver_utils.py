@@ -108,7 +108,7 @@ def compute_alignment(
     
     # Time the alignment process
     start_time = perf_counter()
-    algo.fit(dataset.dict_alignment)
+    algo.fit(dataset.dict_alignment, dataset.target)
     dataset.dict_aligned = algo.transform(dataset.dict_decoding)
     dataset.time = perf_counter() - start_time
     
