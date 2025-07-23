@@ -392,7 +392,7 @@ def load_neuromod_labels(
     subject: str,
 ):
     image_labels = np.load(
-        f"{str(data_path)}/{subject}/descriptive/"
+        f"{str(data_path)}/things.glmsingle/{subject}/descriptive/"
         f"{subject}_task-things_desc-perTrial_labels.npy", allow_pickle=True
     )
     y = image_labels.copy()
@@ -405,7 +405,7 @@ def load_neuromod_mask(
     data_path: Path,
     subject: str
 ):
-    path = data_path / f"{subject}/glmsingle/output/{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR_stat-trialBetas_desc-zscore_statseries.h5"
+    path = data_path / f"things.glmsingle/{subject}/glmsingle/output/{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR_stat-trialBetas_desc-zscore_statseries.h5"
     h5file = h5py.File(path, "r")
     return nib.nifti1.Nifti1Image(np.array(h5file['mask_array']), affine=np.array(h5file['mask_affine']))
 
@@ -414,6 +414,7 @@ def load_neuromod_data(
     subject: str,
 ):
     path = data_path / (
+        "things.glmsingle/"
         f"{subject}/descriptive/"
         f"{subject}_task-things_space-T1w_stat-betas_desc-perTrial_"
         "statseries.npy"
