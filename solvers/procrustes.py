@@ -45,7 +45,7 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
         algo = GroupAlignment(
-            method="scaled_orthogonal",
+            method="procrustes",
             labels=self.dataset.labels,
             n_jobs=N_JOBS,
             verbose=11,
