@@ -369,7 +369,7 @@ def fetch_ibc_surf(
             dict_y[subject] = decoding_df[
                 decoding_df.side == "lh"
             ].contrast.to_numpy()
-        except ValueError as e:
+        except TypeError as e:
             print(f"Error processing subject {subject}: {e}")
             # Pop the subject from the dictionaries if it fails
             dict_alignment.pop(subject, None)
