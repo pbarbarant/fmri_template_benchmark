@@ -55,7 +55,8 @@ class Objective(BaseObjective):
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
         self.dataset = dataset
-        print(f"Running on: {dataset.name}, target: {dataset.target_name}")
+        print(f"Running on: {dataset.name}, test_sub: {dataset.test_sub}, "
+              f"external_template: {dataset.external_template}")
 
     def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
@@ -66,11 +67,11 @@ class Objective(BaseObjective):
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
         print(f"Evaluating on: {dataset.name}, {dataset.task_name}")
-        avg_score = evaluate_dataset(
+        score = evaluate_dataset(
             dataset, max_iter=self.max_iter
         )
 
-        return dict(value=avg_score)
+        return dict(value=score)
 
     def get_one_result(self):
         # Return one solution. The return value should be an object compatible
