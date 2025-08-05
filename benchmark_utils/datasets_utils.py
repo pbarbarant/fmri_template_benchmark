@@ -49,88 +49,15 @@ class Dataset:
     dict_alignment: Dict[str, np.ndarray]
     dict_decoding: Dict[str, np.ndarray]
     dict_y: Dict[str, np.ndarray]
-    target_name: str
+    test_sub: str
+    external_template: bool
     task_name: str
     is_faulty: bool = False
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
     template: Optional[np.ndarray] = None
-    is_surf: bool = False
-    target: Optional[np.ndarray] = None
     solver: Optional[str] = None
-
-
-def check_init_dataset(dataset: Dataset) -> None:
-    """Check that the dataset is correctly initialized."""
-    first_subject = list(dataset.dict_alignment.keys())[0]
-    n_samples_alignment = dataset.dict_alignment[first_subject].shape[-1]
-    n_samples_decoding = dataset.dict_decoding[first_subject].img.shape[-1]
-    mask_img = dataset.masker.mask_img_
-
-    assert dataset.template is None, (
-        "Template should be None at initialization"
-    )
-    assert dataset.dict_aligned is None, (
-        "dict_aligned should be None at initialization"
-    )
-
-    for subject in dataset.dict_alignment:
-        assert (
-            dataset.dict_alignment[subject].shape[-1] == n_samples_alignment
-        ), "Inconsistent number of samples in alignment"
-        assert (
-            dataset.dict_decoding[subject].img.shape[-1] == n_samples_decoding
-        ), "Inconsistent number of samples in decoding"
-        if dataset.is_surf:
-            assert (
-                dataset.dict_alignment[subject].shape[0] == mask_img.shape[0]
-            ), "Alignment image shape does not match mask shape"
-            assert (
-                dataset.dict_decoding[subject].img.shape[0]
-                == mask_img.shape[0]
-            ), "Decoding image shape does not match mask shape"
-        else:
-            assert (
-                dataset.dict_alignment[subject].shape[:-1] == mask_img.shape
-            ), "Alignment image shape does not match mask shape"
-            assert (
-                dataset.dict_decoding[subject].img.shape[:-1] == mask_img.shape
-            ), "Decoding image shape does not match mask shape"
-        assert (
-            dataset.dict_decoding[subject].y.shape[0]
-            == dataset.dict_decoding[subject].img.shape[-1]
-        ), "Number of labels does not match number of samples"
-
-
-def log_dataset_info(dataset: Dataset) -> None:
-    """Log the dataset information in a log file in the output folder."""
-    output_folder = Path(__file__).parent.parent / "outputs/logs"
-    output_folder.mkdir(exist_ok=True, parents=True)
-    first_subject = list(dataset.dict_alignment.keys())[0]
-
-    with open(output_folder / f"{dataset.name}.log", "w") as f:
-        f.write(f"Dataset name: {dataset.name}\n")
-        f.write(f"Number of subjects: {len(dataset.dict_alignment)}\n")
-        f.write(f"List of subjects: {list(dataset.dict_alignment.keys())}\n")
-        f.write(f"Image shape: {dataset.clustering_img.shape}\n")
-        if dataset.is_surf:
-            parts = dataset.clustering_img.data.parts
-            n_parcels = max(parts["left"].max(), parts["right"].max()) - 1
-            f.write(f"Number of parcels: {n_parcels}\n")
-        else:
-            f.write(
-                f"Number of parcels: {len(np.unique(dataset.clustering_img.get_fdata())) - 1}\n"
-            )
-        f.write(
-            f"List of decoding conditions: {np.unique(dataset.dict_decoding[first_subject].y)}\n"
-        )
-        f.write(
-            f"Number of alignment samples: {dataset.dict_alignment[first_subject].shape[-1]}\n"
-        )
-        f.write(
-            f"Number of decoding samples: {dataset.dict_decoding[first_subject].img.shape[-1]}\n"
-        )
 
 
 def load_atlas(resolution=3, n_rois=100):
@@ -164,63 +91,41 @@ def fit_masker(resolution=3, n_rois=100, n_jobs=1):
 
 def sample_dataset(
     name: str,
-    target_name: str,
+    subjects: List[str],
+    test_sub: str,
+    external_template: bool = False,
 ) -> Dataset:
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
-    subjects = ["sub-01", "sub-02"]
 
-    # Generate a gaussian mixture for sub-01
-    mean_1 = np.array([10, 0])
-    mean_2 = np.array([-20, 0])
-    data1 = np.random.randn(100, 2) + mean_1
-    data2 = np.random.randn(100, 2) + mean_2
-    data_sub1 = np.concatenate([data1, data2], axis=0)
-
-    # Generate a gaussian mixture for sub-02
-    mean_3 = np.array([0, 10])
-    mean_4 = np.array([0, -20])
-    data3 = np.random.randn(100, 2) + mean_3
-    data4 = np.random.randn(100, 2) + mean_4
-    data_sub2 = np.concatenate([data3, data4], axis=0)
-
-    # Generate the labels
-    y = np.arange(200) >= 100
-
-    dict_alignment["sub-01"] = data_sub1
-    dict_decoding["sub-01"] = data_sub1
-    dict_y["sub-01"] = y
-
-    dict_alignment["sub-02"] = data_sub2
-    dict_decoding["sub-02"] = data_sub2
-    dict_y["sub-02"] = y
-
-    if target_name == "template":
-        target = None
-    else:
-        target = dict_alignment[target_name]
+    for subject in tqdm(subjects, desc="Sampling dataset"):
+        # Create a random alignment and decoding data for each subject
+        dict_alignment[subject] = np.random.rand(100, 30)
+        dict_decoding[subject] = np.random.rand(100, 30)
+        dict_y[subject] = np.random.randint(0, 2, size=100)
 
     return Dataset(
         name=name,
         subjects=subjects,
         n_subjects=len(subjects),
-        labels=np.ones(2),
+        labels=np.ones(30, dtype=int),
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        target=target,
-        target_name=target_name,
+        test_sub=test_sub,
+        external_template=external_template,
         task_name="simulated_task",
     )
 
 
 def fetch_ibc_vol(
+    test_sub: str,
     name: str = "IBC",
-    target_name: str = "template",
     subjects: List[str] = None,
     task: str = None,
     n_parcels: int = 400,
+    external_template: bool = False,
 ) -> Dataset:
     df = utils_data.make_vol_db(
         derivatives=IBC_PATH,
@@ -268,17 +173,9 @@ def fetch_ibc_vol(
     valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
     is_faulty = False
-    if target_name == "template":
-        target = None
-    else:
-        if target_name not in dict_alignment:
-            print(
-                f"Target subject {target_name} data could not be loaded."
-            )
-            is_faulty = True
-            target = None
-        else:
-            target = dict_alignment[target_name]
+    if test_sub not in valid_subjects:
+        print(f"Test subject {test_sub} data not found. Marking dataset as faulty.")
+        is_faulty = True
 
     return Dataset(
         name=name,
@@ -288,8 +185,8 @@ def fetch_ibc_vol(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        target=target,
-        target_name=target_name,
+        test_sub=test_sub,
+        external_template=external_template,
         task_name=task,
         is_faulty=is_faulty,
     )
@@ -318,10 +215,11 @@ def load_surface_img(
 
 
 def fetch_ibc_surf(
+    test_sub: str,
     name: str = "IBC",
-    target_name: str = "template",
     subjects: List[str] = None,
     task: str = None,
+    external_template: bool = False,
 ) -> Dataset:
     df = utils_data.make_surf_db(
         derivatives=IBC_SURF_PATH,
@@ -382,17 +280,9 @@ def fetch_ibc_surf(
     valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
     is_faulty = False
-    if target_name == "template":
-        target = None
-    else:
-        if target_name not in dict_alignment:
-            print(
-                f"Target subject {target_name} data could not be loaded."
-            )
-            is_faulty = True
-            target = None
-        else:
-            target = dict_alignment[target_name]
+    if test_sub not in valid_subjects:
+        print(f"Test subject {test_sub} data not found. Marking dataset as faulty.")
+        is_faulty = True
 
     return Dataset(
         name=name,
@@ -402,10 +292,9 @@ def fetch_ibc_surf(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        target=target,
-        target_name=target_name,
+        test_sub=test_sub,
+        external_template=external_template,
         task_name=task,
-        is_surf=True,
         is_faulty=is_faulty,
     )
 
@@ -456,11 +345,12 @@ def load_neuromod_data(
 
 
 def fetch_neuromod(
+    test_sub: str,
     name: str = "Neuromod",
-    target_name: str = "template",
     subjects: List[str] = None,
     task: str = "THINGS",
     n_parcels: int = 400,
+    external_template: bool = False,
 ):
     data_path = Path(NEUROMOD_PATH)
     alignment_labels = ["cat", "dog"]
@@ -508,10 +398,7 @@ def fetch_neuromod(
         )
         dict_y[subject] = img_labels[decoding_indices].flatten()
 
-    if target_name == "template":
-        target = None
-    else:
-        target = dict_alignment[target_name]
+
 
     return Dataset(
         name=name,
@@ -521,7 +408,7 @@ def fetch_neuromod(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        target=target,
-        target_name=target_name,
+        test_sub=test_sub,
+        external_template=external_template,
         task_name=task,
     )
