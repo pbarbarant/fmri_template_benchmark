@@ -14,26 +14,6 @@ from sklearn.svm import LinearSVC
 from benchmark_utils.conf import N_JOBS
 
 
-def compute_groups(dataset):
-    subject_dict = dataset.dict_aligned
-    n_samples = next(iter(subject_dict.values())).shape[0]
-    groups = np.concatenate(
-        [np.repeat(i, n_samples) for i in range(len(subject_dict.keys()))]
-    )
-    return groups
-
-
-def compute_X_y(dataset):
-    dict_aligned = dataset.dict_aligned
-    X = np.vstack(
-        [dict_aligned[subject] for subject in dataset.subjects]
-    )
-    y = np.hstack(
-        [dataset.dict_y[subject] for subject in dataset.subjects]
-    )
-    return X, y
-
-
 def compute_pearson_corrs(dataset):
     """Compute the Pearson correlation between each subject and the target."""
     target = dataset.target_name
@@ -106,78 +86,59 @@ def save_weights(estimator, dataset, subject=None):
 
 
 def evaluate_task_dataset(dataset, max_iter=1000):
-    # Leave one subject out cross-validation
-    groups = compute_groups(dataset)
-    X, y = compute_X_y(dataset)
-
     svc = LinearSVC(max_iter=max_iter)
-    scores = cross_validate(
-        svc,
-        X,
-        y,
-        groups=groups,
-        cv=LeaveOneGroupOut(),
-        n_jobs=N_JOBS,
-        return_estimator=True,
+    dummy = DummyClassifier(strategy="most_frequent")
+    X_train = np.vstack(
+        [dataset.dict_aligned[sub] for sub in dataset.subjects if sub != dataset.test_sub]
     )
-    cv_scores_classif = scores["test_score"]
-    for i, estimator in enumerate(scores["estimator"]):
-        save_weights(estimator, dataset, subject=dataset.subjects[i])
-
-    avg_score = np.mean(cv_scores_classif)
-    chance_level = np.mean(
-        cross_val_score(
-            DummyClassifier(strategy="most_frequent"),
-            X,
-            y,
-            groups=groups,
-            cv=LeaveOneGroupOut(),
-            n_jobs=N_JOBS,
-        )
+    y_train = np.hstack(
+        [dataset.dict_y[sub] for sub in dataset.subjects if sub != dataset.test_sub]
     )
+    X_test = dataset.dict_aligned[dataset.test_sub]
+    y_test = dataset.dict_y[dataset.test_sub]
 
-    print(f"Average decoding accuracy: {avg_score:.2f}")
+    svc.fit(X_train, y_train)
+    dummy.fit(X_train, y_train)
+    score = svc.score(X_test, y_test)
+    chance_level = dummy.score(X_test, y_test)
+    save_weights(svc, dataset, subject=dataset.test_sub)
 
-    return avg_score, chance_level, cv_scores_classif
+    print(f"Decoding accuracy on {dataset.test_sub}: {score:.2f}")
 
-
+    return score, chance_level
 
 
 def evaluate_dataset(dataset, max_iter=1000):
     # Compute the Pearson correlations for the dataset
     # pearson_corrs = compute_pearson_corrs(dataset)
     # Evaluate the decoding performance
-    pearson_corrs = []
-    avg_score, chance_level, cv_scores_classif = evaluate_task_dataset(
+    score, chance_level = evaluate_task_dataset(
         dataset, max_iter=max_iter
     )
     # Save the results
     save_decoding_results(
         dataset,
-        avg_score,
+        score,
         chance_level,
-        cv_scores_classif,
-        pearson_corrs,
     )
 
-    # Return only the average score for benchopt
-    return avg_score
+    # Return only the classification score for benchopt
+    return score
 
 
 def save_decoding_results(
     dataset,
-    avg_score,
+    score,
     chance_level,
-    cv_scores_classif,
-    pearson_corrs,
 ):
     results_dict = {
-        "avg_score": avg_score,
+        "score": score,
+        "dataset_name": dataset.name,
         "task_name": dataset.task_name,
         "chance_level": chance_level,
-        "cv_scores_classif": cv_scores_classif,
-        "pearson_corrs": pearson_corrs,
         "time": dataset.time,
+        "test_sub": dataset.test_sub,
+        "external_template": str(dataset.external_template),
     }
     # Dump the results with joblib
     dump(results_dict, dataset.output_dir / "decoding_results.pkl")
