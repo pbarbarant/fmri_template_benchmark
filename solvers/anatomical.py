@@ -5,7 +5,7 @@ from benchopt import BaseSolver, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
-    from fmralign import GroupAlignment, PairwiseAlignment
+    from fmralign import GroupAlignment
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment
 
@@ -50,15 +50,8 @@ class Solver(BaseSolver):
             n_jobs=N_JOBS,
             verbose=11,
         )
-        pairwise_algo = PairwiseAlignment(
-            method="identity",
-            labels=self.dataset.labels,
-            n_jobs=N_JOBS,
-            verbose=11,
-        )
         self.dataset = compute_alignment(
             group_algo,
-            pairwise_algo,
             self.dataset,
             solver_name=self.name,
         )
