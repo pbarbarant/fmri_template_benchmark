@@ -37,7 +37,7 @@ class Objective(BaseObjective):
     # Minimal version of benchopt required to run this benchmark.
     # Bump it up if the benchmark depends on a new feature of benchopt.
     min_benchopt_version = "1.6"
-    
+
     def skip(self, dataset):
         # This method is called to check if the benchmark should be skipped
         # for a given dataset. If it returns True, the benchmark will not run.
@@ -55,8 +55,7 @@ class Objective(BaseObjective):
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
         self.dataset = dataset
-        print(f"Running on: {dataset.name}, test_sub: {dataset.test_sub}, "
-              f"external_template: {dataset.external_template}")
+        print(f"Running on: {dataset.name} task: {dataset.task_name}")
 
     def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
@@ -66,10 +65,7 @@ class Objective(BaseObjective):
 
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
-        print(f"Evaluating on: {dataset.name}, {dataset.task_name}")
-        score = evaluate_dataset(
-            dataset, max_iter=self.max_iter
-        )
+        score = evaluate_dataset(dataset, max_iter=self.max_iter)
 
         return dict(value=score)
 

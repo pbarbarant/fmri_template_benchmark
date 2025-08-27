@@ -38,24 +38,13 @@ def get_results_dataframe(
 
     # Remove the simulated data
     df = df[~df["dataset_name"].str.contains("Simulated")]
-    df = df[~df["dataset_name"].str.contains("Surf")]
-    df = df[~df["solver_name"].str.contains("Ridge")]
 
     # Keep only the results for the specified number of parcels
     # df = df[df["dataset_name"].str.contains(f"{n_parcels}")]
 
     # Remove parcels numbers from the dataset names
-    df["dataset_name"] = df["dataset_name"].str.replace(r"_[0-9]+$", "", regex=True)
-
-    # For anatomical keep only the template target
-    df = df[
-        ~((df["solver_name"] == "Anatomical") & (df["external_template"] == "True"))
-    ]
-    
-    # Add external template information in the solver name
-    df["solver_name"] = df.apply(
-        lambda x: f"{x['solver_name']} ({'Out-of-sample' if (x['external_template'] == 'True')  else 'In-sample'})",
-        axis=1,
+    df["dataset_name"] = df["dataset_name"].str.replace(
+        r"_[0-9]+$", "", regex=True
     )
 
     # Rename Wm by WM
@@ -67,10 +56,13 @@ def get_results_dataframe(
     # Fix underscores in the solver names
     df["solver_name"] = df["solver_name"].str.replace("_", " ")
 
+    df = df.explode("cv_scores")
+
     return df
 
 
 df = get_results_dataframe(data_path)
+
 
 # Set the style and font scale for better readability
 plt.style.use(["science", "nature", "no-latex"])
@@ -83,7 +75,7 @@ def create_accuracy_plot(data, figsize=(12, 7)):
     shifted_palette = original_palette[1:] + original_palette[:1]
     sns.barplot(
         data=data,
-        y="score",
+        y="cv_scores",
         x="task_name",
         hue="solver_name",
         ax=ax,
@@ -112,7 +104,7 @@ def create_accuracy_plot(data, figsize=(12, 7)):
             linestyles="--",
             alpha=0.5,
         )
-        
+
     ax.set_ylim(0, 1.05)
     ax.legend(title="Alignment method", title_fontsize="large")
     sns.move_legend(ax, "center left", bbox_to_anchor=(1, 0.5))
@@ -121,10 +113,12 @@ def create_accuracy_plot(data, figsize=(12, 7)):
     return fig
 
 
-
 fig = create_accuracy_plot(df, figsize=(11, 3))
 # fig1.savefig(figures_path / "boxplot_movie_accuracy.pdf", bbox_inches="tight")
-fig.savefig(figures_path / f"boxplot_task_accuracy_{N_PARCELS}.pdf", bbox_inches="tight", dpi=300)
+fig.savefig(
+    figures_path / f"boxplot_task_accuracy_{N_PARCELS}.pdf",
+    bbox_inches="tight",
+    dpi=300,
+)
 
 plt.show()
-

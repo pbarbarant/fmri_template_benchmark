@@ -24,7 +24,8 @@ SUBJECTS = [
     "sub-15",
 ]
 
-TASKS = ["Audio", "FaceBody", "Mario", "MathLanguage", "RSVPLanguage", "HcpWm"]
+TASKS = ["Audio", "FaceBody", "MathLanguage", "RSVPLanguage", "HcpWm"]
+
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
@@ -37,10 +38,8 @@ class Dataset(BaseDataset):
     requirements = []
 
     parameters = {
-        "n_parcels": [400], 
+        "n_parcels": [400],
         "task": TASKS,
-        "external_template": [True, False],
-        "test_sub": SUBJECTS,
     }
 
     def get_data(self):
@@ -51,12 +50,10 @@ class Dataset(BaseDataset):
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
         self.dataset = fetch_ibc_vol(
-            test_sub=self.test_sub,
             name=self.name + f"_{self.n_parcels}",
             subjects=SUBJECTS,
             task=self.task,
             n_parcels=self.n_parcels,
-            external_template=self.external_template,
         )
 
         return dict(dataset=self.dataset)

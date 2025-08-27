@@ -18,10 +18,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {   
-        "external_template": [True, False],
-        "test_sub": SUBJECTS,
-    }
+    parameters = {}
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -33,8 +30,6 @@ class Dataset(BaseDataset):
         self.dataset = sample_dataset(
             name=self.name,
             subjects=SUBJECTS,
-            test_sub=self.test_sub,
-            external_template=self.external_template,
         )
 
         return dict(dataset=self.dataset)
