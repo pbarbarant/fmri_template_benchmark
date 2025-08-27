@@ -1,15 +1,10 @@
-import glob
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 import h5py
 import numpy as np
-import pandas as pd
-from fmralign._utils import _intersect_clustering_mask
 from ibc_public import utils_data
-from nibabel.nifti1 import Nifti1Image
 from nilearn.datasets import (
-    load_mni152_gm_mask,
     fetch_atlas_schaefer_2018,
     fetch_atlas_surf_destrieux,
     load_fsaverage,
@@ -28,16 +23,10 @@ import nibabel as nib
 from benchmark_utils.conf import (
     IBC_PATH,
     IBC_SURF_PATH,
-    MEMORY,
     N_JOBS,
     NEUROMOD_PATH,
+    IBC_GM_MASK,
 )
-
-
-@dataclass
-class LabeledImage:
-    img: Nifti1Image | SurfaceImage
-    y: np.ndarray
 
 
 @dataclass
@@ -49,61 +38,40 @@ class Dataset:
     dict_alignment: Dict[str, np.ndarray]
     dict_decoding: Dict[str, np.ndarray]
     dict_y: Dict[str, np.ndarray]
-    test_sub: str
-    external_template: bool
     task_name: str
-    is_faulty: bool = False
+    is_faulty: bool
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
     template: Optional[np.ndarray] = None
     solver: Optional[str] = None
+    masker: Optional[MultiNiftiMasker] = None
 
 
-def load_atlas(resolution=3, n_rois=100):
-    atlas = fetch_atlas_schaefer_2018(n_rois=n_rois)
-    atlas = resample_to_img(
-        atlas.maps,
-        load_mni152_gm_mask(resolution=resolution),
-        interpolation="nearest",
-    )
-    return atlas
-
-
-def get_mask_img(resolution=3, n_rois=100):
-    atlas = load_atlas(resolution=resolution, n_rois=n_rois)
-    gm_mask = load_mni152_gm_mask(resolution=resolution)
-    mask_img = math_img("img1*img2 > 0", img1=atlas, img2=gm_mask)
-    return mask_img
-
-
-def fit_masker(resolution=3, n_rois=100, n_jobs=1):
-    mask_img = get_mask_img(resolution=resolution, n_rois=n_rois)
+def get_masker(mask_img, n_jobs=1):
     masker = MultiNiftiMasker(
         mask_img=mask_img,
         standardize=True,
         reports=False,
         n_jobs=n_jobs,
-        verbose=11,
-    ).fit()
+        verbose=1,
+    )
     return masker
 
 
 def sample_dataset(
     name: str,
     subjects: List[str],
-    test_sub: str,
-    external_template: bool = False,
 ) -> Dataset:
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
 
-    for subject in tqdm(subjects, desc="Sampling dataset"):
+    for subject in subjects:
         # Create a random alignment and decoding data for each subject
         dict_alignment[subject] = np.random.rand(100, 30)
         dict_decoding[subject] = np.random.rand(100, 30)
-        dict_y[subject] = np.random.randint(0, 2, size=100)
+        dict_y[subject] = np.array([subject] * 100)
 
     return Dataset(
         name=name,
@@ -113,82 +81,94 @@ def sample_dataset(
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        test_sub=test_sub,
-        external_template=external_template,
         task_name="simulated_task",
     )
 
 
 def fetch_ibc_vol(
-    test_sub: str,
     name: str = "IBC",
     subjects: List[str] = None,
     task: str = None,
     n_parcels: int = 400,
-    external_template: bool = False,
 ) -> Dataset:
+    n_subjects = len(subjects)
+    is_faulty = False
     df = utils_data.make_vol_db(
         derivatives=IBC_PATH,
         subject_list=subjects,
-        task_list=[task],
-        acquisition="all",
+        task_list=[
+            "ArchiStandard",
+            "ArchiSocial",
+            "ArchiSpatial",
+            "ArchiEmotional",
+        ]
+        + [task],
     )
-    # Drop rows with with ffx acquisitions
-    df = df[~df.path.str.contains("ffx")]
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
 
-    masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
-    labels = apply_mask_fmri(
-        load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
-    ).astype(int)
-    missing_subjects = []
+    # Get the masker
+    mask_img = load_img(IBC_GM_MASK)
+    schaefer_atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels).maps
+    atlas_resampled = resample_to_img(
+        schaefer_atlas, mask_img, interpolation="nearest"
+    )
+    # Intersect the mask with the parcellation
+    intersect = math_img("(img1*img2)>0", img1=atlas_resampled, img2=mask_img)
+    masker = get_masker(mask_img=intersect, n_jobs=N_JOBS)
+
+    # Get the labels
+    labels = apply_mask_fmri(atlas_resampled, intersect).astype(int)
+
+    # Get the alignment contrasts
+    alignment_contrasts_all = (
+        df[df.task.str.contains("Archi")]
+        .drop_duplicates(subset=["subject", "contrast"], keep="first")
+        .sort_values(by=["subject", "contrast"])
+        .path.tolist()
+    )
+    alignment_array_all = np.array(
+        masker.fit_transform(alignment_contrasts_all)
+    )
+    n_alignment_contrasts = len(
+        df[df.task.str.contains("Archi")].contrast.unique()
+    )
+    alignment_array_list = [
+        alignment_array_all[
+            n_alignment_contrasts * i : n_alignment_contrasts * (i + 1)
+        ]
+        for i in range(n_subjects)
+    ]
+    dict_alignment = dict(zip(subjects, alignment_array_list))
+
     for subject in tqdm(subjects, desc="Processing IBC data"):
-        try:
-            df_sub = df[(df.subject == subject)]
-            # For each contrast, keep randomly one path
-            alignment_df = df_sub.groupby(["contrast"]).apply(
-                lambda x: x.sample(1, random_state=0)
-            )
-            # Put the rest in decoding_df
-            decoding_df = df_sub[~df_sub.index.isin(alignment_df.index)]
-            dict_alignment[subject] = np.vstack(
-                masker.transform(alignment_df.path.to_list())
-            )
+        subject_decoding_df = df[
+            (df["subject"] == subject) & (df.task.str.contains(task))
+        ]
+        decoding_contrasts = subject_decoding_df.path.tolist()
+        decoding_labels = subject_decoding_df.contrast.tolist()
+        if len(decoding_contrasts) != 0:
             dict_decoding[subject] = np.vstack(
-                masker.transform(decoding_df.path.to_list())
+                masker.transform(decoding_contrasts)
             )
-            dict_y[subject] = decoding_df.contrast.to_numpy()
-        except ValueError as e:
-            print(f"Error processing subject {subject}: {e}")
-            # Pop the subject from the dictionaries if it fails
-            dict_alignment.pop(subject, None)
-            dict_decoding.pop(subject, None)
-            dict_y.pop(subject, None)
-            # Add the subject to the missing subjects list
-            missing_subjects.append(subject)
-            continue
-
-    valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
-
-    is_faulty = False
-    if test_sub not in valid_subjects:
-        print(f"Test subject {test_sub} data not found. Marking dataset as faulty.")
-        is_faulty = True
+            dict_y[subject] = np.array(decoding_labels)
+        else:
+            print(
+                f"Error processing subject {subject}, contrasts are not present"
+            )
 
     return Dataset(
         name=name,
-        subjects=valid_subjects,
-        n_subjects=len(valid_subjects),
+        subjects=list(dict_decoding.keys()),
+        n_subjects=n_subjects,
         labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        test_sub=test_sub,
-        external_template=external_template,
         task_name=task,
         is_faulty=is_faulty,
+        masker=masker,
     )
 
 
@@ -281,7 +261,9 @@ def fetch_ibc_surf(
 
     is_faulty = False
     if test_sub not in valid_subjects:
-        print(f"Test subject {test_sub} data not found. Marking dataset as faulty.")
+        print(
+            f"Test subject {test_sub} data not found. Marking dataset as faulty."
+        )
         is_faulty = True
 
     return Dataset(
@@ -316,13 +298,10 @@ def load_neuromod_labels(
 
 
 def load_neuromod_mask(data_path: Path, subject: str):
-    path = (
-        data_path
-        / (
-            f"things.glmsingle/{subject}/glmsingle/output/"
-            f"{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR"
-            "_stat-trialBetas_desc-zscore_statseries.h5"
-        )
+    path = data_path / (
+        f"things.glmsingle/{subject}/glmsingle/output/"
+        f"{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR"
+        "_stat-trialBetas_desc-zscore_statseries.h5"
     )
     h5file = h5py.File(path, "r")
     return nib.nifti1.Nifti1Image(
@@ -357,7 +336,7 @@ def fetch_neuromod(
     decoding_labels = ["cat", "dog"]
     n_contrasts = 10
 
-    masker = fit_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
+    masker = get_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
     labels = apply_mask_fmri(
         load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
     ).astype(int)
@@ -397,8 +376,6 @@ def fetch_neuromod(
             unmask(data[decoding_indices], individual_mask)
         )
         dict_y[subject] = img_labels[decoding_indices].flatten()
-
-
 
     return Dataset(
         name=name,
