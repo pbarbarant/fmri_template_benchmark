@@ -8,6 +8,7 @@ with safe_import_context() as import_ctx:
 
 SUBJECTS = ["sub-01", "sub-02", "sub-03"]
 
+
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
     # Name to select the dataset in the CLI and to display the results.
@@ -18,7 +19,9 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    parameters = {}
+    parameters = {
+        "connectivity": ["hybrid"],
+    }
 
     def get_data(self):
         # The return arguments of this function are passed as keyword arguments
@@ -28,8 +31,7 @@ class Dataset(BaseDataset):
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
         self.dataset = sample_dataset(
-            name=self.name,
-            subjects=SUBJECTS,
+            name=self.name, subjects=SUBJECTS, connectivity=self.connectivity
         )
 
         return dict(dataset=self.dataset)

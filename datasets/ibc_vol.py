@@ -9,17 +9,17 @@ with safe_import_context() as import_ctx:
     )
 
 SUBJECTS = [
-    "sub-01",
-    "sub-02",
+    # "sub-01",
+    # "sub-02",
     "sub-04",
     "sub-05",
     "sub-06",
-    "sub-07",
+    # "sub-07",
     "sub-08",
     "sub-09",
     "sub-11",
     "sub-12",
-    "sub-13",
+    # "sub-13",
     "sub-14",
     "sub-15",
 ]
@@ -40,6 +40,7 @@ class Dataset(BaseDataset):
     parameters = {
         "n_parcels": [400],
         "task": TASKS,
+        "connectivity": [None],
     }
 
     def get_data(self):
@@ -54,6 +55,7 @@ class Dataset(BaseDataset):
             subjects=SUBJECTS,
             task=self.task,
             n_parcels=self.n_parcels,
+            connectivity=self.connectivity,
         )
 
         return dict(dataset=self.dataset)

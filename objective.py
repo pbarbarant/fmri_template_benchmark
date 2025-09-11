@@ -4,7 +4,9 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
+    import numpy as np
     from benchmark_utils.decoding_utils import evaluate_dataset
+    from fmralign.embeddings.connectivity import get_connectivity_features
 
 
 # The benchmark objective must be named `Objective` and
@@ -38,14 +40,14 @@ class Objective(BaseObjective):
     # Bump it up if the benchmark depends on a new feature of benchopt.
     min_benchopt_version = "1.6"
 
-    def skip(self, dataset):
-        # This method is called to check if the benchmark should be skipped
-        # for a given dataset. If it returns True, the benchmark will not run.
-        # This can be used to skip datasets that are not compatible with the
-        # objective or that are known to be faulty.
-        if dataset.is_faulty:
-            return True, "Dataset is faulty, skipping evaluation."
-        return False, None
+    # def skip(self, dataset):
+    #     # This method is called to check if the benchmark should be skipped
+    #     # for a given dataset. If it returns True, the benchmark will not run.
+    #     # This can be used to skip datasets that are not compatible with the
+    #     # objective or that are known to be faulty.
+    #     if dataset.is_faulty:
+    #         return True, "Dataset is faulty, skipping evaluation."
+    #     return False, None
 
     def set_data(
         self,
@@ -80,4 +82,24 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
+        if self.dataset.connectivity is not None:
+            for subject in self.dataset.subjects:
+                connectivity_features = get_connectivity_features(
+                    self.dataset.dict_alignment[subject], self.dataset.labels
+                )
+                if self.dataset.connectivity == "connectivity":
+                    self.dataset.dict_alignment[subject] = (
+                        connectivity_features
+                    )
+                elif self.dataset.connectivity == "hybrid":
+                    self.dataset.dict_alignment[subject] = np.vstack(
+                        (
+                            self.dataset.dict_alignment[subject],
+                            connectivity_features,
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        f"Connectivity can either be None, 'connectivity' or 'hybrid', found {self.dataset.connectivity}"
+                    )
         return dict(dataset=self.dataset)
