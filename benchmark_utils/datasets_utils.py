@@ -9,15 +9,11 @@ from nilearn.datasets import (
     fetch_atlas_surf_destrieux,
     load_fsaverage,
 )
-from nilearn.image import (
-    load_img,
-    math_img,
-    resample_to_img,
-    concat_imgs,
-)
+from nilearn.image import load_img, math_img, resample_to_img, concat_imgs
 from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
 from nilearn.masking import apply_mask_fmri, unmask
 from nilearn.surface import PolyMesh, SurfaceImage
+from nilearn._utils.data_gen import generate_fake_fmri
 from tqdm import tqdm
 import nibabel as nib
 from benchmark_utils.conf import (
@@ -27,6 +23,7 @@ from benchmark_utils.conf import (
     NEUROMOD_PATH,
     IBC_GM_MASK,
 )
+import pandas as pd
 
 
 @dataclass
@@ -39,13 +36,54 @@ class Dataset:
     dict_decoding: Dict[str, np.ndarray]
     dict_y: Dict[str, np.ndarray]
     task_name: str
-    is_faulty: bool
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
     template: Optional[np.ndarray] = None
     solver: Optional[str] = None
     masker: Optional[MultiNiftiMasker] = None
+    connectivity: Optional[str] = None
+
+
+def sample_dataset(
+    name: str,
+    subjects: List[str],
+    connectivity: Optional[str] = None,
+) -> Dataset:
+    dict_alignment = dict()
+    dict_decoding = dict()
+    dict_y = dict()
+
+    subjects_alignment_imgs = []
+    subjects_decoding_imgs = []
+    subjects_target = []
+    for subject in subjects:
+        alignment_img, mask = generate_fake_fmri()
+        decoding_img, _, target = generate_fake_fmri(n_blocks=2)
+        subjects_alignment_imgs.append(alignment_img)
+        subjects_decoding_imgs.append(decoding_img)
+        subjects_target.append(target)
+
+    masker = get_masker(mask).fit(subjects_alignment_imgs)
+
+    for i, subject in enumerate(subjects):
+        # Create a random alignment and decoding data for each subject
+        dict_alignment[subject] = masker.transform(subjects_alignment_imgs[i])
+        dict_decoding[subject] = masker.transform(subjects_decoding_imgs[i])
+        dict_y[subject] = subjects_target[i]
+
+    return Dataset(
+        name=name,
+        subjects=list(dict_decoding.keys()),
+        n_subjects=len(subjects),
+        labels=np.ones(list(dict_alignment.values())[0].shape[1], dtype=int),
+        dict_alignment=dict_alignment,
+        dict_decoding=dict_decoding,
+        dict_y=dict_y,
+        task_name="simulated_task",
+        masker=masker,
+        connectivity=connectivity,
+    )
 
 
 def get_masker(mask_img, n_jobs=1):
@@ -59,57 +97,23 @@ def get_masker(mask_img, n_jobs=1):
     return masker
 
 
-def sample_dataset(
-    name: str,
-    subjects: List[str],
-) -> Dataset:
-    dict_alignment = dict()
-    dict_decoding = dict()
-    dict_y = dict()
-
-    for subject in subjects:
-        # Create a random alignment and decoding data for each subject
-        dict_alignment[subject] = np.random.rand(100, 30)
-        dict_decoding[subject] = np.random.rand(100, 30)
-        dict_y[subject] = np.array([subject] * 100)
-
-    return Dataset(
-        name=name,
-        subjects=subjects,
-        n_subjects=len(subjects),
-        labels=np.ones(30, dtype=int),
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        dict_y=dict_y,
-        task_name="simulated_task",
-    )
+ALIGNMENT_TASKS = [
+    "ArchiStandard",
+    "ArchiSocial",
+    "ArchiEmotional",
+    "ArchiSpatial",
+    "HcpEmotion",
+    "HcpGambling",
+    "HcpMotor",
+    "HcpLanguage",
+    "HcpRelational",
+    "HcpSocial",
+    "HcpWm",
+]
 
 
-def fetch_ibc_vol(
-    name: str = "IBC",
-    subjects: List[str] = None,
-    task: str = None,
-    n_parcels: int = 400,
-) -> Dataset:
-    n_subjects = len(subjects)
-    is_faulty = False
-    df = utils_data.make_vol_db(
-        derivatives=IBC_PATH,
-        subject_list=subjects,
-        task_list=[
-            "ArchiStandard",
-            "ArchiSocial",
-            "ArchiSpatial",
-            "ArchiEmotional",
-        ]
-        + [task],
-    )
-    dict_alignment = dict()
-    dict_decoding = dict()
-    dict_y = dict()
-
-    # Get the masker
-    mask_img = load_img(IBC_GM_MASK)
+def intersect_masker_atlas(mask_path, n_parcels):
+    mask_img = load_img(mask_path)
     schaefer_atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels).maps
     atlas_resampled = resample_to_img(
         schaefer_atlas, mask_img, interpolation="nearest"
@@ -117,58 +121,119 @@ def fetch_ibc_vol(
     # Intersect the mask with the parcellation
     intersect = math_img("(img1*img2)>0", img1=atlas_resampled, img2=mask_img)
     masker = get_masker(mask_img=intersect, n_jobs=N_JOBS)
+    return masker, intersect, atlas_resampled
 
+
+def get_labels_from_events(img_path, events_path, slice_time_ref=0.5, tr=2.0):
+    # Load the events
+    events_db = pd.read_csv(events_path, sep="\t")
+    img = nib.load(img_path)
+    n_scans = img.shape[3]
+    frametimes = np.linspace(
+        slice_time_ref, (n_scans - 1 + slice_time_ref) * tr, n_scans
+    )
+    y = np.array(["others"] * len(frametimes), dtype=str)
+
+    # Loop over events and label frametimes by trial_type
+    for _, ev in events_db.iterrows():
+        onset, duration, trial_type = (
+            ev["onset"],
+            ev["duration"],
+            ev["trial_type"],
+        )
+        in_event = (frametimes >= onset) & (frametimes < onset + duration)
+        y[in_event] = trial_type
+    return y
+
+
+def load_ibc_db_bold(task):
+    db = utils_data.data_parser(
+        IBC_PATH,
+        task_list=ALIGNMENT_TASKS,
+    )
+    db = db[db.path.str.contains("/func/") & db.path.str.contains("nii.gz")]
+    db["events"] = db["path"].apply(
+        lambda p: Path(str(p).replace("/3mm/", "/derivatives/")).with_name(
+            Path(p)
+            .name.removeprefix("wrdc")
+            .replace("_bold.nii.gz", "_events.tsv")
+        )
+    )
+    db.sort_values(by=["subject", "session", "path"])
+    return db
+
+
+def load_ibc_db_contrasts(task):
+    db = utils_data.data_parser(
+        IBC_PATH,
+        task_list=[task] + ALIGNMENT_TASKS,
+    ).sort_values(by=["subject", "task", "contrast", "path"])
+    # Keep only pa - ap acquisitions
+    db_filtered = db[
+        (db.acquisition.isin(["ap", "pa"])) & (db.contrast != "preprocessed")
+    ]
+    # Add alignment column
+    db_filtered["alignment"] = False
+    db_filtered.loc[db_filtered["task"].isin(ALIGNMENT_TASKS), "alignment"] = (
+        True
+    )
+    # Keep only one session
+    db_one_ses = db_filtered.groupby(
+        ["subject", "task", "contrast", "acquisition"], as_index=False
+    ).tail(1)
+    return db_one_ses
+
+
+def fetch_ibc_vol(
+    name: str = "IBC",
+    task: str = None,
+    n_parcels: int = 400,
+    connectivity=None,
+) -> Dataset:
+    # Get the databases
+    # db_bold = load_ibc_db_bold(task)
+    db_contrasts = load_ibc_db_contrasts(task)
+
+    # Get the subjects
+    subjects = db_contrasts[~db_contrasts.alignment].subject.unique().tolist()
+
+    # Get the masker
+    masker, intersect, atlas_resampled = intersect_masker_atlas(
+        IBC_GM_MASK, n_parcels
+    )
     # Get the labels
     labels = apply_mask_fmri(atlas_resampled, intersect).astype(int)
 
-    # Get the alignment contrasts
-    alignment_contrasts_all = (
-        df[df.task.str.contains("Archi")]
-        .drop_duplicates(subset=["subject", "contrast"], keep="first")
-        .sort_values(by=["subject", "contrast"])
-        .path.tolist()
-    )
-    alignment_array_all = np.array(
-        masker.fit_transform(alignment_contrasts_all)
-    )
-    n_alignment_contrasts = len(
-        df[df.task.str.contains("Archi")].contrast.unique()
-    )
-    alignment_array_list = [
-        alignment_array_all[
-            n_alignment_contrasts * i : n_alignment_contrasts * (i + 1)
-        ]
-        for i in range(n_subjects)
-    ]
-    dict_alignment = dict(zip(subjects, alignment_array_list))
-
-    for subject in tqdm(subjects, desc="Processing IBC data"):
-        subject_decoding_df = df[
-            (df["subject"] == subject) & (df.task.str.contains(task))
-        ]
-        decoding_contrasts = subject_decoding_df.path.tolist()
-        decoding_labels = subject_decoding_df.contrast.tolist()
-        if len(decoding_contrasts) != 0:
-            dict_decoding[subject] = np.vstack(
-                masker.transform(decoding_contrasts)
+    dict_alignment = dict()
+    dict_decoding = dict()
+    dict_y = dict()
+    for subject in subjects:
+        db_sub_decoding = db_contrasts[db_contrasts.subject == subject]
+        dict_alignment[subject] = np.vstack(
+            masker.fit_transform(
+                db_sub_decoding[db_sub_decoding.alignment].path.tolist()
             )
-            dict_y[subject] = np.array(decoding_labels)
-        else:
-            print(
-                f"Error processing subject {subject}, contrasts are not present"
+        )
+        dict_decoding[subject] = np.vstack(
+            masker.fit_transform(
+                db_sub_decoding[~db_sub_decoding.alignment].path.tolist()
             )
+        )
+        dict_y[subject] = db_sub_decoding[
+            ~db_sub_decoding.alignment
+        ].contrast.values.astype(str)
 
     return Dataset(
         name=name,
         subjects=list(dict_decoding.keys()),
-        n_subjects=n_subjects,
+        n_subjects=len(subjects),
         labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
         task_name=task,
-        is_faulty=is_faulty,
         masker=masker,
+        connectivity=connectivity,
     )
 
 
@@ -259,13 +324,6 @@ def fetch_ibc_surf(
 
     valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
 
-    is_faulty = False
-    if test_sub not in valid_subjects:
-        print(
-            f"Test subject {test_sub} data not found. Marking dataset as faulty."
-        )
-        is_faulty = True
-
     return Dataset(
         name=name,
         subjects=valid_subjects,
@@ -277,7 +335,6 @@ def fetch_ibc_surf(
         test_sub=test_sub,
         external_template=external_template,
         task_name=task,
-        is_faulty=is_faulty,
     )
 
 
