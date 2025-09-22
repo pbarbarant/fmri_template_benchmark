@@ -22,4 +22,12 @@ def compute_alignment(
 
     dataset.dict_aligned = group_algo.transform(dataset.dict_decoding)
 
+    if solver_name.lower() == "srm":
+        # Reshape arrays from (n_parcels, n_samples, n_features)
+        # to (n_samples, n_parcels * n_features)
+        dataset.dict_aligned = {
+            k: v.transpose(1, 0, 2).reshape(v.shape[1], -1)
+            for k, v in dataset.dict_aligned.items()
+        }
+
     return dataset
