@@ -49,7 +49,7 @@ class Solver(BaseSolver):
             labels=self.dataset.labels,
             n_jobs=N_JOBS,
             verbose=11,
-            n_iter=30,
+            n_iter=10,
         )
         self.dataset = compute_alignment(
             group_algo,
