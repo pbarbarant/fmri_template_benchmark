@@ -76,6 +76,7 @@ def save_decoding_results(
 ):
     results_dict = {
         "cv_scores": cv_scores.tolist(),
+        "subjects": dataset.subjects,
         "dataset_name": dataset.name,
         "task_name": dataset.task_name,
         "chance_level": chance_level,
