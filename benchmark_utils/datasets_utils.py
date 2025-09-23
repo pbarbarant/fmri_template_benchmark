@@ -149,7 +149,7 @@ def get_labels_from_events(img_path, events_path, slice_time_ref=0.5, tr=2.0):
 def load_ibc_db_bold(task):
     db = utils_data.data_parser(
         IBC_PATH,
-        task_list=ALIGNMENT_TASKS,
+        task_list=task,
     )
     db = db[db.path.str.contains("/func/") & db.path.str.contains("nii.gz")]
     db["events"] = db["path"].apply(
@@ -164,23 +164,26 @@ def load_ibc_db_bold(task):
 
 
 def load_ibc_db_contrasts(task):
+    rng = np.random.default_rng(1234)
     db = utils_data.data_parser(
         IBC_PATH,
-        task_list=[task] + ALIGNMENT_TASKS,
+        task_list=[task],
     ).sort_values(by=["subject", "task", "contrast", "path"])
     # Keep only pa - ap acquisitions
     db_filtered = db[
         (db.acquisition.isin(["ap", "pa"])) & (db.contrast != "preprocessed")
     ]
-    # Add alignment column
-    db_filtered["alignment"] = False
-    db_filtered.loc[db_filtered["task"].isin(ALIGNMENT_TASKS), "alignment"] = (
-        True
-    )
     # Keep only one session
     db_one_ses = db_filtered.groupby(
         ["subject", "task", "contrast", "acquisition"], as_index=False
     ).tail(1)
+
+    # Add alignment column
+    db_one_ses["alignment"] = False
+    # For each subject/contrast, randomly pick one run of each acquisition
+    for _, group in db_one_ses.groupby(["subject", "contrast"]):
+        chosen_idx = rng.choice(group.index)
+        db_one_ses.loc[chosen_idx, "alignment"] = True
     return db_one_ses
 
 
@@ -215,7 +218,7 @@ def fetch_ibc_vol(
             )
         )
         dict_decoding[subject] = np.vstack(
-            masker.fit_transform(
+            masker.transform(
                 db_sub_decoding[~db_sub_decoding.alignment].path.tolist()
             )
         )
