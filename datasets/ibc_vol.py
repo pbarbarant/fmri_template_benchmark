@@ -8,23 +8,19 @@ with safe_import_context() as import_ctx:
         fetch_ibc_vol,
     )
 
-SUBJECTS = [
-    # "sub-01",
-    # "sub-02",
-    "sub-04",
-    "sub-05",
-    "sub-06",
-    # "sub-07",
-    "sub-08",
-    "sub-09",
-    "sub-11",
-    "sub-12",
-    # "sub-13",
-    "sub-14",
-    "sub-15",
+TASKS = [
+    "Audio",
+    "FaceBody",
+    "MathLanguage",
+    "RSVPLanguage",
+    "HcpEmotion",
+    "HcpGambling",
+    "HcpMotor",
+    "HcpLanguage",
+    "HcpRelational",
+    "HcpSocial",
+    "HcpWm",
 ]
-
-TASKS = ["Audio", "FaceBody", "MathLanguage", "RSVPLanguage", "HcpWm"]
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -52,7 +48,6 @@ class Dataset(BaseDataset):
 
         self.dataset = fetch_ibc_vol(
             name=self.name + f"_{self.n_parcels}",
-            subjects=SUBJECTS,
             task=self.task,
             n_parcels=self.n_parcels,
             connectivity=self.connectivity,
