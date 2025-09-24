@@ -10,7 +10,7 @@ from nilearn.datasets import (
     load_fsaverage,
 )
 from nilearn.image import load_img, math_img, resample_to_img, concat_imgs
-from nilearn.maskers import MultiNiftiMasker, SurfaceMasker
+from nilearn.maskers import NiftiMasker, SurfaceMasker
 from nilearn.masking import apply_mask_fmri, unmask
 from nilearn.surface import PolyMesh, SurfaceImage
 from nilearn._utils.data_gen import generate_fake_fmri
@@ -41,7 +41,7 @@ class Dataset:
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
     template: Optional[np.ndarray] = None
     solver: Optional[str] = None
-    masker: Optional[MultiNiftiMasker] = None
+    masker: Optional[NiftiMasker] = None
     connectivity: Optional[str] = None
 
 
@@ -86,13 +86,16 @@ def sample_dataset(
     )
 
 
-def get_masker(mask_img, n_jobs=1):
-    masker = MultiNiftiMasker(
+def get_masker(mask_img, runs):
+    masker = NiftiMasker(
         mask_img=mask_img,
+        detrend=True,
         standardize=True,
         reports=False,
-        n_jobs=n_jobs,
         verbose=1,
+        smoothing_fwhm=5,
+        t_r=2,
+        runs=runs,
     )
     return masker
 
@@ -120,8 +123,7 @@ def intersect_masker_atlas(mask_path, n_parcels):
     )
     # Intersect the mask with the parcellation
     intersect = math_img("(img1*img2)>0", img1=atlas_resampled, img2=mask_img)
-    masker = get_masker(mask_img=intersect, n_jobs=N_JOBS)
-    return masker, intersect, atlas_resampled
+    return intersect, atlas_resampled
 
 
 def get_labels_from_events(img_path, events_path, slice_time_ref=0.5, tr=2.0):
@@ -149,22 +151,15 @@ def get_labels_from_events(img_path, events_path, slice_time_ref=0.5, tr=2.0):
 def load_ibc_db_bold(task):
     db = utils_data.data_parser(
         IBC_PATH,
-        task_list=task,
+        task_list=[task],
     )
     db = db[db.path.str.contains("/func/") & db.path.str.contains("nii.gz")]
-    db["events"] = db["path"].apply(
-        lambda p: Path(str(p).replace("/3mm/", "/derivatives/")).with_name(
-            Path(p)
-            .name.removeprefix("wrdc")
-            .replace("_bold.nii.gz", "_events.tsv")
-        )
-    )
     db.sort_values(by=["subject", "session", "path"])
     return db
 
 
 def load_ibc_db_contrasts(task):
-    rng = np.random.default_rng(1234)
+    # rng = np.random.default_rng(1234)
     db = utils_data.data_parser(
         IBC_PATH,
         task_list=[task],
@@ -178,12 +173,12 @@ def load_ibc_db_contrasts(task):
         ["subject", "task", "contrast", "acquisition"], as_index=False
     ).tail(1)
 
-    # Add alignment column
-    db_one_ses["alignment"] = False
-    # For each subject/contrast, randomly pick one run of each acquisition
-    for _, group in db_one_ses.groupby(["subject", "contrast"]):
-        chosen_idx = rng.choice(group.index)
-        db_one_ses.loc[chosen_idx, "alignment"] = True
+    # # Add alignment column
+    # db_one_ses["alignment"] = False
+    # # For each subject/contrast, randomly pick one run of each acquisition
+    # for _, group in db_one_ses.groupby(["subject", "contrast"]):
+    #     chosen_idx = rng.choice(group.index)
+    #     db_one_ses.loc[chosen_idx, "alignment"] = True
     return db_one_ses
 
 
@@ -194,37 +189,38 @@ def fetch_ibc_vol(
     connectivity=None,
 ) -> Dataset:
     # Get the databases
-    # db_bold = load_ibc_db_bold(task)
+    db_bold = load_ibc_db_bold(task)
     db_contrasts = load_ibc_db_contrasts(task)
 
     # Get the subjects
-    subjects = db_contrasts[~db_contrasts.alignment].subject.unique().tolist()
+    subjects = db_contrasts.subject.unique().tolist()
 
-    # Get the masker
-    masker, intersect, atlas_resampled = intersect_masker_atlas(
-        IBC_GM_MASK, n_parcels
-    )
+    # Get the mask_img
+    mask_img, atlas_resampled = intersect_masker_atlas(IBC_GM_MASK, n_parcels)
+
     # Get the labels
-    labels = apply_mask_fmri(atlas_resampled, intersect).astype(int)
+    labels = apply_mask_fmri(atlas_resampled, mask_img).astype(int)
 
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
     for subject in subjects:
+        db_sub_alignment = db_bold[db_bold.subject == subject]
         db_sub_decoding = db_contrasts[db_contrasts.subject == subject]
-        dict_alignment[subject] = np.vstack(
-            masker.fit_transform(
-                db_sub_decoding[db_sub_decoding.alignment].path.tolist()
-            )
+        runs = np.hstack(
+            [
+                i * np.ones(nib.load(path).shape[-1])
+                for i, path in enumerate(db_sub_alignment.path)
+            ]
         )
-        dict_decoding[subject] = np.vstack(
-            masker.transform(
-                db_sub_decoding[~db_sub_decoding.alignment].path.tolist()
-            )
+        masker = get_masker(mask_img, runs)
+        dict_alignment[subject] = masker.fit_transform(
+            concat_imgs(db_sub_alignment.path.tolist())
         )
-        dict_y[subject] = db_sub_decoding[
-            ~db_sub_decoding.alignment
-        ].contrast.values.astype(str)
+        dict_decoding[subject] = apply_mask_fmri(
+            db_sub_decoding.path.tolist(), mask_img
+        )
+        dict_y[subject] = db_sub_decoding.contrast.values.astype(str)
 
     return Dataset(
         name=name,
