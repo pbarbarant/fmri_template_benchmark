@@ -36,6 +36,7 @@ class Dataset:
     dict_decoding: Dict[str, np.ndarray]
     dict_y: Dict[str, np.ndarray]
     task_name: str
+    alignment_modality: str
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
@@ -48,6 +49,7 @@ class Dataset:
 def sample_dataset(
     name: str,
     subjects: List[str],
+    alignment_modality: str,
     connectivity: Optional[str] = None,
 ) -> Dataset:
     dict_alignment = dict()
@@ -64,7 +66,7 @@ def sample_dataset(
         subjects_decoding_imgs.append(decoding_img)
         subjects_target.append(target)
 
-    masker = get_masker(mask).fit(subjects_alignment_imgs)
+    masker = get_niftimasker(mask).fit(subjects_alignment_imgs)
 
     for i, subject in enumerate(subjects):
         # Create a random alignment and decoding data for each subject
@@ -82,20 +84,37 @@ def sample_dataset(
         dict_y=dict_y,
         task_name="simulated_task",
         masker=masker,
+        alignment_modality=alignment_modality,
         connectivity=connectivity,
     )
 
 
-def get_masker(mask_img, runs):
+def get_niftimasker(mask_img, runs, detrend, t_r, smoothing_fwhm):
     masker = NiftiMasker(
         mask_img=mask_img,
-        detrend=True,
+        detrend=detrend,
         standardize=True,
         reports=False,
         verbose=1,
-        smoothing_fwhm=5,
-        t_r=2,
+        smoothing_fwhm=smoothing_fwhm,
+        t_r=t_r,
         runs=runs,
+    )
+    return masker
+
+
+def get_surfacemasker(
+    mask_img, runs=None, detrend=False, t_r=None, smoothing_fwhm=None
+):
+    masker = SurfaceMasker(
+        mask_img=mask_img,
+        detrend=detrend,
+        standardize=True,
+        reports=False,
+        verbose=1,
+        smoothing_fwhm=smoothing_fwhm,
+        t_r=t_r,
+        clean_args={"runs": runs},
     )
     return masker
 
@@ -126,71 +145,87 @@ def intersect_masker_atlas(mask_path, n_parcels):
     return intersect, atlas_resampled
 
 
-def get_labels_from_events(img_path, events_path, slice_time_ref=0.5, tr=2.0):
-    # Load the events
-    events_db = pd.read_csv(events_path, sep="\t")
-    img = nib.load(img_path)
-    n_scans = img.shape[3]
-    frametimes = np.linspace(
-        slice_time_ref, (n_scans - 1 + slice_time_ref) * tr, n_scans
-    )
-    y = np.array(["others"] * len(frametimes), dtype=str)
-
-    # Loop over events and label frametimes by trial_type
-    for _, ev in events_db.iterrows():
-        onset, duration, trial_type = (
-            ev["onset"],
-            ev["duration"],
-            ev["trial_type"],
-        )
-        in_event = (frametimes >= onset) & (frametimes < onset + duration)
-        y[in_event] = trial_type
-    return y
-
-
-def load_ibc_db_bold(task):
+def load_ibc_db_bold(task, path, surf=False):
     db = utils_data.data_parser(
-        IBC_PATH,
+        path,
         task_list=[task],
     )
     db = db[db.path.str.contains("/func/") & db.path.str.contains("nii.gz")]
     db.sort_values(by=["subject", "session", "path"])
+    if surf:
+        rows = []
+        for _, row in db.iterrows():
+            for side in ["lh", "rh"]:
+                new_row = row.copy()
+                new_row["mesh"] = "fsaverage5"
+                new_row["side"] = side
+                new_row["path"] = (
+                    row["path"]
+                    .replace("/func/", "/freesurfer/")
+                    .replace("wrdcsub-", "rdcsub-")
+                    .replace("_bold.nii.gz", f"_bold_fsaverage5_{side}.gii")
+                )
+                rows.append(new_row)
+        db = pd.DataFrame(rows)
     return db
 
 
-def load_ibc_db_contrasts(task):
-    # rng = np.random.default_rng(1234)
-    db = utils_data.data_parser(
-        IBC_PATH,
+def load_ibc_db_contrasts(task, path, surf=False):
+    if surf:
+        space, extension = "fsaverage5", ".gii"
+    else:
+        space, extension = "MNI152", ".nii.gz"
+    db = utils_data.make_db(
+        path,
+        space=space,
+        extension=extension,
         task_list=[task],
-    ).sort_values(by=["subject", "task", "contrast", "path"])
+        acquisition="all",
+    )
+    # Add acquisition
+    db["acquisition"] = db["path"].str.extract(r"dir-(ap|pa)")
     # Keep only pa - ap acquisitions
-    db_filtered = db[
-        (db.acquisition.isin(["ap", "pa"])) & (db.contrast != "preprocessed")
-    ]
+    db = db[(db.acquisition.isin(["ap", "pa"]))]
     # Keep only one session
-    db_one_ses = db_filtered.groupby(
-        ["subject", "task", "contrast", "acquisition"], as_index=False
-    ).tail(1)
+    db = db[
+        db.groupby(["subject", "task"])["session"].transform("max")
+        == db["session"]
+    ]
 
-    # # Add alignment column
-    # db_one_ses["alignment"] = False
-    # # For each subject/contrast, randomly pick one run of each acquisition
-    # for _, group in db_one_ses.groupby(["subject", "contrast"]):
-    #     chosen_idx = rng.choice(group.index)
-    #     db_one_ses.loc[chosen_idx, "alignment"] = True
-    return db_one_ses
+    # Add alignment column
+    rng = np.random.default_rng(0)
+    db["alignment"] = False
+    # For each subject/contrast, randomly pick one run of each acquisition
+    if "side" in db.columns:
+        db_lh = db[db["side"] == "lh"].copy()
+        db_rh = db[db["side"] == "rh"].copy()
+
+        for (_, group_lh), (_, group_rh) in zip(
+            db_lh.groupby(["subject", "contrast"]),
+            db_rh.groupby(["subject", "contrast"]),
+        ):
+            i = rng.integers(len(group_lh.index))
+            lh_idx = group_lh.index[i]
+            rh_idx = group_rh.index[i]
+            db.loc[[lh_idx, rh_idx], "alignment"] = True
+    else:
+        for _, group in db.groupby(["subject", "contrast"]):
+            chosen_idx = rng.choice(group.index)
+            db.loc[chosen_idx, "alignment"] = True
+
+    return db.sort_values(by=["subject", "task", "contrast", "path"])
 
 
 def fetch_ibc_vol(
-    name: str = "IBC",
+    name: str = "IBC_vol",
     task: str = None,
+    alignment_modality: str = "contrast",
     n_parcels: int = 400,
     connectivity=None,
 ) -> Dataset:
     # Get the databases
-    db_bold = load_ibc_db_bold(task)
-    db_contrasts = load_ibc_db_contrasts(task)
+    db_bold = load_ibc_db_bold(task, path=IBC_PATH)
+    db_contrasts = load_ibc_db_contrasts(task, path=IBC_PATH)
 
     # Get the subjects
     subjects = db_contrasts.subject.unique().tolist()
@@ -205,22 +240,45 @@ def fetch_ibc_vol(
     dict_decoding = dict()
     dict_y = dict()
     for subject in subjects:
-        db_sub_alignment = db_bold[db_bold.subject == subject]
-        db_sub_decoding = db_contrasts[db_contrasts.subject == subject]
-        runs = np.hstack(
-            [
-                i * np.ones(nib.load(path).shape[-1])
-                for i, path in enumerate(db_sub_alignment.path)
-            ]
-        )
-        masker = get_masker(mask_img, runs)
-        dict_alignment[subject] = masker.fit_transform(
-            concat_imgs(db_sub_alignment.path.tolist())
-        )
+        # Get the contrasts for decoding
+        db_sub_decoding = db_contrasts[
+            (db_contrasts.subject == subject) & ~db_contrasts.alignment
+        ]
+        dict_y[subject] = db_sub_decoding.contrast.values.astype(str)
         dict_decoding[subject] = apply_mask_fmri(
             db_sub_decoding.path.tolist(), mask_img
         )
-        dict_y[subject] = db_sub_decoding.contrast.values.astype(str)
+
+        # Align with the bold
+        if alignment_modality == "bold":
+            db_sub_alignment = db_bold[(db_bold.subject == subject)]
+            runs = np.hstack(
+                [
+                    i * np.ones(nib.load(path).shape[-1])
+                    for i, path in enumerate(db_sub_alignment.path)
+                ]
+            )
+            masker = get_niftimasker(
+                mask_img, runs, detrend=True, t_r=2.0, smoothing_fwhm=5
+            )
+            dict_alignment[subject] = masker.fit_transform(
+                concat_imgs(db_sub_alignment.path.tolist())
+            )
+        # Align with the contrasts
+        else:
+            db_sub_alignment = db_contrasts[
+                (db_contrasts.subject == subject) & db_contrasts.alignment
+            ]
+            masker = get_niftimasker(
+                mask_img,
+                runs=None,
+                detrend=False,
+                t_r=None,
+                smoothing_fwhm=None,
+            )
+            dict_alignment[subject] = masker.fit_transform(
+                concat_imgs(db_sub_alignment.path.tolist())
+            )
 
     return Dataset(
         name=name,
@@ -233,107 +291,112 @@ def fetch_ibc_vol(
         task_name=task,
         masker=masker,
         connectivity=connectivity,
+        alignment_modality=alignment_modality,
     )
 
 
 def load_surface_img(
-    paths: List[str], mesh: PolyMesh
+    db: List[str], mesh: PolyMesh
 ) -> (
     SurfaceImage
 ):  # -> Any | SurfaceImage:# -> Any | SurfaceImage:# -> Any | SurfaceImage:
-    # Remove lh.gii and rh.gii extension
-    paths = [path[:-7] for path in paths]
-    # Remove duplicates
-    paths = list(dict.fromkeys(paths))
+    paths_lh = db[db.side == "lh"].path.tolist()
+    paths_rh = db[db.side == "rh"].path.tolist()
     surf_imgs = []
-    for path in paths:
+    for path_lh, path_rh in zip(paths_lh, paths_rh):
         surf_img = SurfaceImage(
-            mesh=mesh,
-            data={
-                "left": path + "_lh.gii",
-                "right": path + "_rh.gii",
-            },
+            mesh=mesh, data={"left": path_lh, "right": path_rh}
         )
         surf_imgs.append(surf_img)
     return concat_imgs(surf_imgs)
 
 
-def fetch_ibc_surf(
-    test_sub: str,
-    name: str = "IBC",
-    subjects: List[str] = None,
-    task: str = None,
-    external_template: bool = False,
-) -> Dataset:
-    df = utils_data.make_surf_db(
-        derivatives=IBC_SURF_PATH,
-        subject_list=subjects,
-        task_list=[task],
-        acquisition="all",
-    )
-    mesh = load_fsaverage("fsaverage5")["pial"]
+def load_labels_fs5():
     atlas = fetch_atlas_surf_destrieux()
-    labels = np.hstack(
-        [atlas["map_left"], atlas["map_right"] + atlas["map_left"].max()]
-    ).astype(int)
-    labels_img = SurfaceImage(
-        mesh=mesh,
-        data={
-            "left": atlas["map_left"],
-            "right": atlas["map_right"],
-        },
-    )
-    masker = SurfaceMasker(
-        mask_img=labels_img,
-        standardize=True,
-        reports=False,
-        verbose=11,
-    ).fit()
+    labels_lh = atlas["map_left"]
+    labels_rh = atlas["map_right"]
+    offset = labels_lh.max()
+    return np.hstack([labels_lh, offset + labels_rh])
+
+
+def fetch_ibc_surf(
+    name: str = "IBC_surf",
+    task: str = None,
+    alignment_modality: str = "contrast",
+    connectivity=None,
+) -> Dataset:
+    # Get the mesh
+    mesh = load_fsaverage("fsaverage5")["pial"]
+    # Get the databases
+    db_bold = load_ibc_db_bold(task, IBC_SURF_PATH, surf=True)
+    db_contrasts = load_ibc_db_contrasts(task, IBC_SURF_PATH, surf=True)
+
+    # Get the subjects
+    subjects = db_contrasts.subject.unique().tolist()
+
+    # Get the labels
+    labels = load_labels_fs5()
 
     dict_alignment = dict()
     dict_decoding = dict()
     dict_y = dict()
-    missing_subjects = []
-    for subject in tqdm(subjects, desc="Processing IBC data"):
-        try:
-            alignment_df = df[
-                (df.subject == subject) & (df.path.str.contains("_dir-ap"))
-            ]
-            decoding_df = df[
-                (df.subject == subject) & (df.path.str.contains("_dir-pa"))
-            ]
-            dict_alignment[subject] = masker.transform(
-                load_surface_img(alignment_df.path.to_list(), mesh)
-            )
-            dict_decoding[subject] = masker.transform(
-                load_surface_img(decoding_df.path.to_list(), mesh),
-            )
-            dict_y[subject] = decoding_df[
-                decoding_df.side == "lh"
-            ].contrast.to_numpy()
-        except TypeError as e:
-            print(f"Error processing subject {subject}: {e}")
-            # Pop the subject from the dictionaries if it fails
-            dict_alignment.pop(subject, None)
-            dict_decoding.pop(subject, None)
-            dict_y.pop(subject, None)
-            # Add the subject to the missing subjects list
-            missing_subjects.append(subject)
-            continue
+    for subject in subjects:
+        # Get the contrasts for decoding
+        db_sub_decoding = db_contrasts[
+            (db_contrasts.subject == subject) & ~db_contrasts.alignment
+        ]
+        dict_y[subject] = db_sub_decoding[
+            db_sub_decoding.side == "lh"
+        ].contrast.values.astype(str)
 
-    valid_subjects = [sub for sub in subjects if sub not in missing_subjects]
+        masker_contrasts = get_surfacemasker(mask_img=None)
+        dict_decoding[subject] = masker_contrasts.fit_transform(
+            load_surface_img(db_sub_decoding, mesh)
+        )
+
+        # Align with the bold
+        if alignment_modality == "bold":
+            db_sub_alignment = db_bold[(db_bold.subject == subject)]
+            runs = np.hstack(
+                [
+                    i * np.ones(len(nib.load(path).darrays))
+                    for i, path in enumerate(
+                        db_sub_alignment[db_sub_alignment.side == "lh"].path
+                    )
+                ]
+            )
+            masker_bold = get_surfacemasker(
+                mask_img=None,
+                runs=runs,
+                detrend=True,
+                t_r=2.0,
+                smoothing_fwhm=5,
+            )
+            dict_alignment[subject] = masker_bold.fit_transform(
+                load_surface_img(db_sub_alignment, mesh)
+            )
+
+        # Align with the contrasts
+        else:
+            db_sub_alignment = db_contrasts[
+                (db_contrasts.subject == subject) & db_contrasts.alignment
+            ]
+            dict_alignment[subject] = masker_contrasts.fit_transform(
+                load_surface_img(db_sub_alignment, mesh)
+            )
 
     return Dataset(
         name=name,
-        subjects=valid_subjects,
-        n_subjects=len(valid_subjects),
+        subjects=list(dict_decoding.keys()),
+        n_subjects=len(subjects),
         labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
-        test_sub=test_sub,
-        external_template=external_template,
         task_name=task,
+        masker=masker_contrasts,
+        connectivity=connectivity,
+        alignment_modality=alignment_modality,
     )
 
 
@@ -392,7 +455,7 @@ def fetch_neuromod(
     decoding_labels = ["cat", "dog"]
     n_contrasts = 10
 
-    masker = get_masker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
+    masker = get_niftimasker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
     labels = apply_mask_fmri(
         load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
     ).astype(int)
