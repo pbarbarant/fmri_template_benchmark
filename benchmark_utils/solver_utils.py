@@ -9,7 +9,7 @@ def compute_alignment(
     dataset: Dataset,
     solver_name: str,
 ) -> Dataset:
-    dataset.solver = solver_name
+    dataset.solver_name = solver_name
     output_dir = (
         Path("outputs") / dataset.name / dataset.task_name / solver_name
     )

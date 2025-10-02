@@ -4,9 +4,7 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    import numpy as np
     from benchmark_utils.decoding_utils import evaluate_dataset
-    from fmralign.embeddings.connectivity import get_connectivity_features
 
 
 # The benchmark objective must be named `Objective` and
@@ -67,6 +65,7 @@ class Objective(BaseObjective):
 
         # This method can return many metrics in a dictionary. One of these
         # metrics needs to be `value` for convergence detection purposes.
+        print("Running SVC")
         score = evaluate_dataset(dataset, max_iter=self.max_iter)
 
         return dict(value=score)
@@ -82,24 +81,5 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
-        if self.dataset.connectivity is not None:
-            for subject in self.dataset.subjects:
-                connectivity_features = get_connectivity_features(
-                    self.dataset.dict_alignment[subject], self.dataset.labels
-                )
-                if self.dataset.connectivity == "connectivity":
-                    self.dataset.dict_alignment[subject] = (
-                        connectivity_features
-                    )
-                elif self.dataset.connectivity == "hybrid":
-                    self.dataset.dict_alignment[subject] = np.vstack(
-                        (
-                            self.dataset.dict_alignment[subject],
-                            connectivity_features,
-                        )
-                    )
-                else:
-                    raise ValueError(
-                        f"Connectivity can either be None, 'connectivity' or 'hybrid', found {self.dataset.connectivity}"
-                    )
+
         return dict(dataset=self.dataset)
