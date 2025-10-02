@@ -43,8 +43,9 @@ def decode(dataset: Dataset, max_iter: int = 1000):
         y,
         cv=LeaveOneGroupOut(),
         groups=groups,
-        n_jobs=N_JOBS,
         return_estimator=True,
+        n_jobs=N_JOBS,
+        verbose=1,
     )
     cv_scores = scores["test_score"]
     # save_weights(scores, dataset)
