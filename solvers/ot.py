@@ -50,12 +50,11 @@ class Solver(BaseSolver):
             labels=self.dataset.labels,
             scale_template=True,
             n_jobs=N_JOBS,
-            verbose=11,
         )
         self.dataset = compute_alignment(
             group_algo,
             self.dataset,
-            solver_name=self.name + f"{self.reg}",
+            solver_name=self.name,
         )
 
     def get_result(self):
