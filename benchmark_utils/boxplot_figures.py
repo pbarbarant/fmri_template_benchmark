@@ -222,6 +222,7 @@ plt.show()
 # %% #######################################################################
 def template_vs_pairwise(data: pd.DataFrame, figsize: tuple = (14, 7)):
     data = data.copy()
+    data = data[data.target != "template_out_of_sample"]
     fig, ax = plt.subplots(figsize=figsize)
     # Use a better color palette
     palette = sns.color_palette(
@@ -334,5 +335,128 @@ def template_vs_pairwise(data: pd.DataFrame, figsize: tuple = (14, 7)):
 
 
 fig = template_vs_pairwise(df, figsize=(14, 5))
+
+plt.show()
+
+
+# %% #######################################################################
+def in_vs_out_of_sample(data: pd.DataFrame, figsize: tuple = (14, 7)):
+    data = data.copy()
+    data = data[
+        (data.target == "template_out_of_sample")
+        | (data.target == "template_in_sample")
+    ]
+    fig, ax = plt.subplots(figsize=figsize)
+    # Use a better color palette
+    palette = sns.color_palette(
+        "Set1", n_colors=len(data["solver_target"].unique())
+    )
+    # Add error bars and improve styling
+    ax = sns.barplot(
+        data=data,
+        x="task_name",
+        y="cv_scores",
+        hue="solver_target",
+        palette=palette,
+        errorbar="se",  # or "sd" for standard deviation
+        capsize=0.1,
+        alpha=0.85,
+        edgecolor="black",
+        linewidth=0.5,
+    )
+
+    # Add hatching to Anatomical bars - iterate through all bars
+    # Get the order of solvers as they appear in the legend
+    _, labels = ax.get_legend_handles_labels()
+
+    anatomical_idx = labels.index("Anatomical")
+
+    # Iterate through containers (each container is one hue/solver)
+    for container_idx, container in enumerate(ax.containers):
+        if container_idx == anatomical_idx:
+            for bar in container:
+                bar.set_hatch("///")
+
+    ax.set_xlabel("Task", fontsize=12, fontweight="bold")
+    ax.set_ylabel("Accuracy", fontsize=12, fontweight="bold")
+    ax.set_ylim(0, 1.05)
+    ax.tick_params(axis="x", rotation=0, labelsize=10)
+    ax.tick_params(axis="y", labelsize=10)
+
+    # Improve legend with hatching for Anatomical
+    legend = ax.legend(
+        title="Alignment method",
+        title_fontsize=11,
+        fontsize=10,
+        frameon=False,
+        shadow=False,
+        loc="best",  # anchor point of legend relative to bbox
+        bbox_to_anchor=(1.02, 1),  # place it just outside on the right
+    )
+
+    # Add hatching to Anatomical legend entry
+    for patch, label in zip(legend.get_patches(), legend.get_texts()):
+        if label.get_text() == "Anatomical (Pai)":
+            patch.set_hatch("///")
+
+    # Add chance levels
+    for i, task in enumerate(data["task_name"].unique()):
+        chance = data[data["task_name"] == task]["chance_level"].iloc[0]
+        ax.hlines(
+            chance,
+            i - 0.4,
+            i + 0.4,
+            colors="k",
+            linestyles="--",
+            alpha=0.7,
+            linewidth=2,
+            label="Chance level" if i == 0 else "",
+        )
+
+    # Add horizontal gridlines
+    ax.yaxis.grid(True, linestyle=":", alpha=0.7)
+    ax.set_axisbelow(True)
+
+    # Statistical annotations
+    from itertools import combinations
+
+    pairs = []
+
+    for task in data["task_name"].unique():
+        for solver in data["solver_name"].unique():
+            flavors = data.loc[
+                (data["task_name"] == task) & (data["solver_name"] == solver),
+                "solver_target",
+            ].unique()
+            if len(flavors) < 2:
+                continue  # need at least 2 flavors to form a pair
+            pairs.extend(
+                [
+                    ((task, f1), (task, f2))
+                    for f1, f2 in combinations(flavors, 2)
+                ]
+            )
+
+    annotator = Annotator(
+        ax,
+        pairs=pairs,
+        data=data,
+        x="task_name",
+        y="cv_scores",
+        hue="solver_target",
+    )
+    annotator.configure(
+        test="Wilcoxon",
+        text_format="star",
+        loc="inside",
+        verbose=0,
+    )
+    annotator.apply_and_annotate()
+
+    plt.tight_layout()
+    return fig
+
+
+fig = in_vs_out_of_sample(df, figsize=(14, 5))
 
 plt.show()
