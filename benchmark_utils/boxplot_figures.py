@@ -226,8 +226,9 @@ def template_vs_pairwise(data: pd.DataFrame, figsize: tuple = (14, 7)):
     fig, ax = plt.subplots(figsize=figsize)
     # Use a better color palette
     palette = sns.color_palette(
-        "Set1", n_colors=len(data["solver_target"].unique())
+        "tab20", n_colors=len(data["solver_target"].unique())
     )
+    palette = palette[1:] + palette[:1]
     # Add error bars and improve styling
     ax = sns.barplot(
         data=data,
@@ -349,8 +350,9 @@ def in_vs_out_of_sample(data: pd.DataFrame, figsize: tuple = (14, 7)):
     fig, ax = plt.subplots(figsize=figsize)
     # Use a better color palette
     palette = sns.color_palette(
-        "Set1", n_colors=len(data["solver_target"].unique())
+        "tab20", n_colors=len(data["solver_target"].unique())
     )
+    palette = palette[1:] + palette[:1]
     # Add error bars and improve styling
     ax = sns.barplot(
         data=data,
