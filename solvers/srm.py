@@ -28,6 +28,15 @@ class Solver(BaseSolver):
 
     stopping_criterion = SingleRunCriterion()
 
+    def skip(self, dataset):
+        # Skip in the case of SRM / external template
+        if dataset.target == "template_out_of_sample":
+            return (
+                True,
+                "SRM does not support alignment to an external template",
+            )
+        return False, None
+
     def set_objective(
         self,
         dataset,

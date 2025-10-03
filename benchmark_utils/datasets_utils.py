@@ -31,6 +31,7 @@ class Dataset:
     dict_decoding: Dict[str, np.ndarray]
     dict_y: Dict[str, np.ndarray]
     task_name: str
+    target: str
     output_dir: Optional[Path] = None
     time: Optional[float] = None
     dict_aligned: Optional[Dict[str, np.ndarray]] = None
@@ -42,6 +43,7 @@ class Dataset:
 def sample_dataset(
     name: str,
     subjects: List[str],
+    target: str,
 ) -> Dataset:
     dict_alignment = dict()
     dict_decoding = dict()
@@ -52,10 +54,10 @@ def sample_dataset(
     subjects_target = []
     for subject in subjects:
         alignment_img, mask = generate_fake_fmri()
-        decoding_img, _, target = generate_fake_fmri(n_blocks=2)
+        decoding_img, _, y = generate_fake_fmri(n_blocks=2)
         subjects_alignment_imgs.append(alignment_img)
         subjects_decoding_imgs.append(decoding_img)
-        subjects_target.append(target)
+        subjects_target.append(y)
 
     masker = NiftiMasker(mask).fit()
 
@@ -65,16 +67,21 @@ def sample_dataset(
         dict_decoding[subject] = masker.transform(subjects_decoding_imgs[i])
         dict_y[subject] = subjects_target[i]
 
+    n_voxels = list(dict_alignment.values())[0].shape[1]
+    labels = np.hstack(
+        [np.ones(n_voxels // 2), 2 * np.ones(n_voxels - n_voxels // 2)]
+    ).astype(int)
     return Dataset(
         name=name,
         subjects=list(dict_decoding.keys()),
         n_subjects=len(subjects),
-        labels=np.ones(list(dict_alignment.values())[0].shape[1], dtype=int),
+        labels=labels,
         dict_alignment=dict_alignment,
         dict_decoding=dict_decoding,
         dict_y=dict_y,
         task_name="simulated_task",
         masker=masker,
+        target=target,
     )
 
 
@@ -116,12 +123,13 @@ def parse_subjects(data_path: Path) -> List[str]:
 
 def fetch_dataset(
     name: str,
+    subjects: List[str],
+    target: str,
     data_path: Path,
     task: str,
     n_parcels: int = 400,
 ) -> Dataset:
     # Get the subjects
-    subjects = parse_subjects(data_path)
 
     # Get the mask_img
     mask_img, atlas_resampled = intersect_masker_atlas(IBC_GM_MASK, n_parcels)
@@ -165,6 +173,7 @@ def fetch_dataset(
         dict_decoding=dict_decoding,
         dict_y=dict_y,
         task_name=task,
+        target=target,
         masker=masker,
     )
 

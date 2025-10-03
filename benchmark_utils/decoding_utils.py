@@ -29,28 +29,55 @@ def save_weights(scores: dict, dataset: Dataset):
 
 def decode(dataset: Dataset, max_iter: int = 1000):
     svc = LinearSVC(max_iter=max_iter)
-    X = np.vstack([dataset.dict_aligned[sub] for sub in dataset.subjects])
-    y = np.hstack([dataset.dict_y[sub] for sub in dataset.subjects])
-    groups = np.concatenate(
-        [
-            [i] * len(dataset.dict_y[sub])
-            for i, sub in enumerate(dataset.subjects)
-        ]
-    )
-    scores = cross_validate(
-        svc,
-        X,
-        y,
-        cv=LeaveOneGroupOut(),
-        groups=groups,
-        return_estimator=True,
-        n_jobs=N_JOBS,
-        verbose=1,
-    )
-    cv_scores = scores["test_score"]
-    # save_weights(scores, dataset)
-    print(f"Average decoding accuracy: {np.mean(cv_scores):.2f}")
-    chance_level = 1 / len(np.unique(y))
+    # Cross decoding in the case of the template
+    if (
+        dataset.target == "template_in_sample"
+        or dataset.target == "template_out_of_sample"
+    ):
+        X = np.vstack([dataset.dict_aligned[sub] for sub in dataset.subjects])
+        y = np.hstack([dataset.dict_y[sub] for sub in dataset.subjects])
+        groups = np.concatenate(
+            [
+                [i] * len(dataset.dict_y[sub])
+                for i, sub in enumerate(dataset.subjects)
+            ]
+        )
+        scores = cross_validate(
+            svc,
+            X,
+            y,
+            cv=LeaveOneGroupOut(),
+            groups=groups,
+            return_estimator=True,
+            n_jobs=N_JOBS,
+            verbose=1,
+        )
+        cv_scores = scores["test_score"].tolist()
+        chance_level = 1 / len(np.unique(y))
+        # save_weights(scores, dataset)
+        print(f"Average decoding accuracy: {np.mean(cv_scores):.2f}")
+    # Decode the target in the pairwise case
+    else:
+        X_train = np.vstack(
+            [
+                dataset.dict_aligned[sub]
+                for sub in dataset.subjects
+                if sub != dataset.target
+            ]
+        )
+        y_train = np.hstack(
+            [
+                dataset.dict_y[sub]
+                for sub in dataset.subjects
+                if sub != dataset.target
+            ]
+        )
+        X_test = dataset.dict_aligned[dataset.target]
+        y_test = dataset.dict_y[dataset.target]
+        svc.fit(X_train, y_train)
+        cv_scores = [svc.score(X_test, y_test)]
+        chance_level = 1 / len(np.unique(y_test))
+        print(f"Decoding accuracy on {dataset.target} : {cv_scores[0]:.2f}")
     return cv_scores, chance_level
 
 
@@ -66,7 +93,7 @@ def evaluate_dataset(dataset: Dataset, max_iter=1000):
         chance_level,
     )
 
-    # Return only the classification score for benchopt
+    # Return only the average score for benchopt
     return np.mean(cv_scores)
 
 
@@ -76,12 +103,12 @@ def save_decoding_results(
     chance_level: float,
 ):
     results_dict = {
-        "cv_scores": cv_scores.tolist(),
-        "subjects": dataset.subjects,
+        "cv_scores": cv_scores,
         "dataset_name": dataset.name,
         "task_name": dataset.task_name,
         "chance_level": chance_level,
         "time": dataset.time,
+        "target": dataset.target,
     }
     # Dump the results with joblib
     dump(results_dict, dataset.output_dir / "decoding_results.pkl")
