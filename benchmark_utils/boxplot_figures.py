@@ -18,6 +18,7 @@ figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 N_PARCELS = 400
+FIGSIZE = (7, 6)
 
 
 def get_results_dataframe(data_path: Path, n_parcels=400) -> pd.DataFrame:
@@ -100,10 +101,13 @@ def get_results_dataframe(data_path: Path, n_parcels=400) -> pd.DataFrame:
 
     # --- Append number of subjects to task_name based on Anatomical solver ---
     anat_counts = (
-        df_anat.groupby("task_name")["dataset_name"].nunique().to_dict()
+        df[df.solver_target == "Anatomical"]
+        .groupby("task_name")["task_name"]
+        .count()
+        .to_dict()
     )
     df["task_name"] = df["task_name"].apply(
-        lambda x: f"{x} ({anat_counts.get(x, 0)} subj)"
+        lambda x: f"{x} (N={anat_counts.get(x, 0)})"
     )
 
     return df.sort_values(["task_name", "solver_target"])
@@ -122,7 +126,7 @@ for i, color in enumerate(palette):
         result.append(color)
 palette = result
 dict_palette = {k: v for k, v in zip(solvers_keys, palette)}
-# %%
+
 # Set the style and font scale for better readability
 sns.set_context("paper")
 
@@ -221,6 +225,7 @@ def anat_vs_template(
         test="Wilcoxon",
         text_format="star",
         loc="inside",
+        hide_non_significant=True,
         verbose=0,
     )
     annotator.apply_and_annotate()
@@ -230,7 +235,7 @@ def anat_vs_template(
     return fig
 
 
-fig = anat_vs_template(df, palette=dict_palette, figsize=(7, 5))
+fig = anat_vs_template(df, palette=dict_palette, figsize=FIGSIZE)
 fig.savefig(
     figures_path / f"boxplot_task_accuracy_{N_PARCELS}.pdf",
     bbox_inches="tight",
@@ -240,7 +245,7 @@ fig.savefig(
 plt.show()
 
 
-# %% #######################################################################
+########################################################################
 def template_vs_pairwise(
     data: pd.DataFrame, palette: dict, figsize: tuple = (14, 7)
 ):
@@ -343,7 +348,7 @@ def template_vs_pairwise(
     return fig
 
 
-fig = template_vs_pairwise(df, palette=dict_palette, figsize=(7, 5))
+fig = template_vs_pairwise(df, palette=dict_palette, figsize=FIGSIZE)
 fig.savefig(
     figures_path / f"template_vs_pairwise_{N_PARCELS}.pdf",
     bbox_inches="tight",
@@ -353,7 +358,7 @@ fig.savefig(
 plt.show()
 
 
-# %% #######################################################################
+########################################################################
 def in_vs_out_of_sample(
     data: pd.DataFrame, palette: dict, figsize: tuple = (14, 7)
 ):
@@ -458,7 +463,6 @@ def in_vs_out_of_sample(
         text_format="star",
         loc="inside",
         verbose=0,
-        # hide_non_significant=True,
     )
     annotator.apply_and_annotate()
     sns.despine(left=True)
@@ -466,7 +470,7 @@ def in_vs_out_of_sample(
     return fig
 
 
-fig = in_vs_out_of_sample(df, palette=dict_palette, figsize=(7, 5))
+fig = in_vs_out_of_sample(df, palette=dict_palette, figsize=FIGSIZE)
 fig.savefig(
     figures_path / f"in_vs_out_of_sample_{N_PARCELS}.pdf",
     bbox_inches="tight",
