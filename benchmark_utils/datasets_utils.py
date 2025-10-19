@@ -1,22 +1,18 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
-import h5py
 import numpy as np
 from nilearn.datasets import (
     fetch_atlas_schaefer_2018,
+    load_mni152_gm_mask,
 )
 from nilearn.image import load_img, math_img, resample_to_img
 from nilearn.maskers import NiftiMasker
-from nilearn.masking import apply_mask_fmri, unmask
+from nilearn.masking import apply_mask_fmri
 from nilearn._utils.data_gen import generate_fake_fmri
 from tqdm import tqdm
-import nibabel as nib
-from benchmark_utils.conf import (
-    N_JOBS,
-    NEUROMOD_PATH,
-    IBC_GM_MASK,
-)
+from benchmark_utils.conf import IBC_GM_MASK
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -101,7 +97,10 @@ ALIGNMENT_TASKS = [
 
 
 def intersect_masker_atlas(mask_path, n_parcels):
-    mask_img = load_img(mask_path)
+    if mask_path is str:
+        mask_img = load_img(mask_path)
+    else:
+        mask_img = mask_path
     schaefer_atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels).maps
     atlas_resampled = resample_to_img(
         schaefer_atlas,
@@ -129,10 +128,12 @@ def fetch_dataset(
     task: str,
     n_parcels: int = 400,
 ) -> Dataset:
-    # Get the subjects
-
     # Get the mask_img
-    mask_img, atlas_resampled = intersect_masker_atlas(IBC_GM_MASK, n_parcels)
+    if "Neuromod" in name:
+        mask_path = load_mni152_gm_mask(3)
+    else:
+        mask_path = IBC_GM_MASK
+    mask_img, atlas_resampled = intersect_masker_atlas(mask_path, n_parcels)
 
     # Get the labels
     labels = apply_mask_fmri(atlas_resampled, mask_img).astype(int)
@@ -175,114 +176,4 @@ def fetch_dataset(
         task_name=task,
         target=target,
         masker=masker,
-    )
-
-
-def load_neuromod_labels(
-    data_path: Path,
-    subject: str,
-):
-    image_labels = np.load(
-        f"{str(data_path)}/things.glmsingle/{subject}/descriptive/"
-        f"{subject}_task-things_desc-perTrial_labels.npy",
-        allow_pickle=True,
-    )
-    y = image_labels.copy()
-    for i in range(image_labels.shape[0]):
-        y[i] = str(image_labels[i])[:-4]
-
-    return y
-
-
-def load_neuromod_mask(data_path: Path, subject: str):
-    path = data_path / (
-        f"things.glmsingle/{subject}/glmsingle/output/"
-        f"{subject}_task-things_space-T1w_model-fitHrfGLMdenoiseRR"
-        "_stat-trialBetas_desc-zscore_statseries.h5"
-    )
-    h5file = h5py.File(path, "r")
-    return nib.nifti1.Nifti1Image(
-        np.array(h5file["mask_array"]), affine=np.array(h5file["mask_affine"])
-    )
-
-
-def load_neuromod_data(
-    data_path: Path,
-    subject: str,
-):
-    path = data_path / (
-        "things.glmsingle/"
-        f"{subject}/descriptive/"
-        f"{subject}_task-things_space-T1w_stat-betas_desc-perTrial_"
-        "statseries.npy"
-    )
-    # Memory-map the array to avoid loading the full file into memory
-    return np.load(path, mmap_mode="r").astype(np.float32)
-
-
-def fetch_neuromod(
-    test_sub: str,
-    name: str = "Neuromod",
-    subjects: List[str] = None,
-    task: str = "THINGS",
-    n_parcels: int = 400,
-    external_template: bool = False,
-):
-    data_path = Path(NEUROMOD_PATH)
-    alignment_labels = ["cat", "dog"]
-    decoding_labels = ["cat", "dog"]
-    n_contrasts = 10
-
-    masker = get_niftimasker(resolution=3, n_rois=n_parcels, n_jobs=N_JOBS)
-    labels = apply_mask_fmri(
-        load_atlas(resolution=3, n_rois=n_parcels), masker.mask_img_
-    ).astype(int)
-
-    dict_alignment = dict()
-    dict_decoding = dict()
-    dict_y = dict()
-    for subject in tqdm(subjects, desc="Processing Neuromod data"):
-        individual_mask = load_neuromod_mask(
-            data_path=data_path,
-            subject=subject,
-        )
-        data = load_neuromod_data(
-            data_path=data_path,
-            subject=subject,
-        )
-        img_labels = load_neuromod_labels(
-            data_path=data_path,
-            subject=subject,
-        )
-        alignment_indices = np.hstack(
-            [
-                np.where(img_labels == lbl)[0][:n_contrasts]
-                for lbl in alignment_labels
-            ]
-        )
-        decoding_indices = np.hstack(
-            [
-                np.where(img_labels == lbl)[0][:n_contrasts]
-                for lbl in decoding_labels
-            ]
-        )
-        dict_alignment[subject] = masker.transform(
-            unmask(data[alignment_indices], individual_mask)
-        )
-        dict_decoding[subject] = masker.transform(
-            unmask(data[decoding_indices], individual_mask)
-        )
-        dict_y[subject] = img_labels[decoding_indices].flatten()
-
-    return Dataset(
-        name=name,
-        subjects=subjects,
-        n_subjects=len(subjects),
-        labels=labels,
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        dict_y=dict_y,
-        test_sub=test_sub,
-        external_template=external_template,
-        task_name=task,
     )
