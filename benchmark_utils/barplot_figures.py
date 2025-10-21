@@ -173,13 +173,13 @@ def add_statistical_annotations(
     annotator.apply_and_annotate()
 
 
-def create_barplot(data: pd.DataFrame, palette: dict):
+def create_barplot(data: pd.DataFrame, palette: dict, y: str = "cv_scores"):
     """Create a styled barplot."""
     fig, ax = plt.subplots()
     sns.barplot(
         data=data,
         x="task_name",
-        y="cv_scores",
+        y=y,
         hue="solver_target",
         palette=palette,
         errorbar="se",
@@ -297,6 +297,54 @@ def in_vs_out_of_sample(
     return fig
 
 
+def time_comparison(
+    data: pd.DataFrame,
+    palette: dict,
+):
+    """Compare times for in-sample template alignment."""
+    data = data[data.target == "template_in_sample"].copy()
+    fig, ax = create_barplot(data, palette, y="time")
+
+    # Add hatching to Anatomical bars
+    _, labels = ax.get_legend_handles_labels()
+    anatomical_idx = labels.index("Anatomical")
+    for container_idx, container in enumerate(ax.containers):
+        if container_idx == anatomical_idx:
+            for bar in container:
+                bar.set_hatch("///")
+
+    ax.set_xlabel("Task (N subjects)", fontsize=12, fontweight="bold")
+    ax.set_ylabel("Time (s)", fontsize=12, fontweight="bold")
+    ax.set_ylim(0, 180)
+    ax.tick_params(axis="x", rotation=30, labelsize=10)
+    ax.tick_params(axis="y", labelsize=10)
+
+    # Add gridlines
+    ax.yaxis.grid(True, linestyle=":", alpha=0.7)
+    ax.set_axisbelow(True)
+
+    # Add legend
+    ax.legend(
+        title="Alignment method",
+        title_fontsize=11,
+        fontsize=10,
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.4),
+        ncol=3,
+    )
+
+    # Add hatching to legend
+    legend = ax.get_legend()
+    for patch, label in zip(legend.get_patches(), legend.get_texts()):
+        if label.get_text() == "Anatomical":
+            patch.set_hatch("///")
+
+    plt.tight_layout()
+    sns.despine(left=True)
+    return fig
+
+
 # Main execution
 df = get_results_dataframe(data_path, n_parcels=N_PARCELS)
 dict_palette = create_palette(df)
@@ -306,11 +354,10 @@ plots = [
     (anat_vs_template, f"boxplot_task_accuracy_{N_PARCELS}.pdf"),
     (template_vs_pairwise, f"template_vs_pairwise_{N_PARCELS}.pdf"),
     (in_vs_out_of_sample, f"in_vs_out_of_sample_{N_PARCELS}.pdf"),
+    (time_comparison, f"time_comparison_{N_PARCELS}.pdf"),
 ]
 
 for plot_func, filename in plots:
     fig = plot_func(df, palette=dict_palette)
-    fig.savefig(figures_path / filename, bbox_inches="tight")
+    # fig.savefig(figures_path / filename, bbox_inches="tight")
     plt.show()
-
-# %%
