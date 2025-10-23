@@ -8,22 +8,16 @@ from benchmark_utils.datasets_utils import Dataset
 
 
 def save_weights(scores: dict, dataset: Dataset):
-    for subject in dataset.subjects:
-        # Locate the subject index in all estimators.classes_
-        map_indices = [
-            estimator.classes_.tolist().index(subject)
-            for estimator in scores["estimator"]
-        ]
-        # Extract the corresponding weights for the subject
-        weights = np.mean(
-            [
-                estimator.coef_[index]
-                for estimator, index in zip(scores["estimator"], map_indices)
-            ],
-            axis=0,
-        )
-        dataset.masker.inverse_transform(weights).to_filename(
-            dataset.output_dir / f"{subject}_weights.nii.gz"
+    estimators = scores["estimator"]
+    classes_ = estimators[0].classes_
+    coefs_aggregated = np.mean(
+        np.stack([estimator.coef_ for estimator in estimators]),
+        axis=0,
+    )
+
+    for i, class_ in enumerate(classes_):
+        dataset.masker.inverse_transform(coefs_aggregated[i]).to_filename(
+            dataset.output_dir / f"coefs_{class_}.nii.gz"
         )
 
 
@@ -54,7 +48,8 @@ def decode(dataset: Dataset, max_iter: int = 1000):
         )
         cv_scores = scores["test_score"].tolist()
         chance_level = 1 / len(np.unique(y))
-        # save_weights(scores, dataset)
+        if dataset.solver_name.lower() != "srm":
+            save_weights(scores, dataset)
         print(f"Average decoding accuracy: {np.mean(cv_scores):.2f}")
     # Decode the target in the pairwise case
     else:
