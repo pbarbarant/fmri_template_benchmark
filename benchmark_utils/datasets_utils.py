@@ -36,6 +36,12 @@ class Dataset:
     masker: Optional[NiftiMasker] = None
 
 
+def parse_subjects(data_path: Path) -> List[str]:
+    niftis = sorted(data_path.glob("*.nii.gz"))
+    subjects = [f.name[:-7] for f in niftis]
+    return subjects
+
+
 def sample_dataset(
     name: str,
     subjects: List[str],
@@ -81,26 +87,7 @@ def sample_dataset(
     )
 
 
-ALIGNMENT_TASKS = [
-    "ArchiStandard",
-    "ArchiSocial",
-    "ArchiEmotional",
-    "ArchiSpatial",
-    "HcpEmotion",
-    "HcpGambling",
-    "HcpMotor",
-    "HcpLanguage",
-    "HcpRelational",
-    "HcpSocial",
-    "HcpWm",
-]
-
-
-def intersect_masker_atlas(mask_path, n_parcels):
-    if mask_path is str:
-        mask_img = load_img(mask_path)
-    else:
-        mask_img = mask_path
+def intersect_masker_atlas(mask_img, n_parcels):
     schaefer_atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels).maps
     atlas_resampled = resample_to_img(
         schaefer_atlas,
@@ -114,12 +101,6 @@ def intersect_masker_atlas(mask_path, n_parcels):
     return intersect, atlas_resampled
 
 
-def parse_subjects(data_path: Path) -> List[str]:
-    niftis = sorted(data_path.glob("*.nii.gz"))
-    subjects = [f.name[:-7] for f in niftis]
-    return subjects
-
-
 def fetch_dataset(
     name: str,
     subjects: List[str],
@@ -130,10 +111,10 @@ def fetch_dataset(
 ) -> Dataset:
     # Get the mask_img
     if "Neuromod" in name:
-        mask_path = load_mni152_gm_mask(3)
+        mask_img = load_mni152_gm_mask(3)
     else:
-        mask_path = IBC_GM_MASK
-    mask_img, atlas_resampled = intersect_masker_atlas(mask_path, n_parcels)
+        mask_img = load_img(IBC_GM_MASK)
+    mask_img, atlas_resampled = intersect_masker_atlas(mask_img, n_parcels)
 
     # Get the labels
     labels = apply_mask_fmri(atlas_resampled, mask_img).astype(int)
