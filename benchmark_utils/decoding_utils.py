@@ -2,12 +2,14 @@ import numpy as np
 from joblib import dump
 from sklearn.model_selection import cross_validate, LeaveOneGroupOut
 from sklearn.svm import LinearSVC
-
+from typing import List
 from benchmark_utils.conf import N_JOBS
-from benchmark_utils.datasets_utils import Dataset
+from benchmark_utils.datasets_utils import Dataset, Fold
+from nilearn.maskers import NiftiMasker
+from pathlib import Path
 
 
-def save_weights(scores: dict, dataset: Dataset):
+def save_weights(scores: dict, masker: NiftiMasker, output_dir: Path):
     estimators = scores["estimator"]
     classes_ = estimators[0].classes_
     coefs_aggregated = np.mean(
@@ -16,25 +18,27 @@ def save_weights(scores: dict, dataset: Dataset):
     )
 
     for i, class_ in enumerate(classes_):
-        dataset.masker.inverse_transform(coefs_aggregated[i]).to_filename(
-            dataset.output_dir / f"coefs_{class_}.nii.gz"
+        masker.inverse_transform(coefs_aggregated[i]).to_filename(
+            output_dir / f"coefs_{class_}.nii.gz"
         )
 
 
-def decode(dataset: Dataset, max_iter: int = 1000):
+def decode_one_fold(
+    fold: Fold,
+    subjects: List[str],
+    target: str,
+    solver_name: str,
+    masker: NiftiMasker,
+    output_dir: Path,
+    max_iter: int = 1000,
+):
     svc = LinearSVC(max_iter=max_iter)
     # Cross decoding in the case of the template
-    if (
-        dataset.target == "template_in_sample"
-        or dataset.target == "template_out_of_sample"
-    ):
-        X = np.vstack([dataset.dict_aligned[sub] for sub in dataset.subjects])
-        y = np.hstack([dataset.dict_y[sub] for sub in dataset.subjects])
+    if target == "template_in_sample" or target == "template_out_of_sample":
+        X = np.vstack([fold.dict_aligned[sub] for sub in subjects])
+        y = np.hstack([fold.dict_y[sub] for sub in subjects])
         groups = np.concatenate(
-            [
-                [i] * len(dataset.dict_y[sub])
-                for i, sub in enumerate(dataset.subjects)
-            ]
+            [[i] * len(fold.dict_y[sub]) for i, sub in enumerate(subjects)]
         )
         scores = cross_validate(
             svc,
@@ -48,31 +52,23 @@ def decode(dataset: Dataset, max_iter: int = 1000):
         )
         cv_scores = scores["test_score"].tolist()
         chance_level = 1 / len(np.unique(y))
-        if dataset.solver_name.lower() != "srm":
-            save_weights(scores, dataset)
+        if solver_name.lower() != "srm":
+            save_weights(scores, masker, output_dir)
         print(f"Average decoding accuracy: {np.mean(cv_scores):.2f}")
     # Decode the target in the pairwise case
     else:
         X_train = np.vstack(
-            [
-                dataset.dict_aligned[sub]
-                for sub in dataset.subjects
-                if sub != dataset.target
-            ]
+            [fold.dict_aligned[sub] for sub in subjects if sub != target]
         )
         y_train = np.hstack(
-            [
-                dataset.dict_y[sub]
-                for sub in dataset.subjects
-                if sub != dataset.target
-            ]
+            [fold.dict_y[sub] for sub in subjects if sub != target]
         )
-        X_test = dataset.dict_aligned[dataset.target]
-        y_test = dataset.dict_y[dataset.target]
+        X_test = fold.dict_aligned[target]
+        y_test = fold.dict_y[target]
         svc.fit(X_train, y_train)
         cv_scores = [svc.score(X_test, y_test)]
         chance_level = 1 / len(np.unique(y_test))
-        print(f"Decoding accuracy on {dataset.target} : {cv_scores[0]:.2f}")
+        print(f"Decoding accuracy on {target} : {cv_scores[0]:.2f}")
     return cv_scores, chance_level
 
 
@@ -80,31 +76,37 @@ def evaluate_dataset(dataset: Dataset, max_iter=1000):
     # Compute the Pearson correlations for the dataset
     # pearson_corrs = compute_pearson_corrs(dataset)
     # Evaluate the decoding performance
-    cv_scores, chance_level = decode(dataset, max_iter=max_iter)
-    # Save the results
-    save_decoding_results(
-        dataset,
-        cv_scores,
-        chance_level,
-    )
+    all_scores = []
+    for fold in dataset.folds:
+        fold_output_dir = dataset.output_dir / f"fold_{fold.index}"
+        fold_output_dir.mkdir(parents=True, exist_ok=True)
+        cv_scores, chance_level = decode_one_fold(
+            fold,
+            subjects=dataset.subjects,
+            target=dataset.target,
+            solver_name=dataset.solver_name,
+            masker=dataset.masker,
+            output_dir=fold_output_dir,
+            max_iter=max_iter,
+        )
+        all_scores.extend(cv_scores)
+        # Save the results
+        results_dict = {
+            "cv_scores": cv_scores,
+            "dataset_name": dataset.name,
+            "task_name": dataset.task_name,
+            "chance_level": chance_level,
+            "time": fold.time,
+            "target": dataset.target,
+            "fold": fold.index,
+            "solver_name": dataset.solver_name,
+            "subject": dataset.subjects
+            if len(cv_scores) > 1
+            else dataset.target,
+        }
+        # Dump the results with joblib
+        dump(results_dict, fold_output_dir / "decoding_results.pkl")
+        print(f"Decoding results saved in {fold_output_dir}")
 
     # Return only the average score for benchopt
-    return np.mean(cv_scores)
-
-
-def save_decoding_results(
-    dataset: Dataset,
-    cv_scores: np.ndarray,
-    chance_level: float,
-):
-    results_dict = {
-        "cv_scores": cv_scores,
-        "dataset_name": dataset.name,
-        "task_name": dataset.task_name,
-        "chance_level": chance_level,
-        "time": dataset.time,
-        "target": dataset.target,
-    }
-    # Dump the results with joblib
-    dump(results_dict, dataset.output_dir / "decoding_results.pkl")
-    print(f"Decoding results saved in {dataset.output_dir}")
+    return np.mean(all_scores)

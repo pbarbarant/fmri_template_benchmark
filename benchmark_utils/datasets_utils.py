@@ -14,7 +14,17 @@ from tqdm import tqdm
 from benchmark_utils.conf import IBC_GM_MASK
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
+
+
+@dataclass
+class Fold:
+    index: int
+    dict_alignment: Dict[str, np.ndarray]
+    dict_decoding: Dict[str, np.ndarray]
+    dict_y: Dict[str, np.ndarray]
+    dict_aligned: Optional[Dict[str, np.ndarray]] = None
+    time: Optional[float] = None
 
 
 @dataclass
@@ -23,15 +33,10 @@ class Dataset:
     subjects: List[str]
     n_subjects: int
     labels: np.ndarray
-    dict_alignment: Dict[str, np.ndarray]
-    dict_decoding: Dict[str, np.ndarray]
-    dict_y: Dict[str, np.ndarray]
+    folds: List[Fold]
     task_name: str
     target: str
     output_dir: Optional[Path] = None
-    time: Optional[float] = None
-    dict_aligned: Optional[Dict[str, np.ndarray]] = None
-    template: Optional[np.ndarray] = None
     solver_name: Optional[str] = None
     masker: Optional[NiftiMasker] = None
 
@@ -51,23 +56,42 @@ def sample_dataset(
     dict_decoding = dict()
     dict_y = dict()
 
-    subjects_alignment_imgs = []
-    subjects_decoding_imgs = []
+    subjects_imgs = []
     subjects_target = []
     for subject in subjects:
-        alignment_img, mask = generate_fake_fmri()
-        decoding_img, _, y = generate_fake_fmri(n_blocks=2)
-        subjects_alignment_imgs.append(alignment_img)
-        subjects_decoding_imgs.append(decoding_img)
+        img, mask, y = generate_fake_fmri(
+            length=100, n_blocks=2, block_size=10
+        )
+        subjects_imgs.append(img)
         subjects_target.append(y)
 
+    runs = np.ones(img.shape[-1])
     masker = NiftiMasker(mask).fit()
 
-    for i, subject in enumerate(subjects):
-        # Create a random alignment and decoding data for each subject
-        dict_alignment[subject] = masker.transform(subjects_alignment_imgs[i])
-        dict_decoding[subject] = masker.transform(subjects_decoding_imgs[i])
-        dict_y[subject] = subjects_target[i]
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+    folds_indices = list(skf.split(runs, runs))
+
+    folds = []
+    for fold_idx, (decoding_idx, alignment_idx) in enumerate(folds_indices):
+        dict_alignment = {
+            sub: masker.transform(img)[alignment_idx]
+            for sub, img in zip(subjects, subjects_imgs)
+        }
+        dict_decoding = {
+            sub: masker.transform(img)[decoding_idx]
+            for sub, img in zip(subjects, subjects_imgs)
+        }
+        dict_y = {
+            sub: y[decoding_idx] for sub, y in zip(subjects, subjects_target)
+        }
+        folds.append(
+            Fold(
+                index=fold_idx,
+                dict_alignment=dict_alignment,
+                dict_decoding=dict_decoding,
+                dict_y=dict_y,
+            )
+        )
 
     n_voxels = list(dict_alignment.values())[0].shape[1]
     labels = np.hstack(
@@ -78,9 +102,7 @@ def sample_dataset(
         subjects=list(dict_decoding.keys()),
         n_subjects=len(subjects),
         labels=labels,
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        dict_y=dict_y,
+        folds=folds,
         task_name="simulated_task",
         masker=masker,
         target=target,
@@ -122,38 +144,49 @@ def fetch_dataset(
     # Get the masker
     masker = NiftiMasker(mask_img=mask_img).fit()
 
-    dict_alignment = dict()
-    dict_decoding = dict()
-    dict_y = dict()
-    for subject in tqdm(subjects, desc="Loading subjects data"):
-        # Get the contrasts
-        runs = (
-            pd.read_csv(data_path / f"{subject}_runs.csv", header=None)
-            .values.astype(str)
-            .ravel()
-        )
-        y = (
-            pd.read_csv(data_path / f"{subject}_labels.csv", header=None)
-            .values.astype(str)
-            .ravel()
-        )
-        X = masker.transform(data_path / f"{subject}.nii.gz")
-        X_alignment, X_decoding, _, y_decoding = train_test_split(
-            X, y, test_size=0.8, stratify=runs, random_state=0
-        )
+    # All runs/labels are structured similarly
+    runs = (
+        pd.read_csv(data_path / f"{subjects[0]}_runs.csv", header=None)
+        .values.astype(str)
+        .ravel()
+    )
+    y = (
+        pd.read_csv(data_path / f"{subjects[0]}_labels.csv", header=None)
+        .values.astype(str)
+        .ravel()
+    )
 
-        dict_alignment[subject] = X_alignment
-        dict_decoding[subject] = X_decoding
-        dict_y[subject] = y_decoding
+    subjects_data = [
+        (masker.transform(data_path / f"{s}.nii.gz")) for s in subjects
+    ]
+
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+    folds_indices = list(skf.split(runs, runs))
+
+    folds = []
+    for fold_idx, (decoding_idx, alignment_idx) in enumerate(folds_indices):
+        dict_alignment = {
+            s: data[alignment_idx] for s, data in zip(subjects, subjects_data)
+        }
+        dict_decoding = {
+            s: data[decoding_idx] for s, data in zip(subjects, subjects_data)
+        }
+        dict_y = {s: y[decoding_idx] for s in subjects}
+        folds.append(
+            Fold(
+                index=fold_idx,
+                dict_alignment=dict_alignment,
+                dict_decoding=dict_decoding,
+                dict_y=dict_y,
+            )
+        )
 
     return Dataset(
         name=name,
         subjects=list(dict_decoding.keys()),
         n_subjects=len(subjects),
         labels=labels,
-        dict_alignment=dict_alignment,
-        dict_decoding=dict_decoding,
-        dict_y=dict_y,
+        folds=folds,
         task_name=task,
         target=target,
         masker=masker,
