@@ -26,12 +26,8 @@ data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
-N_PARCELS = 400
 
-
-def get_results_dataframe(
-    data_path: Path, n_parcels: int = 400
-) -> pd.DataFrame:
+def get_results_dataframe(data_path: Path) -> pd.DataFrame:
     """Load and preprocess all decoding results."""
     results_paths = glob.glob(
         str(data_path / "**" / "decoding_results.pkl"), recursive=True
@@ -41,7 +37,6 @@ def get_results_dataframe(
     for path in results_paths:
         path = Path(path)
         results = load(path)
-        results["solver_name"] = path.parent.parent.name
         res_list.append(pd.DataFrame(results))
 
     df = pd.concat(res_list)
@@ -83,12 +78,7 @@ def get_results_dataframe(
     df = pd.concat([df_anat, df_non_anat])
 
     # Add subject counts to task names
-    anat_counts = (
-        df[df.solver_target == "Anatomical"]
-        .groupby("task_name")["task_name"]
-        .count()
-        .to_dict()
-    )
+    anat_counts = df.groupby("task_name")["subject"].nunique().to_dict()
     df["task_name"] = df["task_name"].apply(
         lambda x: f"{x} (N={anat_counts.get(x, 0)})"
     )
@@ -112,26 +102,48 @@ def create_palette(df: pd.DataFrame) -> dict:
     return {k: v for k, v in zip(solvers_keys, result)}
 
 
+def average_folds(df: pd.DataFrame):
+    # Identify categorical and numerical columns
+    categorical_cols = df.select_dtypes(
+        include=["object", "category"]
+    ).columns.tolist()
+    numerical_cols = df.select_dtypes(include="number").columns.tolist()
+
+    # Remove 'fold' from the grouping columns if it's categorical
+    categorical_cols = [c for c in categorical_cols if c != "fold"]
+
+    # Group by all categorical columns except 'fold' and average the numerical ones
+    df = df.groupby(categorical_cols, as_index=False)[numerical_cols].mean()
+    df = df.drop("fold", axis=1)
+    return df.sort_values(["task_name", "solver_target"])
+
+
 def add_common_plot_elements(ax, data: pd.DataFrame, add_legend: bool = True):
     """Add common elements to plots (chance levels, grid, labels)."""
-    ax.set_xlabel("Task (N subjects)", fontsize=12, fontweight="bold")
+    ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
     ax.set_ylabel("Decoding Accuracy", fontsize=12, fontweight="bold")
     ax.set_ylim(0, 1.05)
     ax.tick_params(axis="x", rotation=30, labelsize=10)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
     ax.tick_params(axis="y", labelsize=10)
 
-    # Add chance levels
+    # Add chance levels and rectangles for separation
     for i, task in enumerate(data["task_name"].unique()):
         chance = data[data["task_name"] == task]["chance_level"].iloc[0]
         ax.hlines(
             chance,
-            i - 0.4,
-            i + 0.4,
+            i - 0.45,
+            i + 0.45,
             colors="k",
             linestyles="--",
-            alpha=0.6,
+            alpha=0.75,
             linewidth=2,
+        )
+        plt.axvspan(
+            i - 0.5,
+            i + 0.5,
+            facecolor="gray",
+            alpha=[0.05 if i % 2 == 1 else 0][0],
         )
 
     # Add gridlines
@@ -176,18 +188,39 @@ def add_statistical_annotations(
 def create_barplot(data: pd.DataFrame, palette: dict, y: str = "cv_scores"):
     """Create a styled barplot."""
     fig, ax = plt.subplots()
-    sns.barplot(
+    sns.boxplot(
         data=data,
         x="task_name",
         y=y,
         hue="solver_target",
+        showmeans=True,
+        dodge=True,
         palette=palette,
-        errorbar="se",
-        capsize=0.1,
-        alpha=0.85,
-        edgecolor="black",
-        linewidth=0.5,
+        meanline=True,
+        meanprops={"color": "k", "ls": "-", "lw": 1},
+        medianprops={"visible": False},
+        whiskerprops={"visible": False},
+        zorder=10,
+        showfliers=False,
+        showbox=False,
+        showcaps=False,
+        linewidth=1,
+        fill=False,
         ax=ax,
+        legend=False,
+    )
+    sns.stripplot(
+        data=data,
+        x="task_name",
+        y=y,
+        hue="solver_target",
+        dodge=True,
+        jitter=False,
+        size=4,
+        palette=palette,
+        alpha=1,
+        ax=ax,
+        linewidth=0.5,
     )
 
     return fig, ax
@@ -199,23 +232,10 @@ def anat_vs_template(
 ):
     """Compare Anatomical alignment vs template-based methods."""
     data = data[data.target == "template_in_sample"].copy()
+    data = average_folds(data)
     fig, ax = create_barplot(data, palette)
 
-    # Add hatching to Anatomical bars
-    _, labels = ax.get_legend_handles_labels()
-    anatomical_idx = labels.index("Anatomical")
-    for container_idx, container in enumerate(ax.containers):
-        if container_idx == anatomical_idx:
-            for bar in container:
-                bar.set_hatch("///")
-
     add_common_plot_elements(ax, data)
-
-    # Add hatching to legend
-    legend = ax.get_legend()
-    for patch, label in zip(legend.get_patches(), legend.get_texts()):
-        if label.get_text() == "Anatomical":
-            patch.set_hatch("///")
 
     # Statistical annotations: Anatomical vs all others
     pairs = [
@@ -240,6 +260,7 @@ def template_vs_pairwise(
         ~data.solver_name.isin(["Anatomical", "Shared Response"])
         & (data.target != "template_out_of_sample")
     ].copy()
+    data = average_folds(data)
 
     fig, ax = create_barplot(data, palette)
     add_common_plot_elements(ax, data)
@@ -273,6 +294,7 @@ def in_vs_out_of_sample(
         ~data.solver_name.isin(["Anatomical", "Shared Response"])
         & data.target.isin(["template_out_of_sample", "template_in_sample"])
     ].copy()
+    data = average_folds(data)
 
     fig, ax = create_barplot(data, palette)
     add_common_plot_elements(ax, data)
@@ -346,18 +368,17 @@ def time_comparison(
 
 
 # Main execution
-df = get_results_dataframe(data_path, n_parcels=N_PARCELS)
+df = get_results_dataframe(data_path)
 dict_palette = create_palette(df)
 
 # Generate and save all plots
 plots = [
-    (anat_vs_template, f"boxplot_task_accuracy_{N_PARCELS}.pdf"),
-    (template_vs_pairwise, f"template_vs_pairwise_{N_PARCELS}.pdf"),
-    (in_vs_out_of_sample, f"in_vs_out_of_sample_{N_PARCELS}.pdf"),
-    (time_comparison, f"time_comparison_{N_PARCELS}.pdf"),
+    (anat_vs_template, "anat_vs_template.pdf"),
+    (template_vs_pairwise, "template_vs_pairwise.pdf"),
+    (in_vs_out_of_sample, "in_vs_out_of_sample.pdf"),
 ]
 
 for plot_func, filename in plots:
     fig = plot_func(df, palette=dict_palette)
-    # fig.savefig(figures_path / filename, bbox_inches="tight")
+    fig.savefig(figures_path / filename, bbox_inches="tight")
     plt.show()
