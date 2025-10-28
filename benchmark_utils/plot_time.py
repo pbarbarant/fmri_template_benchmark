@@ -194,7 +194,6 @@ def time_comparison(
 
 # Main execution
 df = get_results_dataframe(data_path)
-df[df.target != "template_out_of_sample"].copy()
 dict_palette = create_palette(df)
 
 # Generate and save all plots
