@@ -89,17 +89,17 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
 def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
     solvers_keys = sorted(df.solver_target.unique())
-    palette = sns.color_palette("tab20", n_colors=12)
-    del palette[1]
-    del palette[-3:]
+    palette = sns.color_palette("tab20c", n_colors=17)
+    del palette[15]
+    del palette[11]
+    del palette[7]
+    del palette[1:4]
 
     result = []
     for i, color in enumerate(palette):
         result.append(color)
-        if i >= 2 and (i - 2) % 2 == 0:
-            result.append(color)
 
-    return {k: v for k, v in zip(solvers_keys, result)}
+    return {k: v for k, v in zip(solvers_keys, palette)}
 
 
 def average_folds(df: pd.DataFrame):
@@ -122,10 +122,11 @@ def add_common_plot_elements(ax, data: pd.DataFrame, add_legend: bool = True):
     """Add common elements to plots (chance levels, grid, labels)."""
     ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
     ax.set_ylabel("Decoding Accuracy", fontsize=12, fontweight="bold")
-    ax.set_ylim(0, 1.05)
     ax.tick_params(axis="x", rotation=30, labelsize=10)
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
     ax.tick_params(axis="y", labelsize=10)
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
 
     # Add chance levels and rectangles for separation
     for i, task in enumerate(data["task_name"].unique()):
