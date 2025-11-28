@@ -12,7 +12,7 @@ sns.set_theme(
     context="paper",
     style="ticks",
     rc={
-        "figure.figsize": [7, 6],
+        "figure.figsize": [7, 6.5],
         "text.usetex": False,
         "font.family": "sans-serif",
         "savefig.dpi": 300,
@@ -86,17 +86,17 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
 def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
     solvers_keys = sorted(df.solver_target.unique())
-    palette = sns.color_palette("tab20", n_colors=12)
-    del palette[1]
-    del palette[-3:]
+    palette = sns.color_palette("tab20c", n_colors=17)
+    del palette[15]
+    del palette[11]
+    del palette[7]
+    del palette[1:4]
 
     result = []
     for i, color in enumerate(palette):
         result.append(color)
-        if i >= 2 and (i - 2) % 2 == 0:
-            result.append(color)
 
-    return {k: v for k, v in zip(solvers_keys, result)}
+    return {k: v for k, v in zip(solvers_keys, palette)}
 
 
 def sum_time(df: pd.DataFrame):
@@ -139,7 +139,6 @@ def time_comparison(
     palette: dict,
 ):
     """Compare times for in-sample template alignment."""
-    data = data[data.target != "template_out_of_sample"].copy()
     data = sum_time(data)
     fig, ax = create_barplot(data, palette, y="time")
 
