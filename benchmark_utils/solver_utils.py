@@ -2,7 +2,6 @@ from pathlib import Path
 from time import perf_counter
 
 from benchmark_utils.datasets_utils import Dataset, Fold
-from fmralign import PairwiseAlignment
 
 
 def align_one_fold(
@@ -15,29 +14,8 @@ def align_one_fold(
         group_algo.fit(fold.dict_alignment, "template")
         fold.dict_aligned = group_algo.transform(fold.dict_decoding)
     elif target == "template_out_of_sample":
-        fold.dict_aligned = dict()
-        for decoding_sub in fold.dict_alignment.keys():
-            # Compute a template excluding the decoding subject
-            group_algo.fit(
-                {
-                    k: v
-                    for k, v in fold.dict_alignment.items()
-                    if k != "decoding_sub"
-                },
-                "template",
-            )
-            # Align the decoding subject using a pairwise estimator
-            pairwise_algo = PairwiseAlignment(
-                method=group_algo.method,
-                labels=group_algo.labels,
-                n_jobs=group_algo.n_jobs,
-            )
-            pairwise_algo.fit(
-                fold.dict_alignment[decoding_sub], group_algo.template
-            )
-            fold.dict_aligned[decoding_sub] = pairwise_algo.transform(
-                fold.dict_decoding[decoding_sub]
-            )
+        group_algo.fit(fold.dict_alignment, "leave_one_subject_out")
+        fold.dict_aligned = group_algo.transform(fold.dict_decoding)
     else:
         group_algo.fit(fold.dict_alignment, fold.dict_alignment[target])
         fold.dict_aligned = group_algo.transform(fold.dict_decoding)
