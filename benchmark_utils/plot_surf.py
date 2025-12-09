@@ -1,13 +1,14 @@
 # %%
 from pathlib import Path
-
-import matplotlib.gridspec as gridspec
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 from nilearn import datasets, plotting
 from nilearn.surface import SurfaceImage
 from nilearn.plotting import cm
+from nilearn.image import mean_img, math_img
 
 # Setup
 plt.rcParams.update(
@@ -22,16 +23,13 @@ plt.rcParams.update(
 )
 
 # Paths
-data_path = Path(__file__).parent.parent / "outputs_no_folds"
+data_path = Path(__file__).parent.parent / "outputs"
 figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 # Constants
 N_PARCELS = 400
 DATASET = f"IBC_{N_PARCELS}/FaceBody"
-VMIN_WEIGHTS, VMAX_WEIGHTS = -0.003, 0.003
-VMIN_CONTRAST, VMAX_CONTRAST = -1, 1
-IDX_WEIGHTS, IDX_CONTRAST = 4, 19
 METHODS = ["Euclidean", "Procrustes", "Optimal Transport", "Ridge"]
 METHOD_PATHS = {
     "Euclidean": data_path / DATASET / "Anatomical",
@@ -41,7 +39,7 @@ METHOD_PATHS = {
 }
 
 # Load meshes
-mesh = "fsaverage3"
+mesh = "fsaverage5"
 cache_dir = (
     "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
 )
@@ -60,7 +58,7 @@ def project_to_surface(img, interpolation="linear"):
     )
 
 
-def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
+def plot_surface(ax, surface_image, cmap):
     """Plot surface map."""
     plotting.plot_surf_stat_map(
         stat_map=surface_image,
@@ -71,9 +69,9 @@ def plot_surface(ax, surface_image, cmap, vmin, vmax, threshold):
         bg_on_data=True,
         bg_map=curv_sign,
         axes=ax,
-        vmin=vmin,
-        vmax=vmax,
-        threshold=threshold,
+        vmin=0,
+        vmax=0.6,
+        threshold=0,
         alpha=0.5,
     )
     ax.view_init(elev=270, azim=-90)
@@ -106,47 +104,53 @@ def draw_zoom_box(
 
 # Create figure
 fig = plt.figure()
-grid = gridspec.GridSpec(2, len(METHODS), figure=fig, wspace=0.2, hspace=0.01)
+grid = gridspec.GridSpec(
+    2,
+    len(METHODS) + 1,
+    figure=fig,
+    wspace=0.2,
+    hspace=0.01,
+    width_ratios=[1] * len(METHODS) + [0.05],
+)
 
 # Zoom regions for weights plots (right column)
 # Format: elevation, azimuth, zoom level, position, focus region
 
 xmin = -85
-ymin = -70
+ymin = -75
 xmax = xmin + 50
 ymax = ymin + 50
 width, height = 0.15, 0.15
 
+
 # Plot each method
 for i, method in enumerate(METHODS):
-    # Template map (left column)
-    # Classifier weights (right column)
+    # Classifier weights (top row)
     ax_weights = fig.add_subplot(grid[0, i], projection="3d")
     ax_weights.set_title(METHODS[i])
+    img_paths = list(
+        (METHOD_PATHS[method] / "template_in_sample").glob(
+            "*/coefs_Faces_adult.nii.gz"
+        )
+    )
     surface_img = project_to_surface(
-        METHOD_PATHS[method] / "template_in_sample/coefs_Faces_adult.nii.gz",
+        math_img(
+            "img/img.max()", img=mean_img(img_paths)
+        ),  # Average the results across folds
     )
     plot_surface(
         ax_weights,
         surface_img,
         cmap,
-        0,
-        None,
-        0,
     )
 
-    # Add zoomed inset for right column plots
+    # Add zoomed inset
     # Plot the same surface in the inset with the same parameters
     ax_inset = fig.add_subplot(grid[1, i], projection="3d")
     plot_surface(
         ax_inset,
         surface_img,
         cmap,
-        # VMIN_WEIGHTS,
-        # VMAX_WEIGHTS,
-        0,
-        None,
-        0,
     )
 
     # Apply zoom by setting the limits based on focus region
@@ -163,7 +167,7 @@ for i, method in enumerate(METHODS):
         ax_inset,
         xmin,
         xmax + 5,
-        ymin - 5,
+        ymin - 4.5,
         ymax + 3.5,
         zmin,
         color="black",
@@ -184,8 +188,23 @@ for i, method in enumerate(METHODS):
         linewidth=1,
     )
 
+# Add colorbar
+# Colorbar axis (the extra column)
+cax = fig.add_subplot(grid[:, -1])  # span both rows
+
+# Remove ticks for cleaner look (optional)
+cax.tick_params(size=0, labelsize=8)
+
+# Create colorbar
+norm = mpl.colors.Normalize(vmin=0, vmax=0.6)
+cb = fig.colorbar(
+    mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
+    cax=cax,
+)
+
+cax.set_ylabel("Weight", rotation=270, labelpad=15)
 
 plt.show()
 
 # Save figure
-fig.savefig(figures_path / "surf_comparison.pdf", bbox_inches="tight")
+fig.savefig(figures_path / "surf_comparison.png", bbox_inches="tight")
