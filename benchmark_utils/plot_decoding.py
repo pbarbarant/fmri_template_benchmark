@@ -10,6 +10,8 @@ import numpy as np
 import seaborn as sns
 from joblib import load
 from statannotations.Annotator import Annotator
+from statannotations.stats.StatTest import StatTest
+from scipy.stats import t
 
 sns.set_theme(
     context="paper",
@@ -164,6 +166,32 @@ def add_common_plot_elements(ax, data: pd.DataFrame, add_legend: bool = True):
         )
 
 
+def corrected_dependent_ttest(data1, data2):
+    n = len(data1)
+    differences = np.array(data1) - np.array(data2)
+    sd = np.std(differences)
+    divisor = 1 / n * sum(differences)
+    test_training_ratio = 1 / n
+    denominator = np.sqrt(1 / n + test_training_ratio) * sd
+    t_stat = divisor / denominator
+    df = n - 1
+    # calculate the p-value
+    p = (1.0 - t.cdf(abs(t_stat), df)) * 2.0
+    # return everything
+    return t_stat, p
+
+
+class CorrectedDependentTTest(StatTest):
+    def __init__(self):
+        super().__init__(
+            func=corrected_dependent_ttest,
+            test_long_name="Corrected Dependent t-test",
+            test_short_name="Corrected t-test",
+            stat_name="t",
+            alpha=0.05,
+        )
+
+
 def add_statistical_annotations(
     ax, data: pd.DataFrame, pairs: list, hide_ns: bool = False
 ):
@@ -177,10 +205,11 @@ def add_statistical_annotations(
         hue="solver_target",
     )
     annotator.configure(
-        test="Wilcoxon",
+        test=CorrectedDependentTTest(),
+        # test="t-test_ind",
         text_format="star",
         loc="inside",
-        hide_non_significant=hide_ns,
+        # hide_non_significant=hide_ns,
         verbose=0,
     )
     annotator.apply_and_annotate()
@@ -292,7 +321,7 @@ def in_vs_out_of_sample(
 ):
     """Compare in-sample vs out-of-sample template alignment."""
     data = data[
-        ~data.solver_name.isin(["Anatomical", "Shared Response"])
+        ~data.solver_name.isin(["Anatomical"])
         & data.target.isin(["template_out_of_sample", "template_in_sample"])
     ].copy()
     data = average_folds(data)
@@ -314,54 +343,6 @@ def in_vs_out_of_sample(
         )
     ]
     add_statistical_annotations(ax, data, pairs)
-
-    plt.tight_layout()
-    sns.despine(left=True)
-    return fig
-
-
-def time_comparison(
-    data: pd.DataFrame,
-    palette: dict,
-):
-    """Compare times for in-sample template alignment."""
-    data = data[data.target == "template_in_sample"].copy()
-    fig, ax = create_barplot(data, palette, y="time")
-
-    # Add hatching to Anatomical bars
-    _, labels = ax.get_legend_handles_labels()
-    anatomical_idx = labels.index("Anatomical")
-    for container_idx, container in enumerate(ax.containers):
-        if container_idx == anatomical_idx:
-            for bar in container:
-                bar.set_hatch("///")
-
-    ax.set_xlabel("Task (N subjects)", fontsize=12, fontweight="bold")
-    ax.set_ylabel("Time (s)", fontsize=12, fontweight="bold")
-    ax.set_ylim(0, 180)
-    ax.tick_params(axis="x", rotation=30, labelsize=10)
-    ax.tick_params(axis="y", labelsize=10)
-
-    # Add gridlines
-    ax.yaxis.grid(True, linestyle=":", alpha=0.7)
-    ax.set_axisbelow(True)
-
-    # Add legend
-    ax.legend(
-        title="Alignment method",
-        title_fontsize=11,
-        fontsize=10,
-        frameon=False,
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.4),
-        ncol=3,
-    )
-
-    # Add hatching to legend
-    legend = ax.get_legend()
-    for patch, label in zip(legend.get_patches(), legend.get_texts()):
-        if label.get_text() == "Anatomical":
-            patch.set_hatch("///")
 
     plt.tight_layout()
     sns.despine(left=True)
