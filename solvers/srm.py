@@ -30,12 +30,16 @@ class Solver(BaseSolver):
 
     def skip(self, dataset):
         # Skip in the case of SRM / external template
-        if dataset.target == "template_out_of_sample":
+        if (
+            dataset.target == "template_in_sample"
+            or dataset.target == "template_out_of_sample"
+        ):
+            return False, None
+        else:
             return (
                 True,
-                "SRM does not support alignment to an external template",
+                "SRM does not support pairwise alignments",
             )
-        return False, None
 
     def set_objective(
         self,
