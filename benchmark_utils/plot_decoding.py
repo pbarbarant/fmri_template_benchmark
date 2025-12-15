@@ -58,9 +58,9 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
     )
     df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")
 
-    # Handle Anatomical solver - only keep template_in_sample
+    # Handle Anatomical solver - only keep template_out_of_sample
     mask_anat = df["solver_name"] == "Anatomical"
-    df_anat = df[mask_anat & (df["target"] == "template_in_sample")].copy()
+    df_anat = df[mask_anat & (df["target"] == "template_out_of_sample")].copy()
     df_non_anat = df[~mask_anat].copy()
 
     # Create solver_target labels
@@ -71,8 +71,8 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
             df_non_anat["target"] == "template_out_of_sample",
         ],
         [
+            df_non_anat["solver_name"] + "\nIn Sample",
             df_non_anat["solver_name"],
-            df_non_anat["solver_name"] + "\nOut of sample",
         ],
         default=df_non_anat["solver_name"] + "\nPairwise",
     )
@@ -92,7 +92,6 @@ def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
     solvers_keys = sorted(df.solver_target.unique())
     palette = sns.color_palette("tab20c", n_colors=17)
-    del palette[15]
     del palette[11]
     del palette[7]
     del palette[1:4]
@@ -120,7 +119,9 @@ def average_folds(df: pd.DataFrame):
     return df.sort_values(["task_name", "solver_target"])
 
 
-def add_common_plot_elements(ax, data: pd.DataFrame, add_legend: bool = True):
+def add_common_plot_elements(
+    ax, data: pd.DataFrame, add_legend: bool = True, ncols: int = 3
+):
     """Add common elements to plots (chance levels, grid, labels)."""
     ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
     ax.set_ylabel("Decoding Accuracy", fontsize=12, fontweight="bold")
@@ -162,7 +163,7 @@ def add_common_plot_elements(ax, data: pd.DataFrame, add_legend: bool = True):
             frameon=False,
             loc="upper center",
             bbox_to_anchor=(0.5, -0.4),
-            ncol=3,
+            ncol=ncols,
         )
 
 
@@ -261,7 +262,7 @@ def anat_vs_template(
     palette: dict,
 ):
     """Compare Anatomical alignment vs template-based methods."""
-    data = data[data.target == "template_in_sample"].copy()
+    data = data[data.target == "template_out_of_sample"].copy()
     data = average_folds(data)
     fig, ax = create_barplot(data, palette)
 
@@ -288,7 +289,7 @@ def template_vs_pairwise(
     """Compare template-based vs pairwise alignment."""
     data = data[
         ~data.solver_name.isin(["Anatomical", "Shared Response"])
-        & (data.target != "template_out_of_sample")
+        & (data.target != "template_in_sample")
     ].copy()
     data = average_folds(data)
 
@@ -327,7 +328,7 @@ def in_vs_out_of_sample(
     data = average_folds(data)
 
     fig, ax = create_barplot(data, palette)
-    add_common_plot_elements(ax, data)
+    add_common_plot_elements(ax, data, ncols=4)
 
     # Statistical annotations: within-solver comparisons
     pairs = [

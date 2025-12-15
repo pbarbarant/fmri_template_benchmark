@@ -52,9 +52,9 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
     )
     df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")
 
-    # Handle Anatomical solver - only keep template_in_sample
+    # Handle Anatomical solver - only keep template_out_of_sample
     mask_anat = df["solver_name"] == "Anatomical"
-    df_anat = df[mask_anat & (df["target"] == "template_in_sample")].copy()
+    df_anat = df[mask_anat & (df["target"] == "template_out_of_sample")].copy()
     df_non_anat = df[~mask_anat].copy()
 
     # Create solver_target labels
@@ -65,8 +65,8 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
             df_non_anat["target"] == "template_out_of_sample",
         ],
         [
+            df_non_anat["solver_name"] + "\nIn Sample",
             df_non_anat["solver_name"],
-            df_non_anat["solver_name"] + "\nOut of sample",
         ],
         default=df_non_anat["solver_name"] + "\nPairwise",
     )
@@ -106,7 +106,7 @@ def make_failure_table(df: pd.DataFrame):
 
     # Average across folds and filter to the in-sample target
     df = average_folds(df)
-    df = df[df.target == "template_in_sample"]
+    df = df[df.target == "template_out_of_sample"]
 
     # Get Anatomical scores per subject and task
     anat = df[df["solver_name"] == "Anatomical"][
