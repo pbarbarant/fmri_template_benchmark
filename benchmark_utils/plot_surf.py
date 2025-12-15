@@ -8,7 +8,8 @@ import numpy as np
 from nilearn import datasets, plotting
 from nilearn.surface import SurfaceImage
 from nilearn.plotting import cm
-from nilearn.image import mean_img, math_img
+from nilearn.image import mean_img, math_img, largest_connected_component_img
+from nilearn.glm.thresholding import threshold_stats_img
 
 # Setup
 plt.rcParams.update(
@@ -46,6 +47,22 @@ cache_dir = (
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
 curv_sign = datasets.load_fsaverage_data(
     mesh=mesh, data_type="curvature", data_dir=cache_dir
+)
+
+clean_map, threshold = threshold_stats_img(
+    "/storage/store2/data/ibc/smooth_derivatives/group/FaceBody/ffx_faces_adult.nii.gz",
+    alpha=0.05,
+    height_control="fdr",
+    two_sided=False,
+)
+masked_map = largest_connected_component_img(
+    math_img("(img > 4)", img=clean_map)
+)
+
+roi_surf = SurfaceImage.from_volume(
+    mesh=fsaverage_meshes["pial"],
+    volume_img=masked_map,
+    interpolation="nearest_most_frequent",
 )
 
 
@@ -143,6 +160,16 @@ for i, method in enumerate(METHODS):
         surface_img,
         cmap,
     )
+    plotting.plot_surf_contours(
+        surf_mesh=fsaverage_meshes["inflated"],
+        roi_map=roi_surf,
+        hemi="both",
+        levels=[1],
+        legend=False,
+        colors=["royalblue"],
+        view="ventral",
+        axes=ax_weights,
+    )
 
     # Add zoomed inset
     # Plot the same surface in the inset with the same parameters
@@ -151,6 +178,16 @@ for i, method in enumerate(METHODS):
         ax_inset,
         surface_img,
         cmap,
+    )
+    plotting.plot_surf_contours(
+        surf_mesh=fsaverage_meshes["inflated"],
+        roi_map=roi_surf,
+        hemi="both",
+        levels=[1],
+        legend=False,
+        colors=["royalblue"],
+        view="ventral",
+        axes=ax_inset,
     )
 
     # Apply zoom by setting the limits based on focus region
