@@ -53,9 +53,9 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
     )
     df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")
 
-    # Handle Anatomical solver - only keep template_in_sample
+    # Handle Anatomical solver - only keep template_out_of_sample
     mask_anat = df["solver_name"] == "Anatomical"
-    df_anat = df[mask_anat & (df["target"] == "template_in_sample")].copy()
+    df_anat = df[mask_anat & (df["target"] == "template_out_of_sample")].copy()
     df_non_anat = df[~mask_anat].copy()
 
     # Create solver_target labels
@@ -66,8 +66,8 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
             df_non_anat["target"] == "template_out_of_sample",
         ],
         [
+            df_non_anat["solver_name"] + "\nIn Sample",
             df_non_anat["solver_name"],
-            df_non_anat["solver_name"] + "\nOut of sample",
         ],
         default=df_non_anat["solver_name"] + "\nPairwise",
     )
@@ -87,7 +87,6 @@ def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
     solvers_keys = sorted(df.solver_target.unique())
     palette = sns.color_palette("tab20c", n_colors=17)
-    del palette[15]
     del palette[11]
     del palette[7]
     del palette[1:4]
