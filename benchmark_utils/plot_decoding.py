@@ -2,6 +2,7 @@
 import glob
 from pathlib import Path
 from itertools import combinations
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
@@ -12,6 +13,7 @@ from joblib import load
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
 from scipy.stats import t
+from tqdm import tqdm
 
 sns.set_theme(
     context="paper",
@@ -29,19 +31,27 @@ figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 
-def get_results_dataframe(data_path: Path) -> pd.DataFrame:
+def get_results_dataframe(
+    data_path: Path, n_parcels: Optional[int] = None
+) -> pd.DataFrame:
     """Load and preprocess all decoding results."""
     results_paths = glob.glob(
         str(data_path / "**" / "decoding_results.pkl"), recursive=True
     )
 
     res_list = []
-    for path in results_paths:
+    for path in tqdm(results_paths):
         path = Path(path)
         results = load(path)
         res_list.append(pd.DataFrame(results))
 
     df = pd.concat(res_list)
+
+    # Extract n_parcels into a new column
+    df["n_parcels"] = df["dataset_name"].str.extract(r"_(\d+)$").astype("Int64")
+
+    if n_parcels is not None:
+        df = df[df["n_parcels"] == n_parcels]
 
     # Clean dataset names
     df = df[~df["dataset_name"].str.contains("Simulated")]
@@ -91,11 +101,10 @@ def get_results_dataframe(data_path: Path) -> pd.DataFrame:
 def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
     solvers_keys = sorted(df.solver_target.unique())
-    palette = sns.color_palette("tab20c", n_colors=17)
-    del palette[11]
-    del palette[7]
-    del palette[1:4]
-
+    palette = sns.color_palette("tab20c", n_colors=18)
+    palette = [
+        c for i, c in enumerate(palette) if i not in (1, 2, 3, 7, 11, 15)
+    ]
     result = []
     for i, color in enumerate(palette):
         result.append(color)
@@ -126,6 +135,7 @@ def add_common_plot_elements(
     ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
     ax.set_ylabel("Decoding Accuracy", fontsize=12, fontweight="bold")
     ax.tick_params(axis="x", rotation=30, labelsize=10)
+    plt.setp(ax.get_xticklabels(), ha="right")
     ax.tick_params(axis="y", labelsize=10)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
     ax.set_ylim(0, 1.05)
@@ -351,7 +361,7 @@ def in_vs_out_of_sample(
 
 
 # Main execution
-df = get_results_dataframe(data_path)
+df = get_results_dataframe(data_path, n_parcels=400)
 dict_palette = create_palette(df)
 
 # Generate and save all plots

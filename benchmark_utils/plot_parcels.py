@@ -1,7 +1,6 @@
 # %%
 import glob
 from pathlib import Path
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -9,12 +8,13 @@ import numpy as np
 import seaborn as sns
 from joblib import load
 from tqdm import tqdm
+from typing import Optional
 
 sns.set_theme(
     context="paper",
     style="ticks",
     rc={
-        "figure.figsize": [7, 6.5],
+        "figure.figsize": [7, 6],
         "text.usetex": False,
         "font.family": "sans-serif",
         "savefig.dpi": 300,
@@ -107,104 +107,74 @@ def create_palette(df: pd.DataFrame) -> dict:
     return {k: v for k, v in zip(solvers_keys, palette)}
 
 
-def sum_time(df: pd.DataFrame):
-    df = df.drop(
-        ["subject", "cv_scores", "chance_level", "fold"], axis=1
-    ).drop_duplicates()
-    df = df.groupby(
-        [
-            "dataset_name",
-            "task_name",
-            "solver_name",
-            "solver_target",
-        ],
-        as_index=False,
-    )["time"].sum()
-
-    return df.sort_values(["task_name", "solver_target"])
-
-
-def create_barplot(data: pd.DataFrame, palette: dict, y: str = "cv_scores"):
-    """Create a styled barplot."""
-    fig, ax = plt.subplots()
-    sns.barplot(
-        data=data,
-        x="task_name",
-        y=y,
-        hue="solver_target",
-        dodge=True,
-        palette=palette,
-        edgecolor="k",
-        ax=ax,
-        legend=True,
-    )
-
-    return fig, ax
-
-
-def time_comparison(
+def parcellation_influence(
     data: pd.DataFrame,
     palette: dict,
+    anat_level: float,
 ):
-    """Compare times for in-sample template alignment."""
-    data = sum_time(data)
-    fig, ax = create_barplot(data, palette, y="time")
+    """Show influence of number of parcels on CV scores."""
+    fig, ax = plt.subplots()
 
-    # Add hatching to Anatomical bars
-    _, labels = ax.get_legend_handles_labels()
-    anatomical_idx = labels.index("Anatomical")
-    for container_idx, container in enumerate(ax.containers):
-        if container_idx == anatomical_idx:
-            for bar in container:
-                bar.set_hatch("///")
+    # Anatomical level line
+    ax.axhline(
+        anat_level,
+        color="tab:blue",
+        linestyle="--",
+        linewidth=1.5,
+        label="Anatomical",
+    )
 
-    # Add rectangles for separation
-    for i, task in enumerate(data["task_name"].unique()):
-        plt.axvspan(
-            i - 0.5,
-            i + 0.5,
-            facecolor="gray",
-            alpha=[0.05 if i % 2 == 1 else 0][0],
-        )
+    sns.pointplot(
+        data=data,
+        x="n_parcels",
+        y="cv_scores",
+        hue="solver_target",
+        palette=palette,
+        dodge=True,
+        markers="o",
+        linestyles="-",
+        ax=ax,
+    )
 
-    ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
-    ax.set_ylabel("Total Time (s)", fontsize=12, fontweight="bold")
-    ax.set_yscale("log")
-    ax.tick_params(axis="x", rotation=30, labelsize=10)
-    plt.setp(ax.get_xticklabels(), ha="right")
+    ax.set_xlabel("Number of parcels", fontsize=12, fontweight="bold")
+    ax.set_ylabel("Averaged score", fontsize=12, fontweight="bold")
+
+    ax.tick_params(axis="x", labelsize=10)
     ax.tick_params(axis="y", labelsize=10)
 
-    # Add gridlines
+    # Gridlines
     ax.yaxis.grid(True, linestyle=":", alpha=0.7)
     ax.set_axisbelow(True)
 
-    # Add legend
+    # Legend
     ax.legend(
         title="Alignment method",
         title_fontsize=11,
         fontsize=10,
         frameon=False,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.4),
-        ncol=4,
+        bbox_to_anchor=(0.5, -0.35),
+        ncol=3,
     )
 
-    # Add hatching to legend
-    legend = ax.get_legend()
-    for patch, label in zip(legend.get_patches(), legend.get_texts()):
-        if label.get_text() == "Anatomical":
-            patch.set_hatch("///")
-
-    plt.tight_layout()
     sns.despine(left=True)
-    return fig
+    plt.tight_layout()
+
+    return fig, ax
 
 
-# Main execution
-df = get_results_dataframe(data_path, n_parcels=400)
+df = get_results_dataframe(data_path)
+anat_level = df[df["solver_name"] == "Anatomical"]["cv_scores"].mean()
 dict_palette = create_palette(df)
 
-# Generate and save all plots
-fig = time_comparison(df, palette=dict_palette)
-fig.savefig(figures_path / "time_comparison.pdf", bbox_inches="tight")
+# Delete Anatomical from dataframe to avoid duplication in plot
+df = df[df["solver_name"] != "Anatomical"]
+
+fig, ax = parcellation_influence(
+    df, palette=dict_palette, anat_level=anat_level
+)
+fig.savefig(
+    figures_path / "parcellation_influence.pdf",
+    bbox_inches="tight",
+)
 plt.show()

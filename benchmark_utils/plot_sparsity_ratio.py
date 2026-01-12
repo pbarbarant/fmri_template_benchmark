@@ -50,18 +50,58 @@ for method in METHODS:
     dict_results[method_] = sparsity_ratio(img)
 
 dict_palette = {
-    "Anatomical": (0.192, 0.510, 0.741),
-    "Optimal Transport": (0.902, 0.333, 0.051),
-    "Optimal Transport\nIn Sample": (0.992, 0.553, 0.235),
-    "Optimal Transport\nPairwise": (0.992, 0.682, 0.420),
-    "Procrustes": (0.192, 0.639, 0.329),
-    "Procrustes\nIn Sample": (0.455, 0.769, 0.463),
-    "Procrustes\nPairwise": (0.631, 0.851, 0.608),
-    "Ridge": (0.459, 0.420, 0.694),
-    "Ridge\nIn Sample": (0.620, 0.604, 0.784),
-    "Ridge\nPairwise": (0.737, 0.741, 0.863),
-    "Shared Response": (0.855, 0.855, 0.922),
-    "Shared Response\nIn Sample": (0.388, 0.388, 0.388),
+    "Anatomical": (0.19215686274509805, 0.5098039215686274, 0.7411764705882353),
+    "Optimal Transport": (
+        0.9019607843137255,
+        0.3333333333333333,
+        0.050980392156862744,
+    ),
+    "Optimal Transport\nIn Sample": (
+        0.9921568627450981,
+        0.5529411764705883,
+        0.23529411764705882,
+    ),
+    "Optimal Transport\nPairwise": (
+        0.9921568627450981,
+        0.6823529411764706,
+        0.4196078431372549,
+    ),
+    "Procrustes": (
+        0.19215686274509805,
+        0.6392156862745098,
+        0.32941176470588235,
+    ),
+    "Procrustes\nIn Sample": (
+        0.4549019607843137,
+        0.7686274509803922,
+        0.4627450980392157,
+    ),
+    "Procrustes\nPairwise": (
+        0.6313725490196078,
+        0.8509803921568627,
+        0.6078431372549019,
+    ),
+    "Ridge": (0.4588235294117647, 0.4196078431372549, 0.6941176470588235),
+    "Ridge\nIn Sample": (
+        0.6196078431372549,
+        0.6039215686274509,
+        0.7843137254901961,
+    ),
+    "Ridge\nPairwise": (
+        0.7372549019607844,
+        0.7411764705882353,
+        0.8627450980392157,
+    ),
+    "Shared Response": (
+        0.38823529411764707,
+        0.38823529411764707,
+        0.38823529411764707,
+    ),
+    "Shared Response\nIn Sample": (
+        0.5882352941176471,
+        0.5882352941176471,
+        0.5882352941176471,
+    ),
 }
 
 df = pd.DataFrame(dict_results).melt(var_name="Method", value_name="Sparsity")
