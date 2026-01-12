@@ -41,7 +41,6 @@ def parcellation_influence(
         y="cv_scores",
         hue="solver_target",
         palette=palette,
-        dodge=True,
         markers="o",
         linestyles="-",
         ax=ax,
@@ -89,3 +88,5 @@ fig.savefig(
     bbox_inches="tight",
 )
 plt.show()
+
+# %%
