@@ -1,29 +1,16 @@
-# %%
 import glob
 from pathlib import Path
-
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-import seaborn as sns
-from joblib import load
-from tqdm import tqdm
 from typing import Optional
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from tqdm import tqdm
+from joblib import load
 
-sns.set_theme(
-    context="paper",
-    style="ticks",
-    rc={
-        "figure.figsize": [7, 6],
-        "text.usetex": False,
-        "font.family": "sans-serif",
-        "savefig.dpi": 300,
-    },
-)
-# Configuration
-data_path = Path(__file__).parent.parent / "outputs"
-figures_path = data_path.parent / "outputs" / "figures"
-figures_path.mkdir(parents=True, exist_ok=True)
+
+DATA_PATH = Path(__file__).parent.parent / "outputs"
+FIGURES_PATH = DATA_PATH.parent / "outputs" / "figures"
+FIGURES_PATH.mkdir(parents=True, exist_ok=True)
 
 
 def get_results_dataframe(
@@ -105,76 +92,3 @@ def create_palette(df: pd.DataFrame) -> dict:
         result.append(color)
 
     return {k: v for k, v in zip(solvers_keys, palette)}
-
-
-def parcellation_influence(
-    data: pd.DataFrame,
-    palette: dict,
-    anat_level: float,
-):
-    """Show influence of number of parcels on CV scores."""
-    fig, ax = plt.subplots()
-
-    # Anatomical level line
-    ax.axhline(
-        anat_level,
-        color="tab:blue",
-        linestyle="--",
-        linewidth=1.5,
-        label="Anatomical",
-    )
-
-    sns.pointplot(
-        data=data,
-        x="n_parcels",
-        y="cv_scores",
-        hue="solver_target",
-        palette=palette,
-        dodge=True,
-        markers="o",
-        linestyles="-",
-        ax=ax,
-    )
-
-    ax.set_xlabel("Number of parcels", fontsize=12, fontweight="bold")
-    ax.set_ylabel("Averaged score", fontsize=12, fontweight="bold")
-
-    ax.tick_params(axis="x", labelsize=10)
-    ax.tick_params(axis="y", labelsize=10)
-
-    # Gridlines
-    ax.yaxis.grid(True, linestyle=":", alpha=0.7)
-    ax.set_axisbelow(True)
-
-    # Legend
-    ax.legend(
-        title="Alignment method",
-        title_fontsize=11,
-        fontsize=10,
-        frameon=False,
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.35),
-        ncol=3,
-    )
-
-    sns.despine(left=True)
-    plt.tight_layout()
-
-    return fig, ax
-
-
-df = get_results_dataframe(data_path)
-anat_level = df[df["solver_name"] == "Anatomical"]["cv_scores"].mean()
-dict_palette = create_palette(df)
-
-# Delete Anatomical from dataframe to avoid duplication in plot
-df = df[df["solver_name"] != "Anatomical"]
-
-fig, ax = parcellation_influence(
-    df, palette=dict_palette, anat_level=anat_level
-)
-fig.savefig(
-    figures_path / "parcellation_influence.pdf",
-    bbox_inches="tight",
-)
-plt.show()

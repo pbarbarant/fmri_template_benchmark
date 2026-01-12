@@ -1,11 +1,8 @@
 # %%
-import glob
-from pathlib import Path
-
 import pandas as pd
-import numpy as np
 import seaborn as sns
-from joblib import load
+
+from utils import get_results_dataframe, DATA_PATH
 
 sns.set_theme(
     context="paper",
@@ -17,69 +14,6 @@ sns.set_theme(
         "savefig.dpi": 300,
     },
 )
-# Configuration
-data_path = Path(__file__).parent.parent / "outputs"
-figures_path = data_path.parent / "outputs" / "figures"
-figures_path.mkdir(parents=True, exist_ok=True)
-
-
-def get_results_dataframe(data_path: Path) -> pd.DataFrame:
-    """Load and preprocess all decoding results."""
-    results_paths = glob.glob(
-        str(data_path / "**" / "decoding_results.pkl"), recursive=True
-    )
-
-    res_list = []
-    for path in results_paths:
-        path = Path(path)
-        results = load(path)
-        res_list.append(pd.DataFrame(results))
-
-    df = pd.concat(res_list)
-
-    # Clean dataset names
-    df = df[~df["dataset_name"].str.contains("Simulated")]
-    df["dataset_name"] = df["dataset_name"].str.replace(
-        r"_[0-9]+$", "", regex=True
-    )
-
-    # Clean solver and task names
-    df["solver_name"] = (
-        df["solver_name"]
-        .str.replace("ot", "Optimal Transport")
-        .str.replace("SRM", "Shared Response")
-        .str.replace("_", " ")
-    )
-    df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")
-
-    # Handle Anatomical solver - only keep template_out_of_sample
-    mask_anat = df["solver_name"] == "Anatomical"
-    df_anat = df[mask_anat & (df["target"] == "template_out_of_sample")].copy()
-    df_non_anat = df[~mask_anat].copy()
-
-    # Create solver_target labels
-    df_anat["solver_target"] = df_anat["solver_name"]
-    df_non_anat["solver_target"] = np.select(
-        [
-            df_non_anat["target"] == "template_in_sample",
-            df_non_anat["target"] == "template_out_of_sample",
-        ],
-        [
-            df_non_anat["solver_name"] + "\nIn Sample",
-            df_non_anat["solver_name"],
-        ],
-        default=df_non_anat["solver_name"] + "\nPairwise",
-    )
-
-    df = pd.concat([df_anat, df_non_anat])
-
-    # Add subject counts to task names
-    anat_counts = df.groupby("task_name")["subject"].nunique().to_dict()
-    df["task_name"] = df["task_name"].apply(
-        lambda x: f"{x} (N={anat_counts.get(x, 0)})"
-    )
-
-    return df.sort_values(["task_name", "solver_target"])
 
 
 def average_folds(df: pd.DataFrame):
@@ -151,5 +85,5 @@ def make_failure_table(df: pd.DataFrame):
     print(latex_table)
 
 
-df = get_results_dataframe(data_path)
+df = get_results_dataframe(DATA_PATH, n_parcels=400)
 make_failure_table(df)
