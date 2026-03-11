@@ -3,15 +3,13 @@ from itertools import combinations
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
-import pandas as pd
 import numpy as np
+import pandas as pd
 import seaborn as sns
+from scipy.stats import t
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
-from scipy.stats import t
-
-from utils import get_results_dataframe, create_palette, DATA_PATH, FIGURES_PATH
-
+from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
 
 sns.set_theme(
     context="paper",

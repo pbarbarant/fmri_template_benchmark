@@ -1,12 +1,14 @@
+from pathlib import Path
+from typing import List
+
 import numpy as np
 from joblib import dump
-from sklearn.model_selection import cross_validate, LeaveOneGroupOut
+from nilearn.maskers import NiftiMasker
+from sklearn.model_selection import LeaveOneGroupOut, cross_validate
 from sklearn.svm import LinearSVC
-from typing import List
+
 from benchmark_utils.conf import N_JOBS
 from benchmark_utils.datasets_utils import Dataset, Fold
-from nilearn.maskers import NiftiMasker
-from pathlib import Path
 
 
 def save_weights(scores: dict, masker: NiftiMasker, output_dir: Path):

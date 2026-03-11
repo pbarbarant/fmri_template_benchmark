@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
+
 import numpy as np
+import pandas as pd
+from nilearn._utils.data_gen import generate_fake_fmri
 from nilearn.datasets import (
     fetch_atlas_schaefer_2018,
     load_mni152_gm_mask,
@@ -9,12 +12,9 @@ from nilearn.datasets import (
 from nilearn.image import load_img, math_img, resample_to_img
 from nilearn.maskers import NiftiMasker
 from nilearn.masking import apply_mask_fmri
-from nilearn._utils.data_gen import generate_fake_fmri
-from tqdm import tqdm
-from benchmark_utils.conf import IBC_GM_MASK
+from sklearn.model_selection import StratifiedKFold
 
-import pandas as pd
-from sklearn.model_selection import train_test_split, StratifiedKFold
+from benchmark_utils.conf import IBC_GM_MASK
 
 
 @dataclass

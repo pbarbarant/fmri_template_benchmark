@@ -1,15 +1,16 @@
 # %%
 from pathlib import Path
+
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
 from nilearn import datasets, plotting
-from nilearn.surface import SurfaceImage
-from nilearn.plotting import cm
-from nilearn.image import mean_img, math_img, largest_connected_component_img
 from nilearn.glm.thresholding import threshold_stats_img
+from nilearn.image import largest_connected_component_img, math_img, mean_img
+from nilearn.plotting import cm
+from nilearn.surface import SurfaceImage
 
 # Setup
 plt.rcParams.update(

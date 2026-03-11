@@ -3,7 +3,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
 from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
 
 sns.set_theme(

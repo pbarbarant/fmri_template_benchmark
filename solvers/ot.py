@@ -6,9 +6,10 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fmralign import GroupAlignment
+    from fmralign.methods import OptimalTransport
+
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment
-    from fmralign.methods import OptimalTransport
 
 
 # The benchmark solvers must be named `Solver` and

@@ -1,12 +1,12 @@
 import glob
 from pathlib import Path
 from typing import Optional
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from tqdm import tqdm
 from joblib import load
-
+from tqdm import tqdm
 
 DATA_PATH = Path(__file__).parent.parent / "outputs"
 FIGURES_PATH = DATA_PATH.parent / "outputs" / "figures"

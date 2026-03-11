@@ -1,8 +1,7 @@
 # %%
 import pandas as pd
 import seaborn as sns
-
-from utils import get_results_dataframe, DATA_PATH
+from utils import DATA_PATH, get_results_dataframe
 
 sns.set_theme(
     context="paper",

@@ -2,8 +2,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
-from utils import get_results_dataframe, create_palette, DATA_PATH, FIGURES_PATH
+from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
 
 sns.set_theme(
     context="paper",

@@ -2,12 +2,12 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from nilearn.maskers import NiftiMasker
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from nilearn.image import concat_imgs
+from nilearn.maskers import NiftiMasker
 
 plt.rcParams.update(
     {
