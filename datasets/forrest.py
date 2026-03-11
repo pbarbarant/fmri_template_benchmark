@@ -4,8 +4,9 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchmark_utils.datasets_utils import fetch_dataset, parse_subjects
     from pathlib import Path
+
+    from benchmark_utils.datasets_utils import fetch_dataset, parse_subjects
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -23,7 +24,7 @@ class Dataset(BaseDataset):
     )
 
     parameters = {
-        "n_parcels": [400],
+        "n_parcels": [200, 400, 600, 800],
         "target": ["template_in_sample", "template_out_of_sample"]
         + parse_subjects(data_path),
     }
