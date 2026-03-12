@@ -43,7 +43,7 @@ METHOD_PATHS = {
 # Load meshes
 mesh = "fsaverage5"
 cache_dir = (
-    "/home/mind/pbarbara/.paths/pbarbara/fmri_template_benchmark/memory_cache"
+    "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/memory_cache"
 )
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
 curv_sign = datasets.load_fsaverage_data(
@@ -51,7 +51,7 @@ curv_sign = datasets.load_fsaverage_data(
 )
 
 clean_map, threshold = threshold_stats_img(
-    "/storage/store2/data/ibc/smooth_derivatives/group/FaceBody/ffx_faces_adult.nii.gz",
+    "/data/parietal/store2/data/ibc/smooth_derivatives/group/FaceBody/ffx_faces_adult.nii.gz",
     alpha=0.05,
     height_control="fdr",
     two_sided=False,
