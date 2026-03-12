@@ -6,7 +6,7 @@ import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import t
+from scipy.stats import t, ttest_1samp
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
 from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
@@ -114,6 +114,21 @@ class CorrectedDependentTTest(StatTest):
         )
 
 
+class OneSampleTTest(StatTest):
+    @staticmethod
+    def statannotations_to_scipy_ttest_1samp(group1, group2, **stats_params):
+        return ttest_1samp(group1, popmean=0, **stats_params)
+
+    def __init__(self):
+        super().__init__(
+            func=self.statannotations_to_scipy_ttest_1samp,
+            test_long_name="One-sample t-test",
+            test_short_name="One-sample t-test",
+            stat_name="t",
+            alpha=0.05,
+        )
+
+
 def add_statistical_annotations(
     ax, data: pd.DataFrame, pairs: list, hide_ns: bool = False
 ):
@@ -126,25 +141,34 @@ def add_statistical_annotations(
         y="cv_scores",
         hue="solver_target",
     )
+    annotator._pvalue_format.pvalue_thresholds = [
+        [0.001, "***"],
+        [0.01, "**"],
+        [0.05, "*"],
+        [1, "ns"],
+    ]
     annotator.configure(
         test=CorrectedDependentTTest(),
-        # test="t-test_ind",
         text_format="star",
         loc="inside",
-        # hide_non_significant=hide_ns,
         verbose=0,
     )
     annotator.apply_and_annotate()
 
 
-def create_barplot(data: pd.DataFrame, palette: dict, y: str = "cv_scores"):
+def create_barplot(
+    data: pd.DataFrame,
+    palette: dict,
+    y: str = "cv_scores",
+    hue: str = "solver_target",
+):
     """Create a styled barplot."""
     fig, ax = plt.subplots()
     sns.boxplot(
         data=data,
         x="task_name",
         y=y,
-        hue="solver_target",
+        hue=hue,
         showmeans=True,
         dodge=True,
         palette=palette,
@@ -165,7 +189,7 @@ def create_barplot(data: pd.DataFrame, palette: dict, y: str = "cv_scores"):
         data=data,
         x="task_name",
         y=y,
-        hue="solver_target",
+        hue=hue,
         dodge=True,
         jitter=False,
         size=4,
@@ -271,6 +295,116 @@ def in_vs_out_of_sample(
     return fig
 
 
+def bias_diff(
+    data: pd.DataFrame,
+    palette: dict,
+):
+    """Compare in-sample vs out-of-sample template alignment."""
+    data = data[
+        ~data.solver_name.isin(["Anatomical"])
+        & data.target.isin(["template_out_of_sample", "template_in_sample"])
+    ].copy()
+    data = average_folds(data)
+
+    # Pivot so each target becomes its own column
+    pivot = data.pivot_table(
+        index=["subject", "task_name", "solver_name"],
+        columns="target",
+        values="cv_scores",
+        aggfunc="mean",  # in case of duplicates
+    ).reset_index()
+
+    pivot.columns.name = None  # clean up column name
+
+    # Compute the difference: in_sample - out_of_sample
+    pivot["cv_score_diff"] = (
+        pivot["template_in_sample"] - pivot["template_out_of_sample"]
+    )
+
+    # Sort
+    pivot = pivot.sort_values(["task_name", "solver_name"])
+    solvers = sorted(pivot["solver_name"].unique().tolist())
+    tasks = pivot["task_name"].unique().tolist()
+
+    fig, ax = plt.subplots()
+    sns.pointplot(
+        data=pivot,
+        x="task_name",
+        y="cv_score_diff",
+        hue="solver_name",
+        palette=palette,
+        dodge=0.6,
+        join=False,
+        markers="D",
+        markersize=2,
+        errwidth=1.5,
+        capsize=0.15,
+        ax=ax,
+        legend=True,
+    )
+
+    pairs = [
+        ((task, solver), (task, solver)) for task in tasks for solver in solvers
+    ]
+
+    annotator = Annotator(
+        ax,
+        pairs=pairs,
+        data=pivot,
+        x="task_name",
+        y="cv_score_diff",
+        hue="solver_name",
+    )
+    annotator.configure(
+        test=OneSampleTTest(),
+        text_format="star",
+        loc="inside",
+        verbose=0,
+    )
+    annotator._pvalue_format.pvalue_thresholds = [
+        [0.001, "***"],
+        [0.01, "**"],
+        [0.05, "*"],
+        [1, "ns"],
+    ]
+    annotator.apply_and_annotate()
+
+    ax.axhline(0, color="black", linewidth=0.8, linestyle="--")
+    ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
+    ax.set_ylabel("Bias", fontsize=12, fontweight="bold")
+    ax.tick_params(axis="x", rotation=30, labelsize=10)
+    plt.setp(ax.get_xticklabels(), ha="right")
+    ax.tick_params(axis="y", labelsize=10)
+
+    # Add chance levels and rectangles for separation
+    for i, task in enumerate(data["task_name"].unique()):
+        plt.axvspan(
+            i - 0.5,
+            i + 0.5,
+            facecolor="gray",
+            alpha=[0.05 if i % 2 == 1 else 0][0],
+        )
+
+    # Add gridlines
+    ax.yaxis.grid(True, linestyle=":", alpha=0.7)
+    ax.set_axisbelow(True)
+
+    # Add legend
+    ax.legend(
+        title="Alignment method",
+        title_fontsize=11,
+        fontsize=10,
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.4),
+        ncol=4,
+    )
+
+    plt.tight_layout()
+    sns.despine(left=True)
+    return fig, annotator
+
+
 # Main execution
 df = get_results_dataframe(DATA_PATH, n_parcels=400)
 dict_palette = create_palette(df)
@@ -280,9 +414,10 @@ plots = [
     (anat_vs_template, "anat_vs_template.pdf"),
     (template_vs_pairwise, "template_vs_pairwise.pdf"),
     (in_vs_out_of_sample, "in_vs_out_of_sample.pdf"),
+    (bias_diff, "bias_diff.pdf"),
 ]
 
 for plot_func, filename in plots:
-    fig = plot_func(df, palette=dict_palette)
+    fig, annot = plot_func(df, palette=dict_palette)
     fig.savefig(FIGURES_PATH / filename, bbox_inches="tight")
     plt.show()
