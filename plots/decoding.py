@@ -9,6 +9,7 @@ import seaborn as sns
 from scipy.stats import t, ttest_1samp
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
+
 from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
 
 sns.set_theme(
@@ -337,7 +338,7 @@ def bias_diff(
         join=False,
         markers="D",
         markersize=2,
-        errwidth=1.5,
+        err_kws={"linewidth": 1.5},
         capsize=0.15,
         ax=ax,
         legend=True,
@@ -368,6 +369,35 @@ def bias_diff(
         [1, "ns"],
     ]
     annotator.apply_and_annotate()
+
+    # Now do the two sample tests between Optimal Transport and other solvers
+    pairs_2samples = [
+        ((task, "Optimal Transport"), (task, solver))
+        for task in tasks
+        for solver in solvers
+        if solver != "Optimal Transport"
+    ]
+    annotator_2samples = Annotator(
+        ax,
+        pairs=pairs_2samples,
+        data=pivot,
+        x="task_name",
+        y="cv_score_diff",
+        hue="solver_name",
+    )
+    annotator_2samples.configure(
+        test=CorrectedDependentTTest(),
+        text_format="star",
+        loc="outside",
+        verbose=0,
+    )
+    annotator_2samples._pvalue_format.pvalue_thresholds = [
+        [0.001, "***"],
+        [0.01, "**"],
+        [0.05, "*"],
+        [1, "ns"],
+    ]
+    annotator_2samples.apply_and_annotate()
 
     ax.axhline(0, color="black", linewidth=0.8, linestyle="--")
     ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
@@ -402,7 +432,8 @@ def bias_diff(
 
     plt.tight_layout()
     sns.despine(left=True)
-    return fig, annotator
+    fig.subplots_adjust(bottom=0.3)
+    return fig
 
 
 # Main execution
@@ -418,6 +449,6 @@ plots = [
 ]
 
 for plot_func, filename in plots:
-    fig, annot = plot_func(df, palette=dict_palette)
+    fig = plot_func(df, palette=dict_palette)
     fig.savefig(FIGURES_PATH / filename, bbox_inches="tight")
     plt.show()
