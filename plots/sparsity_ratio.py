@@ -116,6 +116,7 @@ sns.histplot(
     element="step",
     linewidth=1.5,
     ax=ax,
+    log_scale=True,
 )
 sns.despine(ax=ax)
 ax.set_xlabel("Sparsity Ratio (L2 / L1)")
@@ -135,6 +136,7 @@ sns.histplot(
     linewidth=1.2,
     ax=axins,
     legend=False,
+    log_scale=True,
 )
 axins.set_xlim(x1, x2)
 axins.set_ylim(0, ax.get_ylim()[1] * 0.6)
