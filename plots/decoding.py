@@ -9,7 +9,6 @@ import seaborn as sns
 from scipy.stats import t, ttest_1samp
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
-
 from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
 
 sns.set_theme(
@@ -436,6 +435,154 @@ def bias_diff(
     return fig
 
 
+def pairwise_diff(
+    data: pd.DataFrame,
+    palette: dict,
+):
+    """Compare in-sample vs out-of-sample template alignment."""
+    data = data[
+        ~data.solver_name.isin(["Anatomical", "Shared Response"])
+        & (data.target != "template_in_sample")
+    ].copy()
+    data = average_folds(data)
+
+    # Replace subjects name in target with pairwise
+    df["target"] = df.apply(
+        lambda row: (
+            "pairwise"
+            if not row["target"] == "template_out_of_sample"
+            else "template_out_of_sample"
+        ),
+        axis=1,
+    )
+
+    # Pivot so each target becomes its own column
+    pivot = data.pivot_table(
+        index=["subject", "task_name", "solver_name"],
+        columns="target",
+        values="cv_scores",
+        aggfunc="mean",  # in case of duplicates
+    ).reset_index()
+
+    pivot.columns.name = None  # clean up column name
+
+    # Compute the difference: pairwise - out_of_sample
+    pivot["cv_score_diff"] = pivot["pairwise"] - pivot["template_out_of_sample"]
+
+    # Sort
+    pivot = pivot.sort_values(["task_name", "solver_name"])
+    solvers = sorted(pivot["solver_name"].unique().tolist())
+    tasks = pivot["task_name"].unique().tolist()
+
+    fig, ax = plt.subplots()
+    sns.pointplot(
+        data=pivot,
+        x="task_name",
+        y="cv_score_diff",
+        hue="solver_name",
+        palette=palette,
+        dodge=0.6,
+        join=False,
+        markers="D",
+        markersize=2,
+        err_kws={"linewidth": 1.5},
+        capsize=0.15,
+        ax=ax,
+        legend=True,
+    )
+
+    pairs = [
+        ((task, solver), (task, solver)) for task in tasks for solver in solvers
+    ]
+
+    annotator = Annotator(
+        ax,
+        pairs=pairs,
+        data=pivot,
+        x="task_name",
+        y="cv_score_diff",
+        hue="solver_name",
+    )
+    annotator.configure(
+        test=OneSampleTTest(),
+        text_format="star",
+        loc="inside",
+        verbose=0,
+    )
+    annotator._pvalue_format.pvalue_thresholds = [
+        [0.001, "***"],
+        [0.01, "**"],
+        [0.05, "*"],
+        [1, "ns"],
+    ]
+    annotator.apply_and_annotate()
+
+    # Now do the two sample tests between Optimal Transport and other solvers
+    pairs_2samples = [
+        ((task, "Optimal Transport"), (task, solver))
+        for task in tasks
+        for solver in solvers
+        if solver != "Optimal Transport"
+    ]
+    annotator_2samples = Annotator(
+        ax,
+        pairs=pairs_2samples,
+        data=pivot,
+        x="task_name",
+        y="cv_score_diff",
+        hue="solver_name",
+    )
+    annotator_2samples.configure(
+        test=CorrectedDependentTTest(),
+        text_format="star",
+        loc="outside",
+        verbose=0,
+    )
+    annotator_2samples._pvalue_format.pvalue_thresholds = [
+        [0.001, "***"],
+        [0.01, "**"],
+        [0.05, "*"],
+        [1, "ns"],
+    ]
+    annotator_2samples.apply_and_annotate()
+
+    ax.axhline(0, color="black", linewidth=0.8, linestyle="--")
+    ax.set_xlabel("Task (N Subjects)", fontsize=12, fontweight="bold")
+    ax.set_ylabel("Accuracy Gap", fontsize=12, fontweight="bold")
+    ax.tick_params(axis="x", rotation=30, labelsize=10)
+    plt.setp(ax.get_xticklabels(), ha="right")
+    ax.tick_params(axis="y", labelsize=10)
+
+    # Add chance levels and rectangles for separation
+    for i, task in enumerate(data["task_name"].unique()):
+        plt.axvspan(
+            i - 0.5,
+            i + 0.5,
+            facecolor="gray",
+            alpha=[0.05 if i % 2 == 1 else 0][0],
+        )
+
+    # Add gridlines
+    ax.yaxis.grid(True, linestyle=":", alpha=0.7)
+    ax.set_axisbelow(True)
+
+    # Add legend
+    ax.legend(
+        title="Alignment method",
+        title_fontsize=11,
+        fontsize=10,
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.4),
+        ncol=4,
+    )
+
+    plt.tight_layout()
+    sns.despine(left=True)
+    fig.subplots_adjust(bottom=0.3)
+    return fig
+
+
 # Main execution
 df = get_results_dataframe(DATA_PATH, n_parcels=400)
 dict_palette = create_palette(df)
@@ -446,6 +593,7 @@ plots = [
     (template_vs_pairwise, "template_vs_pairwise.pdf"),
     (in_vs_out_of_sample, "in_vs_out_of_sample.pdf"),
     (bias_diff, "bias_diff.pdf"),
+    (pairwise_diff, "pairwise_diff.pdf"),
 ]
 
 for plot_func, filename in plots:
