@@ -47,6 +47,20 @@ def parse_subjects(data_path: Path) -> List[str]:
     return subjects
 
 
+def _require_dataset_files(data_path: Path, subjects: List[str]) -> None:
+    missing_files = []
+    for subject in subjects:
+        for suffix in [".nii.gz", "_runs.csv", "_labels.csv"]:
+            file_path = data_path / f"{subject}{suffix}"
+            if not file_path.exists():
+                missing_files.append(str(file_path))
+    if missing_files:
+        missing_str = "\n".join(f"- {file_path}" for file_path in missing_files)
+        raise FileNotFoundError(
+            f"Missing dataset files under {data_path}:\n{missing_str}"
+        )
+
+
 def sample_dataset(
     name: str,
     subjects: List[str],
@@ -129,6 +143,8 @@ def fetch_dataset(
     task: str,
     n_parcels: int = 400,
 ) -> Dataset:
+    _require_dataset_files(data_path, subjects)
+
     # Get the mask_img
     if "Neuromod" in name:
         mask_img = load_mni152_gm_mask(3)
