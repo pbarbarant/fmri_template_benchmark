@@ -12,6 +12,8 @@ from nilearn.image import largest_connected_component_img, math_img, mean_img
 from nilearn.plotting import cm
 from nilearn.surface import SurfaceImage
 
+from benchmark_utils.conf import IBC_FACEBODY_GROUP_ZMAP
+
 # Setup
 plt.rcParams.update(
     {
@@ -42,16 +44,11 @@ METHOD_PATHS = {
 
 # Load meshes
 mesh = "fsaverage5"
-cache_dir = (
-    "/data/parietal/store3/work/pbarbara/fmri_template_benchmark/memory_cache"
-)
-fsaverage_meshes = datasets.load_fsaverage(mesh=mesh, data_dir=cache_dir)
-curv_sign = datasets.load_fsaverage_data(
-    mesh=mesh, data_type="curvature", data_dir=cache_dir
-)
+fsaverage_meshes = datasets.load_fsaverage(mesh=mesh)
+curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature")
 
 clean_map, threshold = threshold_stats_img(
-    "/data/parietal/store2/data/ibc/smooth_derivatives/group/FaceBody/ffx_faces_adult.nii.gz",
+    IBC_FACEBODY_GROUP_ZMAP,
     alpha=0.05,
     height_control="fdr",
     two_sided=False,
