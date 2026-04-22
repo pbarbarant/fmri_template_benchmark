@@ -4,8 +4,7 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from pathlib import Path
-
+    from benchmark_utils.conf import THINGS_CONDITIONS_DIR
     from benchmark_utils.datasets_utils import fetch_dataset, parse_subjects
 
 
@@ -19,12 +18,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    data_path = (
-        Path(
-            "/data/parietal/store3/work/pbarbara/data/neuromod/z_maps/conditions"
-        )
-        / name
-    )
+    data_path = THINGS_CONDITIONS_DIR / name
 
     parameters = {
         "n_parcels": [200, 400, 600, 800],

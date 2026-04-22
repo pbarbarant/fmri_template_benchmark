@@ -14,7 +14,7 @@ from nilearn.maskers import NiftiMasker
 from nilearn.masking import apply_mask_fmri
 from sklearn.model_selection import StratifiedKFold
 
-from benchmark_utils.conf import IBC_GM_MASK
+from benchmark_utils.conf import GM_MASK
 
 
 @dataclass
@@ -59,9 +59,7 @@ def sample_dataset(
     subjects_imgs = []
     subjects_target = []
     for subject in subjects:
-        img, mask, y = generate_fake_fmri(
-            length=100, n_blocks=2, block_size=10
-        )
+        img, mask, y = generate_fake_fmri(length=100, n_blocks=2, block_size=10)
         subjects_imgs.append(img)
         subjects_target.append(y)
 
@@ -135,7 +133,7 @@ def fetch_dataset(
     if "Neuromod" in name:
         mask_img = load_mni152_gm_mask(3)
     else:
-        mask_img = load_img(IBC_GM_MASK)
+        mask_img = load_img(GM_MASK)
     mask_img, atlas_resampled = intersect_masker_atlas(mask_img, n_parcels)
 
     # Get the labels
