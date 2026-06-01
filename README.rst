@@ -12,7 +12,7 @@ This benchmark relies on `benchopt`_ and `fmralign`_. It can be installed using 
 
 .. code-block::
 
-   $ pip install -U benchopt git+https://github.com/fmralign/fmralign.git
+   $ pip install -U benchopt fmralign==0.0.5
 
 Visualization is handled separetly using the scripts in the ``plots/`` directory. By default, benchopt will try to generate a figure. To avoid any error, make sure to pass the ``--no-plot`` option to ``benchopt run``.
 Options can be passed to ``benchopt run``, to restrict the benchmarks to some solvers or datasets, e.g.:
