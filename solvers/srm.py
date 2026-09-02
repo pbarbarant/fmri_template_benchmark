@@ -69,7 +69,7 @@ class Solver(BaseSolver):
         self.dataset = compute_alignment(
             group_algo,
             self.dataset,
-            solver_name=self.name,
+            solver_name=self.name + f"_{self.n_components}",
         )
 
     def get_result(self):
