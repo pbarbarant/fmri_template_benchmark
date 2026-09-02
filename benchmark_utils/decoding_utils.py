@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import numpy as np
 from joblib import dump
@@ -27,13 +26,13 @@ def save_weights(scores: dict, masker: NiftiMasker, output_dir: Path):
 
 def decode_one_fold(
     fold: Fold,
-    subjects: List[str],
     target: str,
     solver_name: str,
     masker: NiftiMasker,
     output_dir: Path,
     max_iter: int = 1000,
 ):
+    subjects = list(fold.dict_aligned.keys())
     svc = LinearSVC(max_iter=max_iter)
     # Cross decoding in the case of the template
     if target == "template_in_sample" or target == "template_out_of_sample":
@@ -54,7 +53,7 @@ def decode_one_fold(
         )
         cv_scores = scores["test_score"].tolist()
         chance_level = 1 / len(np.unique(y))
-        if solver_name.lower() != "srm":
+        if solver_name.lower() != "srm" and masker is not None:
             save_weights(scores, masker, output_dir)
         print(f"Average decoding accuracy: {np.mean(cv_scores):.2f}")
     # Decode the target in the pairwise case
@@ -84,7 +83,6 @@ def evaluate_dataset(dataset: Dataset, max_iter=1000):
         fold_output_dir.mkdir(parents=True, exist_ok=True)
         cv_scores, chance_level = decode_one_fold(
             fold,
-            subjects=dataset.subjects,
             target=dataset.target,
             solver_name=dataset.solver_name,
             masker=dataset.masker,
