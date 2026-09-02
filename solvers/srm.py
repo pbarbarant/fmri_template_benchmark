@@ -6,6 +6,7 @@ from benchopt import BaseSolver, safe_import_context
 with safe_import_context() as import_ctx:
     from benchopt.stopping_criterion import SingleRunCriterion
     from fmralign import GroupAlignment
+    from fmralign.methods import DetSRM
 
     from benchmark_utils.conf import N_JOBS
     from benchmark_utils.solver_utils import compute_alignment
@@ -20,7 +21,7 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {}
+    parameters = {"n_components": [10, 20, 40, 60, 80]}
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
@@ -59,7 +60,7 @@ class Solver(BaseSolver):
         # You can also use a `tolerance` or a `callback`, as described in
         # https://benchopt.github.io/performance_curves.html
         group_algo = GroupAlignment(
-            method="srm",
+            method=DetSRM(n_components=self.n_components),
             labels=self.dataset.labels,
             scale_template=True,
             n_jobs=N_JOBS,
