@@ -34,15 +34,15 @@ class Dataset:
     labels: np.ndarray
     folds: list[Fold]
     task_name: str
-    target: str
+    target: str | list[str]
     output_dir: Path | None = None
     solver_name: str | None = None
     masker: NiftiMasker | None = None
 
 
 def parse_subjects(data_path: Path) -> list[str]:
-    niftis = sorted(data_path.glob("*.nii.gz"))
-    subjects = [f.name[:-7] for f in niftis]
+    niftis = sorted(data_path.glob("*_labels.csv"))
+    subjects = [f.name[:-11] for f in niftis]
     return subjects
 
 
