@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -20,34 +19,34 @@ from benchmark_utils.conf import GM_MASK
 @dataclass
 class Fold:
     index: int
-    dict_alignment: Dict[str, np.ndarray]
-    dict_decoding: Dict[str, np.ndarray]
-    dict_y: Dict[str, np.ndarray]
-    dict_aligned: Optional[Dict[str, np.ndarray]] = None
-    time: Optional[float] = None
+    dict_alignment: dict[str, np.ndarray]
+    dict_decoding: dict[str, np.ndarray]
+    dict_y: dict[str, np.ndarray]
+    dict_aligned: dict[str, np.ndarray] | None = None
+    time: float | None = None
 
 
 @dataclass
 class Dataset:
     name: str
-    subjects: List[str]
+    subjects: list[str]
     n_subjects: int
     labels: np.ndarray
-    folds: List[Fold]
+    folds: list[Fold]
     task_name: str
     target: str
-    output_dir: Optional[Path] = None
-    solver_name: Optional[str] = None
-    masker: Optional[NiftiMasker] = None
+    output_dir: Path | None = None
+    solver_name: str | None = None
+    masker: NiftiMasker | None = None
 
 
-def parse_subjects(data_path: Path) -> List[str]:
+def parse_subjects(data_path: Path) -> list[str]:
     niftis = sorted(data_path.glob("*.nii.gz"))
     subjects = [f.name[:-7] for f in niftis]
     return subjects
 
 
-def _require_dataset_files(data_path: Path, subjects: List[str]) -> None:
+def _require_dataset_files(data_path: Path, subjects: list[str]) -> None:
     missing_files = []
     for subject in subjects:
         for suffix in [".nii.gz", "_runs.csv", "_labels.csv"]:
@@ -63,12 +62,11 @@ def _require_dataset_files(data_path: Path, subjects: List[str]) -> None:
 
 def sample_dataset(
     name: str,
-    subjects: List[str],
+    subjects: list[str],
     target: str,
 ) -> Dataset:
-    dict_alignment = dict()
-    dict_decoding = dict()
-    dict_y = dict()
+    dict_alignment = {}
+    dict_decoding = {}
 
     subjects_imgs = []
     subjects_target = []
@@ -105,7 +103,7 @@ def sample_dataset(
             )
         )
 
-    n_voxels = list(dict_alignment.values())[0].shape[1]
+    n_voxels = next(iter(dict_alignment.values())).shape[1]
     labels = np.hstack(
         [np.ones(n_voxels // 2), 2 * np.ones(n_voxels - n_voxels // 2)]
     ).astype(int)
@@ -137,7 +135,7 @@ def intersect_masker_atlas(mask_img, n_parcels):
 
 def fetch_dataset(
     name: str,
-    subjects: List[str],
+    subjects: list[str],
     target: str,
     data_path: Path,
     task: str,
