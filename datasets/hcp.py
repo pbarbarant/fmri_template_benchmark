@@ -10,6 +10,7 @@ with safe_import_context() as import_ctx:
     import pandas as pd
     from sklearn.model_selection import KFold
 
+    from benchmark_utils.conf import HCP_CONDITIONS_DIR
     from benchmark_utils.datasets_utils import Dataset as DatasetDataClass
     from benchmark_utils.datasets_utils import Fold, parse_subjects
 
@@ -24,7 +25,7 @@ class Dataset(BaseDataset):
     install_pip = "pip"
     requirements = []
 
-    data_path = Path("/Users/plbar/Code/fmri_template_benchmark/data/hcp")
+    data_path = HCP_CONDITIONS_DIR
 
     parameters = {"target": ["template_out_of_sample"]}
 
