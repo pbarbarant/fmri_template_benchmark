@@ -1,6 +1,12 @@
 from pathlib import Path
 from time import perf_counter
 
+from fmralign.alignment.utils import (
+    _check_method,
+    _fit_template,
+    _map_to_target,
+)
+
 from benchmark_utils.datasets_utils import Dataset, Fold
 
 
@@ -32,6 +38,38 @@ def align_one_fold(
         }
 
 
+def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
+    method = _check_method(group_algo.method)
+    _, external_template = _fit_template(
+        list(fold.dict_alignment.values()),
+        method,
+        group_algo.labels,
+        group_algo.n_jobs,
+        group_algo.verbose,
+        group_algo.n_iter,
+        group_algo.scale_template,
+    )
+    fits = _map_to_target(
+        list(fold.dict_decoding.values()),
+        external_template,
+        method,
+        group_algo.labels,
+        group_algo.n_jobs,
+        group_algo.verbose,
+    )
+    fold.dict_aligned = {
+        s: estimator.transform(fold.dict_decoding[s])
+        for s, estimator in zip(fold.dict_decoding.keys(), fits)
+    }
+    if solver_name.lower() == "srm":
+        # Reshape arrays from (n_parcels, n_samples, n_features)
+        # to (n_samples, n_parcels * n_features)
+        fold.dict_aligned = {
+            k: v.transpose(1, 0, 2).reshape(v.shape[1], -1)
+            for k, v in fold.dict_aligned.items()
+        }
+
+
 def compute_alignment(
     group_algo,
     dataset: Dataset,
@@ -50,6 +88,9 @@ def compute_alignment(
 
     for fold in dataset.folds:
         print(f"Aligning on fold n°{fold.index}")
-        align_one_fold(fold, group_algo, dataset.target, solver_name)
+        if dataset.name == "HCP":
+            align_one_fold_hcp(fold, group_algo, solver_name)
+        else:
+            align_one_fold(fold, group_algo, dataset.target, solver_name)
 
     return dataset

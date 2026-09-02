@@ -34,7 +34,7 @@ class Dataset:
     labels: np.ndarray
     folds: list[Fold]
     task_name: str
-    target: str | list[str]
+    target: str
     output_dir: Path | None = None
     solver_name: str | None = None
     masker: NiftiMasker | None = None
