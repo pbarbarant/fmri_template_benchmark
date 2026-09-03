@@ -39,9 +39,14 @@ def align_one_fold(
 
 
 def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
+    decoding_subjects = fold.decoding_subjects
     method = _check_method(group_algo.method)
     _, external_template = _fit_template(
-        list(fold.dict_alignment.values()),
+        [
+            v
+            for k, v in fold.dict_alignment.items()
+            if k not in decoding_subjects
+        ],
         method,
         group_algo.labels,
         group_algo.n_jobs,
@@ -50,7 +55,7 @@ def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
         group_algo.scale_template,
     )
     fits = _map_to_target(
-        list(fold.dict_decoding.values()),
+        [v for k, v in fold.dict_alignment.items() if k in decoding_subjects],
         external_template,
         method,
         group_algo.labels,
