@@ -44,7 +44,7 @@ class Dataset(BaseDataset):
         for fold_idx, (decoding_idx, _) in enumerate(folds_indices):
             dict_alignment = {
                 sub: np.load(data_path / f"{sub}_movie.npy", mmap_mode="r")[
-                    10:, labels != 0
+                    10:,
                 ]  # Skip first 10 TRs to avoid movie onset effects
                 for sub in np.array(subjects)
             }
@@ -74,7 +74,7 @@ class Dataset(BaseDataset):
             name=self.name,
             subjects=subjects,
             n_subjects=len(subjects),
-            labels=labels[labels != 0],
+            labels=labels,
             folds=folds,
             task_name="hcp",
             target=self.target,
