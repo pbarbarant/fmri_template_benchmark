@@ -35,8 +35,8 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-
-        subjects = parse_subjects(data_path)
+        labels = np.load(data_path / "schaefer_400_parcellation.npy")
+        subjects = parse_subjects(data_path)[:100]  # Limit to 100 subjects
         kf = KFold(n_splits=5, shuffle=True, random_state=0)
         folds_indices = list(kf.split(subjects))
 
@@ -44,8 +44,8 @@ class Dataset(BaseDataset):
         for fold_idx, (decoding_idx, _) in enumerate(folds_indices):
             dict_alignment = {
                 sub: np.load(data_path / f"{sub}_movie.npy", mmap_mode="r")[
-                    10:, :  # Skip first 10 TRs to avoid movie onset effects
-                ]
+                    10:, labels != 0
+                ]  # Skip first 10 TRs to avoid movie onset effects
                 for sub in np.array(subjects)
             }
             dict_decoding = {
@@ -70,12 +70,11 @@ class Dataset(BaseDataset):
                 )
             )
 
-        labels = np.load(data_path / "schaefer_400_parcellation.npy")
         self.dataset = DatasetDataClass(
             name=self.name,
             subjects=subjects,
             n_subjects=len(subjects),
-            labels=labels,
+            labels=labels[labels != 0],
             folds=folds,
             task_name="hcp",
             target=self.target,
