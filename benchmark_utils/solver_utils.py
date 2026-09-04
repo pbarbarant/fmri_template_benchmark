@@ -29,7 +29,7 @@ def align_one_fold(
     # End the timer
     fold.time = perf_counter() - start_time
 
-    if solver_name.lower() == "srm":
+    if solver_name.lower().startswith("srm"):
         # Reshape arrays from (n_parcels, n_samples, n_features)
         # to (n_samples, n_parcels * n_features)
         fold.dict_aligned = {
@@ -67,7 +67,7 @@ def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
         s: estimator.transform(fold.dict_decoding[s][:, labels != 0])
         for s, estimator in zip(fold.dict_decoding.keys(), fits)
     }
-    if solver_name.lower() == "srm":
+    if solver_name.lower().startswith("srm"):
         # Reshape arrays from (n_parcels, n_samples, n_features)
         # to (n_samples, n_parcels * n_features)
         fold.dict_aligned = {
