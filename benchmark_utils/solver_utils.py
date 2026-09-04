@@ -56,11 +56,7 @@ def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
         group_algo.scale_template,
     )
     fits = _map_to_target(
-        [
-            v[:, labels != 0]
-            for k, v in fold.dict_alignment.items()
-            if k in decoding_subjects
-        ],
+        (fold.dict_alignment[k][:, labels != 0] for k in decoding_subjects),
         external_template,
         method,
         labels[labels != 0],
