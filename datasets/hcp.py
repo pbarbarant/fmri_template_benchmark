@@ -8,7 +8,6 @@ with safe_import_context() as import_ctx:
 
     import numpy as np
     import pandas as pd
-    from sklearn.model_selection import KFold
 
     from benchmark_utils.conf import HCP_CONDITIONS_DIR
     from benchmark_utils.datasets_utils import Dataset as DatasetDataClass
@@ -27,7 +26,7 @@ class Dataset(BaseDataset):
 
     data_path = HCP_CONDITIONS_DIR
 
-    parameters = {"target": ["template_out_of_sample"]}
+    parameters = {"target": ["template_in_sample"]}
 
     def get_data(self, data_path: Path = data_path):
         # The return arguments of this function are passed as keyword arguments
@@ -37,38 +36,32 @@ class Dataset(BaseDataset):
         # The dictionary defines the keyword arguments for `Objective.set_data`
         labels = np.load(data_path / "schaefer_400_parcellation.npy")
         subjects = parse_subjects(data_path)[:100]  # Limit to 100 subjects
-        kf = KFold(n_splits=5, shuffle=True, random_state=0)
-        folds_indices = list(kf.split(subjects))
 
-        folds = []
-        for fold_idx, (decoding_idx, _) in enumerate(folds_indices):
-            dict_alignment = {
-                sub: np.load(data_path / f"{sub}_movie.npy", mmap_mode="r")[
-                    10:,
-                ]  # Skip first 10 TRs to avoid movie onset effects
-                for sub in np.array(subjects)
-            }
-            dict_decoding = {
-                sub: np.load(data_path / f"{sub}_task.npy", mmap_mode="r")
-                for sub in np.array(subjects)[decoding_idx]
-            }
-            dict_y = {
-                sub: (
-                    pd.read_csv(data_path / f"{sub}_labels.csv")["condition"]
-                    .values.astype(str)
-                    .ravel()
-                )
-                for sub in np.array(subjects)[decoding_idx]
-            }
-            folds.append(
-                Fold(
-                    index=fold_idx,
-                    dict_alignment=dict_alignment,
-                    dict_decoding=dict_decoding,
-                    dict_y=dict_y,
-                    decoding_subjects=np.array(subjects)[decoding_idx].tolist(),
-                )
+        dict_alignment = {
+            sub: np.load(data_path / f"{sub}_movie.npy", mmap_mode="r")
+            for sub in np.array(subjects)
+        }
+        dict_decoding = {
+            sub: np.load(data_path / f"{sub}_task.npy", mmap_mode="r")
+            for sub in np.array(subjects)
+        }
+        dict_y = {
+            sub: (
+                pd.read_csv(data_path / f"{sub}_labels.csv")["condition"]
+                .values.astype(str)
+                .ravel()
             )
+            for sub in np.array(subjects)
+        }
+        folds = [
+            Fold(
+                index=0,
+                dict_alignment=dict_alignment,
+                dict_decoding=dict_decoding,
+                dict_y=dict_y,
+                timepoints_mask=np.load(data_path / "movie1_mask.npy"),
+            )
+        ]
 
         self.dataset = DatasetDataClass(
             name=self.name,
