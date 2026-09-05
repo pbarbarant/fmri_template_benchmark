@@ -43,7 +43,7 @@ def decode_one_fold(
         chance_level = 1 / len(np.unique(y))
         if dataset_name.lower() == "hcp":
             # Do a 5-fold cross-validation but get a score for each subject
-            cv = GroupKFold(n_splits=4, shuffle=True, random_state=0)
+            cv = GroupKFold(n_splits=5, shuffle=True, random_state=0)
             for train_idx, test_idx in cv.split(
                 subjects, groups=np.arange(len(subjects))
             ):
