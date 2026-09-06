@@ -43,7 +43,7 @@ def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
     labels = group_algo.labels
     method = _check_method(group_algo.method)
     fits, _ = _fit_template(
-        lambda: (
+        (
             v[np.ix_(fold.timepoints_mask, labels != 0)]
             for v in fold.dict_alignment.values()
         ),
