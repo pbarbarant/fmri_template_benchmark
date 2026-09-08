@@ -26,7 +26,10 @@ class Dataset(BaseDataset):
 
     data_path = HCP_CONDITIONS_DIR
 
-    parameters = {"target": ["template_in_sample"]}
+    parameters = {
+        "target": ["template_in_sample"],
+        "n_subjects": [10, 20, 50, 100],
+    }
 
     def get_data(self, data_path: Path = data_path):
         # The return arguments of this function are passed as keyword arguments
@@ -35,7 +38,9 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         labels = np.load(data_path / "schaefer_400_parcellation.npy")
-        subjects = parse_subjects(data_path)[:100]  # Limit to 100 subjects
+        subjects = parse_subjects(data_path)[
+            : self.n_subjects
+        ]  # Limit to 100 subjects
 
         dict_alignment = {
             sub: np.load(data_path / f"{sub}_movie.npy", mmap_mode="r")
@@ -64,7 +69,7 @@ class Dataset(BaseDataset):
         ]
 
         self.dataset = DatasetDataClass(
-            name=self.name,
+            name=self.name + f"_{self.n_subjects}",
             subjects=subjects,
             n_subjects=len(subjects),
             labels=labels,
