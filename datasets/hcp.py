@@ -69,12 +69,12 @@ class Dataset(BaseDataset):
         ]
 
         self.dataset = DatasetDataClass(
-            name=self.name + f"_{self.n_subjects}",
+            name=self.name,
             subjects=subjects,
             n_subjects=len(subjects),
             labels=labels,
             folds=folds,
-            task_name="hcp",
+            task_name="hcp" + f"_{self.n_subjects}",
             target=self.target,
         )
 
