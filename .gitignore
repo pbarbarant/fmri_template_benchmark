@@ -10,6 +10,7 @@ memory_cache
 joblib/
 benchopt_run/
 copy_outputs/
+.python-version
 
 # IDE specific folders
 .vscode
@@ -21,3 +22,4 @@ benchopt.ini
 .DS_Store
 coverage.xml
 data/**
+slurm_config.yaml
