@@ -22,7 +22,7 @@ class Fold:
     dict_alignment: dict[str, np.ndarray]
     dict_decoding: dict[str, np.ndarray]
     dict_y: dict[str, np.ndarray]
-    timepoints_mask: np.ndarray
+    timepoints_mask: np.ndarray | None = None
     dict_aligned: dict[str, np.ndarray] | None = None
     time: float | None = None
 
