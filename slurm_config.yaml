@@ -1,5 +1,0 @@
-slurm_time: 06:00:00        # max runtime 6 hours
-slurm_partition: normal
-slurm_job_name: benchopt    # Job name
-slurm_additional_parameters:
-  cpus-per-task: 40         # requires 40 CPUs per job
