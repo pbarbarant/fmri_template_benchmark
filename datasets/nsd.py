@@ -39,7 +39,9 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        labels = np.load(data_path / f"schaefer_{self.n_parcels}.npy")
+        labels = np.load(
+            data_path / f"schaefer_{self.n_parcels}_fs5.npy"
+        ).astype(int)
         subjects = parse_subjects(data_path)
 
         y = (
@@ -48,7 +50,7 @@ class Dataset(BaseDataset):
             .ravel()
         )
 
-        subjects_data = [np.load(data_path / f"{s}.npy") for s in subjects]
+        subjects_data = [np.load(data_path / f"{s}_fs5.npy") for s in subjects]
 
         kf = KFold(n_splits=5, shuffle=True, random_state=0)
         splits = kf.split(np.arange(len(y)))
@@ -56,11 +58,11 @@ class Dataset(BaseDataset):
         folds = []
         for fold_idx, (decoding_idx, alignment_idx) in enumerate(splits):
             dict_alignment = {
-                s: data[alignment_idx]
+                s: data[alignment_idx][:, labels != 0]
                 for s, data in zip(subjects, subjects_data)
             }
             dict_decoding = {
-                s: data[decoding_idx]
+                s: data[decoding_idx][:, labels != 0]
                 for s, data in zip(subjects, subjects_data)
             }
             dict_y = {s: y[decoding_idx] for s in subjects}
@@ -77,7 +79,7 @@ class Dataset(BaseDataset):
             name=self.name + f"_{self.n_parcels}",
             subjects=subjects,
             n_subjects=len(subjects),
-            labels=labels,
+            labels=labels[labels != 0],
             folds=folds,
             task_name="NSD",
             target=self.target,
