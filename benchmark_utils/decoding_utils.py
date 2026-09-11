@@ -77,11 +77,11 @@ def decode_one_fold(
             y_pred_all = np.hstack(all_y_pred)
 
             cm = confusion_matrix(y_true_all, y_pred_all, labels=svc.classes_)
-            np.save(output_dir / "confusion_matrix.npy", cm)
+            np.save(output_dir.parent / "confusion_matrix.npy", cm)
             ConfusionMatrixDisplay.from_predictions(y_true_all, y_pred_all)
             plt.xticks(rotation=90)
             plt.savefig(
-                output_dir / "confusion_matrix.png",
+                output_dir.parent / "confusion_matrix.png",
                 dpi=300,
                 bbox_inches="tight",
             )
