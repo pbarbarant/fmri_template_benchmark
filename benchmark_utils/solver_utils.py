@@ -38,14 +38,21 @@ def align_one_fold(
         }
 
 
-def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
+def align_one_fold_hcp(
+    fold: Fold, group_algo, solver_name: str, output_dir: Path
+) -> None:
     start_time = perf_counter()
     labels = group_algo.labels
     method = _check_method(group_algo.method)
     fits, _ = _fit_template(
         (
-            v[np.ix_(fold.timepoints_mask, labels != 0)]
-            for v in fold.dict_alignment.values()
+            np.vstack(
+                [
+                    m[np.ix_(mask, labels != 0)]
+                    for m, mask in zip(movies, fold.timepoints_masks)
+                ]
+            )
+            for movies in fold.dict_alignment.values()
         ),
         method,
         labels[labels != 0],
@@ -59,6 +66,10 @@ def align_one_fold_hcp(fold: Fold, group_algo, solver_name: str) -> None:
         for s, estimator in zip(fold.dict_decoding.keys(), fits)
     }
     fold.time = perf_counter() - start_time
+    np.save(
+        output_dir / "template.npy",
+        np.mean(list(fold.dict_aligned.values()), axis=0),
+    )
     if solver_name.lower().startswith("srm"):
         # Reshape arrays from (n_parcels, n_samples, n_features)
         # to (n_samples, n_parcels * n_features)
@@ -87,7 +98,7 @@ def compute_alignment(
     for fold in dataset.folds:
         print(f"Aligning on fold n°{fold.index}")
         if dataset.name == "HCP":
-            align_one_fold_hcp(fold, group_algo, solver_name)
+            align_one_fold_hcp(fold, group_algo, solver_name, output_dir)
         else:
             align_one_fold(fold, group_algo, dataset.target, solver_name)
 

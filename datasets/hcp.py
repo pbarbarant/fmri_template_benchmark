@@ -29,6 +29,7 @@ class Dataset(BaseDataset):
     parameters = {
         "target": ["template_in_sample"],
         "n_subjects": [10, 20, 50, 100],
+        "n_movies": [1, 2, 3, 4],
     }
 
     def get_data(self, data_path: Path = data_path):
@@ -43,9 +44,16 @@ class Dataset(BaseDataset):
         ]  # Limit to 100 subjects
 
         dict_alignment = {
-            sub: np.load(data_path / f"{sub}_movie.npy", mmap_mode="r")
+            sub: [
+                np.load(data_path / f"{sub}_movie{i}.npy", mmap_mode="r")
+                for i in range(1, self.n_movies + 1)
+            ]
             for sub in np.array(subjects)
         }
+        timepoints_masks = [
+            np.load(data_path / f"movie{i}_mask.npy")
+            for i in range(1, self.n_movies + 1)
+        ]
         dict_decoding = {
             sub: np.load(data_path / f"{sub}_task.npy", mmap_mode="r")
             for sub in np.array(subjects)
@@ -64,7 +72,7 @@ class Dataset(BaseDataset):
                 dict_alignment=dict_alignment,
                 dict_decoding=dict_decoding,
                 dict_y=dict_y,
-                timepoints_mask=np.load(data_path / "movie1_mask.npy"),
+                timepoints_masks=timepoints_masks,
             )
         ]
 
@@ -74,7 +82,7 @@ class Dataset(BaseDataset):
             n_subjects=len(subjects),
             labels=labels,
             folds=folds,
-            task_name="hcp" + f"_{self.n_subjects}",
+            task_name="hcp" + f"_{self.n_subjects}_{self.n_movies}",
             target=self.target,
         )
 
