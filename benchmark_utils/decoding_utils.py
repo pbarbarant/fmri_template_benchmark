@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from joblib import dump
 from nilearn.maskers import NiftiMasker
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, cross_validate
 from sklearn.svm import LinearSVC
 
@@ -44,6 +46,8 @@ def decode_one_fold(
         if dataset_name.lower() == "hcp":
             # Do a 5-fold cross-validation but get a score for each subject
             cv = GroupKFold(n_splits=5, shuffle=True, random_state=0)
+            all_y_true = []
+            all_y_pred = []
             for train_idx, test_idx in cv.split(
                 subjects, groups=np.arange(len(subjects))
             ):
@@ -61,8 +65,26 @@ def decode_one_fold(
                 for test_sub in test_subjects:
                     X_test = fold.dict_aligned[test_sub]
                     y_test = fold.dict_y[test_sub]
+                    y_pred = svc.predict(X_test)
                     cv_scores.append(svc.score(X_test, y_test))
                     cv_subjects.append(test_sub)
+
+                    all_y_true.append(y_test)
+                    all_y_pred.append(y_pred)
+
+            # Concatenate across all subjects/folds
+            y_true_all = np.hstack(all_y_true)
+            y_pred_all = np.hstack(all_y_pred)
+
+            cm = confusion_matrix(y_true_all, y_pred_all, labels=svc.classes_)
+            np.save(output_dir / "confusion_matrix.npy", cm)
+            ConfusionMatrixDisplay.from_predictions(y_true_all, y_pred_all)
+            plt.xticks(rotation=90)
+            plt.savefig(
+                output_dir / "confusion_matrix.png",
+                dpi=300,
+                bbox_inches="tight",
+            )
         else:
             X = np.vstack([fold.dict_aligned[sub] for sub in subjects])
             groups = np.concatenate(
