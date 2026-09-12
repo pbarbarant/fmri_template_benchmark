@@ -45,7 +45,7 @@ class Dataset(BaseDataset):
 
         dict_alignment = {
             sub: [
-                np.load(data_path / f"{sub}_movie{i}.npy", mmap_mode="r")
+                data_path / f"{sub}_movie{i}.npy"
                 for i in range(1, self.n_movies + 1)
             ]
             for sub in np.array(subjects)

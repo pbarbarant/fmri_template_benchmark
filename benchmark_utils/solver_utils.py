@@ -45,10 +45,10 @@ def align_one_fold_hcp(
     labels = group_algo.labels
     method = _check_method(group_algo.method)
     fits, _ = _fit_template(
-        (
+        lambda: (
             np.vstack(
                 [
-                    m[np.ix_(mask, labels != 0)]
+                    np.load(m)[np.ix_(mask, labels != 0)]
                     for m, mask in zip(movies, fold.timepoints_masks)
                 ]
             )
