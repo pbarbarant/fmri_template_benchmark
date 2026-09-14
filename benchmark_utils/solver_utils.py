@@ -10,6 +10,14 @@ from fmralign.alignment.utils import (
 from benchmark_utils.datasets_utils import Dataset, Fold
 
 
+class ReIterable:
+    def __init__(self, gen):
+        self.gen = gen
+
+    def __iter__(self):
+        return self.gen()
+
+
 def align_one_fold(
     fold: Fold, group_algo, target: str, solver_name: str
 ) -> None:
@@ -44,7 +52,7 @@ def align_one_fold_hcp(
     start_time = perf_counter()
     labels = group_algo.labels
     method = _check_method(group_algo.method)
-    fits, _ = _fit_template(
+    X = ReIterable(
         lambda: (
             np.vstack(
                 [
@@ -53,7 +61,10 @@ def align_one_fold_hcp(
                 ]
             )
             for movies in fold.dict_alignment.values()
-        ),
+        )
+    )
+    fits, _ = _fit_template(
+        X,
         method,
         labels[labels != 0],
         group_algo.n_jobs,
