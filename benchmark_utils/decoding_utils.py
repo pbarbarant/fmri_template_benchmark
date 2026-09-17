@@ -36,7 +36,7 @@ def decode_one_fold(
     max_iter: int = 1000,
 ):
     subjects = list(fold.dict_aligned.keys())
-    svc = LinearSVC(max_iter=max_iter)
+    svc = LinearSVC(max_iter=max_iter, random_state=0)
     # Cross decoding in the case of the template
     if target == "template_in_sample" or target == "template_out_of_sample":
         cv_scores = []
