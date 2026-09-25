@@ -11,7 +11,8 @@ from nilearn.datasets import (
 from nilearn.image import load_img, math_img, resample_to_img
 from nilearn.maskers import NiftiMasker
 from nilearn.masking import apply_mask_fmri
-from sklearn.model_selection import StratifiedKFold
+from scipy.stats import zscore
+from sklearn.model_selection import LeaveOneGroupOut
 
 from benchmark_utils.conf import GM_MASK
 
@@ -71,16 +72,18 @@ def sample_dataset(
 
     subjects_imgs = []
     subjects_target = []
-    for subject in subjects:
+    for _ in subjects:
         img, mask, y = generate_fake_fmri(length=100, n_blocks=2, block_size=10)
         subjects_imgs.append(img)
         subjects_target.append(y)
 
-    runs = np.ones(img.shape[-1])
+    runs = np.hstack(
+        [np.ones(img.shape[-1] // 2), 2 * np.ones(img.shape[-1] // 2)]
+    )
     masker = NiftiMasker(mask).fit()
 
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-    folds_indices = list(skf.split(runs, runs))
+    logo = LeaveOneGroupOut()
+    folds_indices = list(logo.split(runs, y, groups=runs))
 
     folds = []
     for fold_idx, (decoding_idx, alignment_idx) in enumerate(folds_indices):
@@ -134,6 +137,15 @@ def intersect_masker_atlas(mask_img, n_parcels):
     return intersect, atlas_resampled
 
 
+def z_score_per_run(data, runs):
+    """Z-score the data separately for each run."""
+    data_z = data.copy()
+    for run in pd.unique(runs):
+        run_idx = runs == run
+        data_z[run_idx] = zscore(data[run_idx], axis=0)
+    return data_z
+
+
 def fetch_dataset(
     name: str,
     subjects: list[str],
@@ -172,9 +184,10 @@ def fetch_dataset(
     subjects_data = [
         (masker.transform(data_path / f"{s}.nii.gz")) for s in subjects
     ]
+    subjects_data = [z_score_per_run(data, runs) for data in subjects_data]
 
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-    folds_indices = list(skf.split(runs, runs))
+    logo = LeaveOneGroupOut()
+    folds_indices = list(logo.split(runs, y, groups=runs))
 
     folds = []
     for fold_idx, (decoding_idx, alignment_idx) in enumerate(folds_indices):
