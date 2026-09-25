@@ -21,7 +21,7 @@ def save_weights(scores: dict, masker: NiftiMasker, output_dir: Path):
     )
 
     # Skip binary classification (simulation)
-    if classes_ > 2:
+    if len(classes_) > 2:
         for i, class_ in enumerate(classes_):
             masker.inverse_transform(coefs_aggregated[i]).to_filename(
                 output_dir / f"coefs_{class_}.nii.gz"
