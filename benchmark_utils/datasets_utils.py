@@ -57,6 +57,8 @@ class Dataset:
 def parse_subjects(data_path: Path) -> list[str]:
     niftis = sorted(data_path.glob("*_labels.csv"))
     subjects = [f.name[:-11] for f in niftis]
+    if len(subjects) == 0:
+        raise ValueError(f"No subjects found in {data_path}")
     return subjects
 
 
