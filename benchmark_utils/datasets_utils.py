@@ -29,6 +29,18 @@ class Fold:
 
 
 @dataclass
+class DatasetParams:
+    name: str
+    subjects: list[str]
+    target: str
+    data_path: Path | None
+    task: str
+    n_subjects: int
+    n_parcels: int | None = None
+    n_movies: int | None = None
+
+
+@dataclass
 class Dataset:
     name: str
     subjects: list[str]
@@ -146,13 +158,13 @@ def z_score_per_run(data, runs):
     return data_z
 
 
-def fetch_dataset(
+def fetch_nifti_dataset(
     name: str,
     subjects: list[str],
     target: str,
     data_path: Path,
     task: str,
-    n_parcels: int = 400,
+    n_parcels: int,
 ) -> Dataset:
     _require_dataset_files(data_path, subjects)
 
@@ -217,3 +229,82 @@ def fetch_dataset(
         target=target,
         masker=masker,
     )
+
+
+def fetch_hcp_dataset(
+    name: str,
+    target: str,
+    data_path: Path,
+    n_subjects: int,
+    n_movies: int,
+) -> Dataset:
+    labels = np.load(data_path / "schaefer_400_parcellation.npy")
+    subjects = parse_subjects(data_path)[:n_subjects]  # Limit to 100 subjects
+
+    dict_alignment = {
+        sub: [data_path / f"{sub}_movie{i}.npy" for i in range(1, n_movies + 1)]
+        for sub in np.array(subjects)
+    }
+    timepoints_masks = [
+        np.load(data_path / f"movie{i}_mask.npy")
+        for i in range(1, n_movies + 1)
+    ]
+    dict_decoding = {
+        sub: np.load(data_path / f"{sub}_task.npy", mmap_mode="r")
+        for sub in np.array(subjects)
+    }
+    dict_y = {
+        sub: (
+            pd.read_csv(data_path / f"{sub}_labels.csv")["condition"]
+            .values.astype(str)
+            .ravel()
+        )
+        for sub in np.array(subjects)
+    }
+    folds = [
+        Fold(
+            index=0,
+            dict_alignment=dict_alignment,
+            dict_decoding=dict_decoding,
+            dict_y=dict_y,
+            timepoints_masks=timepoints_masks,
+        )
+    ]
+
+    return Dataset(
+        name=name,
+        subjects=subjects,
+        n_subjects=len(subjects),
+        labels=labels,
+        folds=folds,
+        task_name="hcp" + f"_{n_subjects}_{n_movies}",
+        target=target,
+    )
+
+
+def fetch_dataset(
+    name: str,
+    subjects: list[str],
+    target: str,
+    data_path: Path,
+    task: str,
+    n_subjects: int,
+    n_parcels: int | None,
+    n_movies: int | None,
+) -> Dataset:
+    if name == "Simulated":
+        return sample_dataset(name, subjects, target)
+    elif name.startswith(("IBC", "Neuromod", "Forrest")):
+        assert isinstance(n_parcels, int), (
+            "n_parcels must be provided for Nifti datasets"
+        )
+        return fetch_nifti_dataset(
+            name, subjects, target, data_path, task, n_parcels
+        )
+    elif name == "HCP":
+        assert isinstance(n_movies, int), (
+            "n_movies must be provided for HCP dataset"
+        )
+        return fetch_hcp_dataset(name, target, data_path, n_subjects, n_movies)
+    else:
+        raise ValueError(f"Unknown dataset name: {name}")
