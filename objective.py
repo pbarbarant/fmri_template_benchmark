@@ -4,6 +4,7 @@ from benchopt import BaseObjective, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
+    from benchmark_utils.datasets_utils import fetch_dataset
     from benchmark_utils.decoding_utils import evaluate_dataset
 
 
@@ -49,13 +50,12 @@ class Objective(BaseObjective):
 
     def set_data(
         self,
-        dataset,
+        dataset_params,
     ):
         # The keyword arguments of this function are the keys of the dictionary
         # returned by `Dataset.get_data`. This defines the benchmark's
         # API to pass data. This is customizable for each benchmark.
-        self.dataset = dataset
-        print(f"Running on: {dataset.name} task: {dataset.task_name}")
+        self.dataset_params = dataset_params
 
     def evaluate_result(self, dataset):
         # The keyword arguments of this function are the keys of the
@@ -81,5 +81,15 @@ class Objective(BaseObjective):
         # for `Solver.set_objective`. This defines the
         # benchmark's API for passing the objective to the solver.
         # It is customizable for each benchmark.
+        dataset = fetch_dataset(
+            name=self.dataset_params.name,
+            subjects=self.dataset_params.subjects,
+            target=self.dataset_params.target,
+            data_path=self.dataset_params.data_path,
+            task=self.dataset_params.task,
+            n_subjects=self.dataset_params.n_subjects,
+            n_parcels=self.dataset_params.n_parcels,
+            n_movies=self.dataset_params.n_movies,
+        )
 
-        return dict(dataset=self.dataset)
+        return {"dataset": dataset}
