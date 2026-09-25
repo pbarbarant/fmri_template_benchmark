@@ -105,7 +105,7 @@ def decode_one_fold(
             cv_scores = scores["test_score"].tolist()
             cv_subjects = subjects
 
-        if solver_name.lower() != "srm" and masker is not None:
+        if not solver_name.startswith("SRM") and masker is not None:
             save_weights(scores, masker, output_dir)
         print(f"Average decoding accuracy: {np.mean(cv_scores):.2f}")
     # Decode the target in the pairwise case
