@@ -4,7 +4,7 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchmark_utils.datasets_utils import sample_dataset
+    from benchmark_utils.datasets_utils import DatasetParams
 
 SUBJECTS = ["sub-01", "sub-02", "sub-03"]
 
@@ -30,10 +30,13 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        self.dataset = sample_dataset(
+        dataset_params = DatasetParams(
             name=self.name,
             subjects=SUBJECTS,
             target=self.target,
+            data_path=None,
+            task=self.name,
+            n_subjects=len(SUBJECTS),
         )
 
-        return dict(dataset=self.dataset)
+        return {"dataset_params": dataset_params}

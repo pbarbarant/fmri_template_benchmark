@@ -6,12 +6,8 @@ from benchopt import BaseDataset, safe_import_context
 with safe_import_context() as import_ctx:
     from pathlib import Path
 
-    import numpy as np
-    import pandas as pd
-
     from benchmark_utils.conf import HCP_CONDITIONS_DIR
-    from benchmark_utils.datasets_utils import Dataset as DatasetDataClass
-    from benchmark_utils.datasets_utils import Fold, parse_subjects
+    from benchmark_utils.datasets_utils import DatasetParams, parse_subjects
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -38,52 +34,16 @@ class Dataset(BaseDataset):
         # API to pass data. It is customizable for each benchmark.
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        labels = np.load(data_path / "schaefer_400_parcellation.npy")
-        subjects = parse_subjects(data_path)[
-            : self.n_subjects
-        ]  # Limit to 100 subjects
-
-        dict_alignment = {
-            sub: [
-                data_path / f"{sub}_movie{i}.npy"
-                for i in range(1, self.n_movies + 1)
-            ]
-            for sub in np.array(subjects)
-        }
-        timepoints_masks = [
-            np.load(data_path / f"movie{i}_mask.npy")
-            for i in range(1, self.n_movies + 1)
-        ]
-        dict_decoding = {
-            sub: np.load(data_path / f"{sub}_task.npy", mmap_mode="r")
-            for sub in np.array(subjects)
-        }
-        dict_y = {
-            sub: (
-                pd.read_csv(data_path / f"{sub}_labels.csv")["condition"]
-                .values.astype(str)
-                .ravel()
-            )
-            for sub in np.array(subjects)
-        }
-        folds = [
-            Fold(
-                index=0,
-                dict_alignment=dict_alignment,
-                dict_decoding=dict_decoding,
-                dict_y=dict_y,
-                timepoints_masks=timepoints_masks,
-            )
-        ]
-
-        self.dataset = DatasetDataClass(
+        subjects = parse_subjects(data_path)[: self.n_subjects]
+        dataset_params = DatasetParams(
             name=self.name,
             subjects=subjects,
-            n_subjects=len(subjects),
-            labels=labels,
-            folds=folds,
-            task_name="hcp" + f"_{self.n_subjects}_{self.n_movies}",
             target=self.target,
+            data_path=data_path,
+            task=self.name,
+            n_subjects=len(subjects),
+            n_parcels=None,
+            n_movies=self.n_movies,
         )
 
-        return {"dataset": self.dataset}
+        return {"dataset_params": dataset_params}

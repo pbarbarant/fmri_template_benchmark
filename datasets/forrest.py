@@ -5,7 +5,7 @@ from benchopt import BaseDataset, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchmark_utils.conf import FORREST_CONDITIONS_DIR
-    from benchmark_utils.datasets_utils import fetch_dataset, parse_subjects
+    from benchmark_utils.datasets_utils import DatasetParams, parse_subjects
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -33,13 +33,15 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        self.dataset = fetch_dataset(
+        subjects = parse_subjects(data_path)
+        dataset_params = DatasetParams(
             name=self.name + f"_{self.n_parcels}",
-            subjects=parse_subjects(data_path),
+            subjects=subjects,
             target=self.target,
             data_path=data_path,
             task=self.name,
+            n_subjects=len(subjects),
             n_parcels=self.n_parcels,
         )
 
-        return dict(dataset=self.dataset)
+        return {"dataset_params": dataset_params}
