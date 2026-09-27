@@ -1,0 +1,47 @@
+from benchopt import BaseDataset, safe_import_context
+
+# Protect the import with `safe_import_context()`. This allows:
+# - skipping import to speed up autocompletion in CLI.
+# - getting requirements info when all dependencies are not installed.
+with safe_import_context() as import_ctx:
+    from benchmark_utils.conf import IBC_TRIALS_ROOT
+    from benchmark_utils.datasets_utils import DatasetParams, parse_subjects
+
+
+# All datasets must be named `Dataset` and inherit from `BaseDataset`
+class Dataset(BaseDataset):
+    # Name to select the dataset in the CLI and to display the results.
+    name = "Audio"
+
+    # List of packages needed to run the dataset. See the corresponding
+    # section in objective.py
+    install_pip = "pip"
+    requirements = []
+
+    data_path = IBC_TRIALS_ROOT / name
+
+    parameters = {
+        "n_parcels": [200, 400, 600, 800],
+        "target": ["template_in_sample", "template_out_of_sample"]
+        + parse_subjects(data_path),
+    }
+
+    def get_data(self, data_path=data_path):
+        # The return arguments of this function are passed as keyword arguments
+        # to `Objective.set_data`. This defines the benchmark's
+        # API to pass data. It is customizable for each benchmark.
+
+        # The dictionary defines the keyword arguments for `Objective.set_data`
+
+        subjects = parse_subjects(data_path)
+        dataset_params = DatasetParams(
+            name="IBC" + f"_{self.n_parcels}",
+            subjects=subjects,
+            target=self.target,
+            data_path=data_path,
+            task=self.name,
+            n_subjects=len(subjects),
+            n_parcels=self.n_parcels,
+        )
+
+        return {"dataset_params": dataset_params}
