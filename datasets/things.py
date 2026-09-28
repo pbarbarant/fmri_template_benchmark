@@ -20,7 +20,11 @@ class Dataset(BaseDataset):
 
     data_path = THINGS_CONDITIONS_DIR
 
-    parameters = {"n_parcels": [400], "target": ["template_in_sample"]}
+    parameters = {
+        "n_parcels": [200, 400, 600, 800],
+        "target": ["template_in_sample", "template_out_of_sample"]
+        + parse_subjects(data_path),
+    }
 
     def get_data(self, data_path=data_path):
         # The return arguments of this function are passed as keyword arguments
