@@ -10,11 +10,7 @@ from nilearn.datasets import (
 from nilearn.image import load_img, math_img, resample_to_img
 from nilearn.maskers import NiftiMasker
 from nilearn.masking import apply_mask_fmri
-from sklearn.model_selection import (
-    LeaveOneGroupOut,
-    StratifiedGroupKFold,
-    StratifiedKFold,
-)
+from sklearn.model_selection import LeaveOneGroupOut, StratifiedKFold
 
 from benchmark_utils.conf import GM_MASK
 
@@ -224,75 +220,6 @@ def fetch_things_dataset(
     )
 
 
-def fetch_neuromod_facebody_dataset(
-    name: str,
-    subjects: list[str],
-    target: str,
-    data_path: Path,
-    task: str,
-    n_parcels: int,
-) -> Dataset:
-    _require_dataset_files(data_path, subjects)
-
-    # Get the mask_img
-    mask_img = load_img(GM_MASK)
-    mask_img, atlas_resampled = intersect_masker_atlas(mask_img, n_parcels)
-
-    # Get the labels
-    labels = apply_mask_fmri(atlas_resampled, mask_img).astype(int)
-
-    # Get the masker
-    masker = NiftiMasker(mask_img=mask_img).fit()
-
-    # All runs/labels are structured similarly
-    runs = (
-        pd.read_csv(data_path / f"{subjects[0]}_runs.csv", header=None)
-        .values.astype(str)
-        .ravel()
-    )
-    y = (
-        pd.read_csv(data_path / f"{subjects[0]}_labels.csv", header=None)
-        .values.astype(str)
-        .ravel()
-    )
-
-    subjects_data = [
-        (masker.transform(data_path / f"{s}.nii.gz")) for s in subjects
-    ]
-
-    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=0)
-    folds_indices = list(sgkf.split(runs, y, groups=runs))
-
-    folds = []
-    for fold_idx, (decoding_idx, alignment_idx) in enumerate(folds_indices):
-        dict_alignment = {
-            s: data[alignment_idx] for s, data in zip(subjects, subjects_data)
-        }
-        dict_decoding = {
-            s: data[decoding_idx] for s, data in zip(subjects, subjects_data)
-        }
-        dict_y = {s: y[decoding_idx] for s in subjects}
-        folds.append(
-            Fold(
-                index=fold_idx,
-                dict_alignment=dict_alignment,
-                dict_decoding=dict_decoding,
-                dict_y=dict_y,
-            )
-        )
-
-    return Dataset(
-        name=name,
-        subjects=list(dict_decoding.keys()),
-        n_subjects=len(subjects),
-        labels=labels,
-        folds=folds,
-        task_name=task,
-        target=target,
-        masker=masker,
-    )
-
-
 def fetch_nifti_dataset(
     name: str,
     subjects: list[str],
@@ -436,14 +363,9 @@ def fetch_dataset(
         assert isinstance(n_parcels, int), (
             "n_parcels must be provided for Neuromod datasets"
         )
-        if task == "THINGS":
-            return fetch_things_dataset(
-                name, subjects, target, data_path, task, n_parcels
-            )
-        elif task == "Neuromod-FaceBody":
-            return fetch_neuromod_facebody_dataset(
-                name, subjects, target, data_path, task, n_parcels
-            )
+        return fetch_things_dataset(
+            name, subjects, target, data_path, task, n_parcels
+        )
 
     elif name == "HCP":
         assert isinstance(n_movies, int), (
