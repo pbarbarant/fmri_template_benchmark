@@ -10,7 +10,6 @@ from nilearn.datasets import (
 from nilearn.image import load_img, math_img, resample_to_img
 from nilearn.maskers import NiftiMasker
 from nilearn.masking import apply_mask_fmri
-from scipy.stats import zscore
 from sklearn.model_selection import LeaveOneGroupOut, StratifiedKFold
 
 from benchmark_utils.conf import GM_MASK
@@ -150,15 +149,6 @@ def intersect_masker_atlas(mask_img, n_parcels):
     return intersect, atlas_resampled
 
 
-def z_score_per_run(data, runs):
-    """Z-score the data separately for each run."""
-    data_z = data.copy()
-    for run in pd.unique(runs):
-        run_idx = runs == run
-        data_z[run_idx] = np.nan_to_num(zscore(data[run_idx], axis=0))
-    return data_z
-
-
 def fetch_neuromod_dataset(
     name: str,
     subjects: list[str],
@@ -196,7 +186,6 @@ def fetch_neuromod_dataset(
     subjects_data = [
         (masker.transform(data_path / f"{s}.nii.gz")) for s in subjects
     ]
-    subjects_data = [z_score_per_run(data, runs) for data in subjects_data]
 
     kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
     folds_indices = list(kf.split(runs, y))
@@ -266,7 +255,6 @@ def fetch_nifti_dataset(
     subjects_data = [
         (masker.transform(data_path / f"{s}.nii.gz")) for s in subjects
     ]
-    subjects_data = [z_score_per_run(data, runs) for data in subjects_data]
 
     logo = LeaveOneGroupOut()
     folds_indices = list(logo.split(runs, y, groups=runs))
