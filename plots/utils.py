@@ -1,6 +1,5 @@
 import glob
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -14,7 +13,7 @@ FIGURES_PATH.mkdir(parents=True, exist_ok=True)
 
 
 def get_results_dataframe(
-    data_path: Path, n_parcels: Optional[int] = None
+    data_path: Path, n_parcels: int | None = None
 ) -> pd.DataFrame:
     """Load and preprocess all decoding results."""
     results_paths = glob.glob(
@@ -36,16 +35,24 @@ def get_results_dataframe(
         df = df[df["n_parcels"] == n_parcels]
 
     # Clean dataset names
-    df = df[~df["dataset_name"].str.contains("Simulated")]
+    df = df[~df["dataset_name"].str.startswith(("Simulated", "HCP"))]
     df["dataset_name"] = df["dataset_name"].str.replace(
         r"_[0-9]+$", "", regex=True
     )
+
+    # Drop any SRM apart from SRM_20
+    df = df[
+        ~(
+            (df["solver_name"].str.startswith("SRM"))
+            & (df["solver_name"] != "SRM_20")
+        )
+    ]
 
     # Clean solver and task names
     df["solver_name"] = (
         df["solver_name"]
         .str.replace("ot", "Optimal Transport")
-        .str.replace("SRM", "Shared Response")
+        .str.replace("SRM_20", "Shared Response")
         .str.replace("_", " ")
     )
     df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")

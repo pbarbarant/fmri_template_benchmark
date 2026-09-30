@@ -46,9 +46,3 @@ repos:
       - id: blacken-docs
         additional_dependencies:
           - black==26.3.1
-
-  - repo: https://github.com/codespell-project/codespell
-    # Configuration for codespell is in .pre-commit-config.yaml
-    rev: v2.4.2
-    hooks:
-      - id: codespell
