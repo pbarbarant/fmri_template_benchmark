@@ -6,7 +6,9 @@ import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import false_discovery_control, permutation_test
+from scipy.stats import t, ttest_1samp
+from statannotations.Annotator import Annotator
+from statannotations.stats.StatTest import StatTest
 from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
 
 sns.set_theme(
@@ -20,69 +22,94 @@ sns.set_theme(
     },
 )
 
-RNG_SEED = 0
+STAR_THRESHOLDS = [[1, ""], [0.05, "*"], [0.01, "**"], [0.001, "***"]]
 
 
-def stars_from_p(p):
-    if p < 0.001:
-        return "***"
-    if p < 0.01:
-        return "**"
-    if p < 0.05:
-        return "*"
-    return ""  # dont display ns results
+# --------------------------------------------------------------------------
+# Statistical tests
+# --------------------------------------------------------------------------
+def corrected_dependent_ttest(data1, data2):
+    """Paired t-test with Nadeau & Bengio variance correction."""
+    data1, data2 = np.asarray(data1), np.asarray(data2)
+    n = len(data1)
+    differences = data1 - data2
+    sd = np.std(differences, ddof=1)
+    test_training_ratio = 1 / n
+    denominator = np.sqrt(1 / n + test_training_ratio) * sd
+    t_stat = differences.mean() / denominator
+    p = 2.0 * t.sf(abs(t_stat), n - 1)
+    return t_stat, p
 
 
-def paired_contrasts(data, value, group, contrasts):
+class CorrectedDependentTTest(StatTest):
+    def __init__(self):
+        super().__init__(
+            func=corrected_dependent_ttest,
+            test_long_name="Corrected Dependent t-test",
+            test_short_name="Corrected t-test",
+            stat_name="t",
+            alpha=0.05,
+        )
+
+
+class OneSampleTTest(StatTest):
+    @staticmethod
+    def statannotations_to_scipy_ttest_1samp(group1, group2, **stats_params):
+        return ttest_1samp(group1, popmean=0, **stats_params)
+
+    def __init__(self):
+        super().__init__(
+            func=self.statannotations_to_scipy_ttest_1samp,
+            test_long_name="One-sample t-test",
+            test_short_name="One-sample t-test",
+            stat_name="t",
+            alpha=0.05,
+        )
+
+
+def annotate_stats(ax, data, pairs, test, y, hue, order, hue_order, plot):
+    """Run `test` on `pairs`, BH-correct, draw stars, return a stats table.
+
+    Within each (task, group) the rows must be sorted by subject so that
+    paired tests compare the same subjects.
     """
-    contrasts: list of (task, g1, g2). Per subject, d = value[g1] - value[g2]
-    (or d = value[g1] if g2 is None, i.e. a one-sample test against 0).
-    The sign-permutation test is run on d; p-values are BH-corrected across
-    all contrasts of the figure.
-    """
-    wide = data.pivot_table(
-        index=["subject", "task_name"],
-        columns=group,
-        values=value,
-        aggfunc="mean",
+    annotator = Annotator(
+        ax,
+        pairs,
+        data=data,
+        x="task_name",
+        y=y,
+        hue=hue,
+        order=order,
+        hue_order=hue_order,
+        plot=plot,
     )
-    rows = []
-    for task, g1, g2 in contrasts:
-        sub = wide.xs(task, level="task_name")
-        d = sub[g1] if g2 is None else sub[g1] - sub[g2]
-        d = d.dropna().to_numpy()
-        if len(d) < 2:
-            continue
-        result = permutation_test(
-            (d,),
-            lambda x, axis: x.mean(axis=axis),
-            vectorized=True,
-            permutation_type="samples",
-            n_resamples=np.inf,
-            alternative="two-sided",
-            rng=RNG_SEED,
-        )
-        rows.append(
-            {
-                "task_name": task,
-                "g1": g1,
-                "g2": g2,
-                "n": len(d),
-                "mean_diff": d.mean(),
-                "p": result.pvalue,
-            }
-        )
-    res = pd.DataFrame(rows)
-    if res.empty:
-        return res.assign(p_fdr=[], stars=[])
-    res["p_fdr"] = false_discovery_control(res["p"].to_numpy(), method="bh")
-    res["stars"] = res["p_fdr"].map(stars_from_p)
-    return res
+    annotator.configure(
+        test=test,
+        comparisons_correction="BH",
+        hide_non_significant=True,
+        loc="inside",
+        verbose=0,
+    )
+
+    annotator._pvalue_format.pvalue_thresholds = STAR_THRESHOLDS
+    annotator.apply_test().annotate()
+    rows = [
+        {
+            "group1": a.structs[0]["group"],
+            "group2": a.structs[1]["group"],
+            "stat": a.data.stat_value,
+            "p_fdr": a.data.pvalue,
+        }
+        for a in annotator.annotations
+    ]
+    return pd.DataFrame(rows)
 
 
-def within_solver_contrasts(data):
+def within_solver_pairs(data):
+    """Pairs of solver_target labels belonging to the same solver, per task."""
     return [
-        (task, g1, g2)
+        ((task, g1), (task, g2))
         for (task, _), sub in data.groupby(["task_name", "solver_name"])
         for g1, g2 in itertools.combinations(
             sorted(sub["solver_target"].unique()), 2
@@ -90,94 +117,9 @@ def within_solver_contrasts(data):
     ]
 
 
-def annotate_stars(
-    ax,
-    res,
-    data,
-    y,
-    group,
-    order,
-    hue_order,
-    spread=0.8,
-    mode="slots",
-    top="raw",
-):
-    """
-    One-sample contrasts (g2 None): stars above the group.
-    Pairwise contrasts: bracket + stars above the task's data.
-    mode: 'slots' (box/strip dodge) or 'spread' (pointplot dodge)
-    top:  'raw' (max of points) or 'ci' (mean + 1.96 SEM, for pointplots)
-    """
-    res = res[res["stars"] != ""]
-    if res.empty:
-        return
-    n = len(hue_order)
-    span = ax.get_ylim()[1] - ax.get_ylim()[0]
-    step = 0.06 * span
-
-    def xpos(task, g):
-        i, j = order.index(task), hue_order.index(g)
-        if mode == "slots":
-            return i - spread / 2 + spread / n * (j + 0.5)
-        return i - spread / 2 + (spread * j / (n - 1) if n > 1 else spread / 2)
-
-    def group_top(task, g):
-        v = data.loc[
-            (data["task_name"] == task) & (data[group] == g), y
-        ].dropna()
-        if v.empty:
-            return -np.inf
-        return (
-            v.max()
-            if top == "raw"
-            else v.mean() + 1.96 * v.std(ddof=1) / np.sqrt(len(v))
-        )
-
-    ymax = ax.get_ylim()[1]
-    for task in order:
-        r = res[res["task_name"] == task]
-        if r.empty:
-            continue
-        tops = [group_top(task, g) for g in hue_order]
-        base = max(tops) + 0.05 * span
-        level = 0
-        for _, row in r.iterrows():
-            if pd.isna(row["g2"]):
-                y_txt = group_top(task, row["g1"]) + 0.02 * span
-                ax.text(
-                    xpos(task, row["g1"]),
-                    y_txt,
-                    row["stars"],
-                    ha="center",
-                    va="bottom",
-                    fontsize=11,
-                    fontweight="bold",
-                )
-                ymax = max(ymax, y_txt + step)
-            else:
-                x1, x2 = xpos(task, row["g1"]), xpos(task, row["g2"])
-                yb = base + level * step
-                tick = 0.015 * span
-                ax.plot(
-                    [x1, x1, x2, x2],
-                    [yb - tick, yb, yb, yb - tick],
-                    color="k",
-                    lw=1,
-                )
-                ax.text(
-                    (x1 + x2) / 2,
-                    yb,
-                    row["stars"],
-                    ha="center",
-                    va="bottom",
-                    fontsize=11,
-                    fontweight="bold",
-                )
-                ymax = max(ymax, yb + step)
-                level += 1
-    ax.set_ylim(top=ymax)
-
-
+# --------------------------------------------------------------------------
+# Plotting
+# --------------------------------------------------------------------------
 def average_folds(df: pd.DataFrame):
     categorical_cols = df.select_dtypes(
         include=["object", "str", "category"]
@@ -186,7 +128,7 @@ def average_folds(df: pd.DataFrame):
     categorical_cols = [c for c in categorical_cols if c != "fold"]
     df = df.groupby(categorical_cols, as_index=False)[numerical_cols].mean()
     df = df.drop("fold", axis=1)
-    return df.sort_values(["task_name", "solver_target"])
+    return df.sort_values(["task_name", "solver_target", "subject"])
 
 
 def add_common_plot_elements(
@@ -285,14 +227,21 @@ def _orders(data):
     )
 
 
-def _absolute_plot(data, palette, contrasts, ncols=3):
-    """Plot absolute accuracies; stats on subject-wise paired differences."""
+def _absolute_plot(data, palette, pairs, ncols=3):
+    """Absolute accuracies; Nadeau-Bengio corrected paired t-tests."""
     order, hue_order = _orders(data)
     fig, ax = create_pointplot(data, palette, order, hue_order)
     add_common_plot_elements(ax, data, ncols=ncols)
-    res = paired_contrasts(data, "cv_scores", "solver_target", contrasts)
-    annotate_stars(
-        ax, res, data, "cv_scores", "solver_target", order, hue_order
+    res = annotate_stats(
+        ax,
+        data,
+        pairs,
+        CorrectedDependentTTest(),
+        y="cv_scores",
+        hue="solver_target",
+        order=order,
+        hue_order=hue_order,
+        plot="boxplot",
     )
     plt.tight_layout()
     sns.despine(left=True)
@@ -300,10 +249,11 @@ def _absolute_plot(data, palette, contrasts, ncols=3):
 
 
 def _diff_plot(data, pivot, palette, ylabel):
-    """Pointplot of per-subject differences; stats on the differences."""
-    pivot = pivot.sort_values(["task_name", "solver_name"])
+    """Per-subject differences; one-sample t-test of each solver against 0."""
+    pivot = pivot.sort_values(["task_name", "solver_name", "subject"])
     solvers = sorted(pivot["solver_name"].unique().tolist())
     tasks = sorted(pivot["task_name"].unique().tolist())
+    n = len(solvers)
 
     fig, ax = plt.subplots()
     sns.pointplot(
@@ -314,7 +264,8 @@ def _diff_plot(data, pivot, palette, ylabel):
         order=tasks,
         hue_order=solvers,
         palette=palette,
-        dodge=0.6,
+        # centers match the boxplot slots statannotations assumes
+        dodge=0.8 * (n - 1) / n,
         linestyle="none",
         markers="D",
         markersize=2,
@@ -324,27 +275,17 @@ def _diff_plot(data, pivot, palette, ylabel):
         legend=True,
     )
 
-    # 1 each solver's difference vs 0; 2 Optimal Transport vs other solvers
-    contrasts = [(t, s, None) for t in tasks for s in solvers]
-    if "Optimal Transport" in solvers:
-        contrasts += [
-            (t, "Optimal Transport", s)
-            for t in tasks
-            for s in solvers
-            if s != "Optimal Transport"
-        ]
-    res = paired_contrasts(pivot, "cv_score_diff", "solver_name", contrasts)
-    annotate_stars(
+    pairs = [((t_, s), (t_, s)) for t_ in tasks for s in solvers]
+    res = annotate_stats(
         ax,
-        res,
         pivot,
-        "cv_score_diff",
-        "solver_name",
-        tasks,
-        solvers,
-        spread=0.6,
-        mode="spread",
-        top="ci",
+        pairs,
+        OneSampleTTest(),
+        y="cv_score_diff",
+        hue="solver_name",
+        order=tasks,
+        hue_order=solvers,
+        plot="boxplot",
     )
 
     ax.axhline(0, color="black", linewidth=0.8, linestyle="--")
@@ -382,13 +323,13 @@ def _diff_plot(data, pivot, palette, ylabel):
 
 def anat_vs_template(data, palette):
     data = average_folds(data[data.target == "template_out_of_sample"].copy())
-    contrasts = [
-        (task, solver, "Anatomical")
+    pairs = [
+        ((task, solver), (task, "Anatomical"))
         for task in data["task_name"].unique()
         for solver in data["solver_target"].unique()
         if solver != "Anatomical"
     ]
-    return _absolute_plot(data, palette, contrasts)
+    return _absolute_plot(data, palette, pairs)
 
 
 def template_vs_pairwise(data, palette):
@@ -397,7 +338,7 @@ def template_vs_pairwise(data, palette):
         & (data.target != "template_in_sample")
     ].copy()
     data = average_folds(data)
-    return _absolute_plot(data, palette, within_solver_contrasts(data))
+    return _absolute_plot(data, palette, within_solver_pairs(data))
 
 
 def in_vs_out_of_sample(data, palette):
@@ -406,7 +347,7 @@ def in_vs_out_of_sample(data, palette):
         & data.target.isin(["template_out_of_sample", "template_in_sample"])
     ].copy()
     data = average_folds(data)
-    return _absolute_plot(data, palette, within_solver_contrasts(data), ncols=4)
+    return _absolute_plot(data, palette, within_solver_pairs(data), ncols=4)
 
 
 def bias_diff(data, palette):
