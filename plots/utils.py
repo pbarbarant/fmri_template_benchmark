@@ -70,8 +70,8 @@ def get_results_dataframe(
             df_non_anat["target"] == "template_out_of_sample",
         ],
         [
-            df_non_anat["solver_name"] + "\nIn Sample",
-            df_non_anat["solver_name"],
+            df_non_anat["solver_name"] + "\nIn-Sample",
+            df_non_anat["solver_name"] + "\nOut-of-Sample",
         ],
         default=df_non_anat["solver_name"] + "\nPairwise",
     )
@@ -90,12 +90,23 @@ def get_results_dataframe(
 def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
     solvers_keys = sorted(df.solver_target.unique())
+    # For each solver swap the order of the In-Sample and Out-of-Sample solvers
+    solvers_keys = [
+        s.replace("\nIn-Sample", "\nOut-of-Sample")
+        if "\nIn-Sample" in s
+        else s.replace("\nOut-of-Sample", "\nIn-Sample")
+        for s in solvers_keys
+    ]
     palette = sns.color_palette("tab20c", n_colors=18)
     palette = [
         c for i, c in enumerate(palette) if i not in (1, 2, 3, 7, 11, 15)
     ]
-    result = []
-    for i, color in enumerate(palette):
-        result.append(color)
+    # Copy the colors of the Out-of-Sample solvers
+    for solver in solvers_keys:
+        if "Out-of-Sample" in solver:
+            base_solver = solver.replace("\nOut-of-Sample", "")
+            idx = solvers_keys.index(solver)
+            solvers_keys.append(base_solver)
+            palette.append(palette[idx])
 
     return {k: v for k, v in zip(solvers_keys, palette)}
