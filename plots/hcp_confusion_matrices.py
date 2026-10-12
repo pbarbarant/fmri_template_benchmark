@@ -75,7 +75,7 @@ fig.colorbar(
     im, ax=axes, location="bottom", shrink=0.4, aspect=30, pad=0.05
 ).set_label("Number of subjects", fontsize=8)
 fig.savefig(
-    FIGURES_PATH / "hcp_confusion_matrices.png", dpi=300, bbox_inches="tight"
+    FIGURES_PATH / "hcp_confusion_matrices.pdf", dpi=300, bbox_inches="tight"
 )
 plt.show()
 
@@ -168,3 +168,5 @@ fig.savefig(
     bbox_inches="tight",
 )
 plt.show()
+
+# %%

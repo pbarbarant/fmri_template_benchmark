@@ -8,12 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from decoding import corrected_dependent_ttest
 from joblib import load
 from matplotlib import ticker as mtick
 from matplotlib.colors import to_rgb
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import FancyBboxPatch
-from scipy.stats import false_discovery_control, permutation_test
+from scipy.stats import false_discovery_control
 from tqdm import tqdm
 from utils import DATA_PATH, FIGURES_PATH
 
@@ -24,7 +25,7 @@ sns.set_theme(
         "text.usetex": False,
         "font.family": "sans-serif",
         "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-        "pdf.fonttype": 42,  # embed TrueType: text stays editable in Illustrator/Inkscape
+        "pdf.fonttype": 42,
         "ps.fonttype": 42,
         "savefig.dpi": 300,
         "axes.linewidth": 0.8,
@@ -33,7 +34,6 @@ sns.set_theme(
 
 N_SUBJECTS = [10, 20, 50, 100]
 N_MOVIES = [1, 2, 3, 4]
-RNG_SEED = 0
 
 BRAIN_ZOOM = 0.36  # was 0.25
 BRAIN_SPACING = 0.15  # was 0.12 (scaled with the larger icons)
@@ -73,7 +73,7 @@ def stars_from_p(p):
 
 def winner_vs_anatomical(df):
     """Per (n_subjects, n_movies) cell: best method by mean accuracy, then a
-    paired sign-permutation test of (winner - Anatomical) across subjects
+    paired t-test with Nadeau-Bengio correction (Anatomical - winner) across subjects
     (same test as anat_vs_template), BH-corrected across the 16 cells."""
     subj = (
         df.groupby(["n_subjects", "n_movies", "solver_name", "subject"])[
@@ -89,26 +89,17 @@ def winner_vs_anatomical(df):
         )
         means = wide.mean()
         winner = means.idxmax()
-        row = dict(
-            n_subjects=ns,
-            n_movies=nm,
-            winner=winner,
-            score=means.max(),
-            p=np.nan,
-        )
+        row = {
+            "n_subjects": ns,
+            "n_movies": nm,
+            "winner": winner,
+            "score": means.max(),
+            "p": np.nan,
+        }
         if winner != "Anatomical":
-            d = (wide[winner] - wide["Anatomical"]).dropna().to_numpy()
-            row["n"] = len(d)
-            row["mean_diff"] = d.mean()
-            row["p"] = permutation_test(
-                (d,),
-                lambda x, axis: x.mean(axis=axis),
-                vectorized=True,
-                permutation_type="samples",
-                n_resamples=9999,  # exact when 2**n < 9999
-                alternative="two-sided",
-                rng=RNG_SEED,
-            ).pvalue
+            d1 = wide["Anatomical"].to_numpy()
+            d2 = wide[winner].to_numpy()
+            row["p"] = corrected_dependent_ttest(d1, d2)[1]
         rows.append(row)
 
     res = pd.DataFrame(rows)
@@ -133,6 +124,7 @@ def add_panel_label(ax, label, x=-0.02, y=1.0):
         transform=ax.transAxes,
         fontsize=16,
         fontweight="bold",
+        style="italic",
         va="bottom",
         ha="right",
     )
@@ -290,18 +282,7 @@ def draw_grid(ax, res, palette):
         "Best-performing alignment method",
         fontsize=13,
         fontweight="bold",
-        pad=36,
-    )
-    ax.text(
-        0.5,
-        1.035,
-        "Stars: winner vs. anatomical (paired permutation test, BH-corrected)",
-        transform=ax.transAxes,
-        ha="center",
-        va="bottom",
-        fontsize=9,
-        color="dimgray",
-        style="italic",
+        pad=16,
     )
     ax.set_aspect("equal")
     ax.tick_params(left=False, bottom=False)
@@ -327,8 +308,8 @@ def main():
     grid_ax = fig.add_subplot(gs[1])
     draw_grid(grid_ax, res, palette)
 
-    add_panel_label(line_axes[0], "a", x=-0.28, y=1.22)
-    add_panel_label(grid_ax, "b", x=-0.14, y=1.22)
+    add_panel_label(line_axes[0], "A.", x=-0.28, y=1.14)
+    add_panel_label(grid_ax, "B.", x=-0.14, y=1.22)
 
     handles = [
         plt.Line2D(
@@ -356,7 +337,6 @@ def main():
     )
 
     fig.savefig(FIGURES_PATH / "HCP_summary.pdf", dpi=300, bbox_inches="tight")
-    res.to_csv(FIGURES_PATH / "HCP_summary_stats.csv", index=False)
     plt.show()
 
 
