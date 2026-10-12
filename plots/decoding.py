@@ -18,11 +18,15 @@ sns.set_theme(
         "figure.figsize": [7, 6],
         "text.usetex": False,
         "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
         "savefig.dpi": 300,
+        "axes.linewidth": 0.8,
     },
 )
 
-STAR_THRESHOLDS = [[1, ""], [0.05, "*"], [0.01, "**"], [0.001, "***"]]
+STAR_THRESHOLDS = [[1.0, "ns"], [0.05, "*"], [0.01, "**"], [0.001, "***"]]
 
 
 # --------------------------------------------------------------------------
@@ -32,7 +36,7 @@ def corrected_dependent_ttest(data1, data2):
     """Paired t-test with Nadeau & Bengio variance correction."""
     data1, data2 = np.asarray(data1), np.asarray(data2)
     n = len(data1)
-    differences = data1 - data2
+    differences = data2 - data1
     sd = np.std(differences, ddof=1)
     test_training_ratio = 1 / n
     denominator = np.sqrt(1 / n + test_training_ratio) * sd
@@ -67,7 +71,9 @@ class OneSampleTTest(StatTest):
         )
 
 
-def annotate_stats(ax, data, pairs, test, y, hue, order, hue_order, plot):
+def annotate_stats(
+    ax, data, pairs, test, y, hue, order, hue_order, plot, loc="inside"
+):
     """Run `test` on `pairs`, BH-correct, draw stars, return a stats table.
 
     Within each (task, group) the rows must be sorted by subject so that
@@ -87,23 +93,14 @@ def annotate_stats(ax, data, pairs, test, y, hue, order, hue_order, plot):
     annotator.configure(
         test=test,
         comparisons_correction="BH",
-        hide_non_significant=True,
-        loc="inside",
+        hide_non_significant=False,
+        correction_format="replace",
+        loc=loc,
         verbose=0,
     )
 
     annotator._pvalue_format.pvalue_thresholds = STAR_THRESHOLDS
     annotator.apply_test().annotate()
-    rows = [
-        {
-            "group1": a.structs[0]["group"],
-            "group2": a.structs[1]["group"],
-            "stat": a.data.stat_value,
-            "p_fdr": a.data.pvalue,
-        }
-        for a in annotator.annotations
-    ]
-    return pd.DataFrame(rows)
 
 
 def within_solver_pairs(data):
@@ -232,7 +229,7 @@ def _absolute_plot(data, palette, pairs, ncols=3):
     order, hue_order = _orders(data)
     fig, ax = create_pointplot(data, palette, order, hue_order)
     add_common_plot_elements(ax, data, ncols=ncols)
-    res = annotate_stats(
+    annotate_stats(
         ax,
         data,
         pairs,
@@ -245,7 +242,7 @@ def _absolute_plot(data, palette, pairs, ncols=3):
     )
     plt.tight_layout()
     sns.despine(left=True)
-    return fig, res
+    return fig
 
 
 def _diff_plot(data, pivot, palette, ylabel):
@@ -276,7 +273,7 @@ def _diff_plot(data, pivot, palette, ylabel):
     )
 
     pairs = [((t_, s), (t_, s)) for t_ in tasks for s in solvers]
-    res = annotate_stats(
+    annotate_stats(
         ax,
         pivot,
         pairs,
@@ -286,6 +283,27 @@ def _diff_plot(data, pivot, palette, ylabel):
         order=tasks,
         hue_order=solvers,
         plot="boxplot",
+    )
+
+    reference = "Optimal Transport"
+    pairs_ot = [
+        ((task, reference), (task, solver))
+        for task in tasks
+        for solver in solvers
+        if solver != reference
+    ]
+
+    annotate_stats(
+        ax,
+        pivot,
+        pairs_ot,
+        test=CorrectedDependentTTest(),
+        y="cv_score_diff",
+        hue="solver_name",
+        order=tasks,
+        hue_order=solvers,
+        plot="boxplot",
+        loc="outside",
     )
 
     ax.axhline(0, color="black", linewidth=0.8, linestyle="--")
@@ -318,7 +336,7 @@ def _diff_plot(data, pivot, palette, ylabel):
     plt.tight_layout()
     sns.despine(left=True)
     fig.subplots_adjust(bottom=0.3)
-    return fig, res
+    return fig
 
 
 def anat_vs_template(data, palette):
@@ -406,6 +424,5 @@ if __name__ == "__main__":
     ]
 
     for plot_func, name in plots:
-        fig, stats_table = plot_func(df, palette=dict_palette)
+        fig = plot_func(df, palette=dict_palette)
         fig.savefig(FIGURES_PATH / f"{name}.pdf", bbox_inches="tight")
-        stats_table.to_csv(FIGURES_PATH / f"{name}_stats.csv", index=False)
