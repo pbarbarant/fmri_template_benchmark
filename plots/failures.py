@@ -32,57 +32,97 @@ def average_folds(df: pd.DataFrame):
 
 
 def make_failure_table(df: pd.DataFrame):
-    """
-    Generate a LaTeX table showing the number of misclassified subjects per task and solver,
-    relative to the Anatomical solver.
-    """
-
-    # Average across folds and filter to the in-sample target
+    """Count subjects performing worse than anatomical alignment."""
     df = average_folds(df)
-    df = df[df.target == "template_out_of_sample"]
+    df = df.loc[df["target"] == "template_out_of_sample"].copy()
 
-    # Get Anatomical scores per subject and task
-    anat = df[df["solver_name"] == "Anatomical"][
-        ["subject", "task_name", "cv_scores"]
-    ].rename(columns={"cv_scores": "anat_score"})
+    # Adjust these aliases if your solver names differ.
+    df["solver_name"] = df["solver_name"].replace(
+        {
+            "OT": "Optimal Transport",
+            "OptimalTransport": "Optimal Transport",
+            "SRM": "Shared Response",
+            "SharedResponse": "Shared Response",
+        }
+    )
+    methods = [
+        "Optimal Transport",
+        "Procrustes",
+        "Ridge",
+        "Shared Response",
+    ]
 
-    # Merge Anatomical scores back to all rows by subject and task
-    df = df.merge(anat, on=["subject", "task_name"], how="left")
-
-    # Mark a subject as misclassified if cv_scores < Anatomical score
-    df["sub_miss"] = (df["cv_scores"] < df["anat_score"]).astype(int)
-    df = df.drop(columns=["anat_score"])
-
-    # Pivot table: rows = task_name, columns = solver_name, values = number of failures
-    failure_table = df.pivot_table(
-        index="task_name",
+    # One mean score per subject, task, and method.
+    scores = df.pivot(
+        index=["task_name", "subject"],
         columns="solver_name",
-        values="sub_miss",
-        aggfunc="sum",
-        fill_value=0,  # ensure missing solver/task combinations show as 0
+        values="cv_scores",
     )
 
-    # Remove Anatomical column
-    if "Anatomical" in failure_table.columns:
-        failure_table = failure_table.drop(columns=["Anatomical"])
+    required = ["Anatomical", *methods]
+    missing = [method for method in required if method not in scores.columns]
+    if missing:
+        raise ValueError(f"Missing solvers: {missing}")
 
-    # Add a "Total" row summing all tasks
-    total_row = pd.DataFrame(failure_table.sum()).T
-    total_row.index = ["Total"]
-    failure_table = pd.concat([failure_table, total_row])
+    # Missing scores must not silently count as zero failures.
+    if scores[required].isna().any().any():
+        raise ValueError(
+            "Some subject/task combinations have missing solver scores."
+        )
 
-    # Ensure integer type
-    failure_table = failure_table.astype(int)
-
-    # Generate LaTeX table with centered columns
-    latex_table = failure_table.to_latex(
-        caption="Failure Cases",
-        label="tab:failure_case",
-        column_format="l" + "c" * (failure_table.shape[1]),
+    failures = scores[methods].lt(scores["Anatomical"], axis=0)
+    table = failures.groupby(level="task_name", observed=True).sum().astype(int)
+    table.insert(
+        0,
+        "N Subjects",
+        scores.groupby(level="task_name", observed=True).size(),
     )
 
+    # task_order = [
+    #     "ArchiSpatial",
+    #     "ArchiStandard",
+    #     "FaceBody",
+    #     "Forrest",
+    #     "HcpWm",
+    #     "Language",
+    #     "THINGS",
+    # ]
+    # ordered_tasks = [task for task in task_order if task in table.index]
+    # ordered_tasks += [task for task in table.index if task not in task_order]
+    # table = table.loc[ordered_tasks]
+
+    table.loc["Total"] = table.sum()
+
+    latex_table = table.to_latex(
+        escape=False,
+        column_format="lccccc",
+        formatters={
+            "N Subjects": lambda value: str(int(value)),
+        },
+    )
+
+    # Insert a horizontal rule before the total.
+    lines = latex_table.splitlines()
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("Total"):
+            lines.insert(i, r"\midrule")
+            break
+
+    latex_table = "\n".join(
+        [
+            r"\begin{table}",
+            r"\centering",
+            r"\caption{Number of subjects with lower decoding accuracy "
+            r"than anatomical alignment.}",
+            r"\label{tab:failure_case}",
+            r"\vskip 0.12in",
+            "\n".join(lines),
+            r"\end{table}",
+        ]
+    )
     print(latex_table)
+    return table
 
 
 df = get_results_dataframe(DATA_PATH, n_parcels=400)
-make_failure_table(df)
+failure_table = make_failure_table(df)
