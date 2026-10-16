@@ -5,9 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
-from nilearn.image import concat_imgs
-from nilearn.maskers import NiftiMasker
 
 plt.rcParams.update(
     {
@@ -25,11 +22,10 @@ figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 METHODS = ["Anatomical", "ot", "Procrustes", "Ridge"]
-masker = NiftiMasker()
+EXCLUDED = ("THINGS", "Simulated", "HCP")
 
 
-def sparsity_ratio(img):
-    data = masker.fit_transform(img)
+def sparsity_ratio(data):
     return np.linalg.norm(data, axis=1, ord=2) / np.linalg.norm(
         data, axis=1, ord=1
     )
@@ -38,16 +34,12 @@ def sparsity_ratio(img):
 dict_results = {}
 for method in METHODS:
     method_ = "Optimal Transport" if method == "ot" else method
-    coef_list = sorted(
-        data_path.rglob(f"{method}/template_out_of_sample*/**/*.nii.gz")
+    paths = sorted(
+        data_path.rglob(f"{method}/template_in_sample*/**/template.npy")
     )
-    coef_list_filtered = [
-        img
-        for img in coef_list
-        if "THINGS" not in str(img) and "Simulated" not in str(img)
-    ]
-    img = concat_imgs(coef_list_filtered)
-    dict_results[method_] = sparsity_ratio(img)
+    paths = [p for p in paths if not any(d in str(p) for d in EXCLUDED)]
+    templates = [np.load(p) for p in paths]
+    dict_results[method_] = sparsity_ratio(np.vstack(templates))
 
 dict_palette = {
     "Anatomical": (0.19215686274509805, 0.5098039215686274, 0.7411764705882353),
@@ -112,7 +104,7 @@ sns.histplot(
     x="Sparsity",
     hue="Method",
     palette=dict_palette,
-    bins=300,
+    bins=200,
     element="step",
     linewidth=1.5,
     ax=ax,
@@ -122,30 +114,18 @@ sns.despine(ax=ax)
 ax.set_xlabel("Sparsity Ratio (L2 / L1)")
 ax.set_ylabel("Count")
 
-x1, x2 = 0.0065, 0.01
-axins = inset_axes(
-    ax, width="70%", height="70%", loc="upper right", borderpad=1.2
+ax.annotate(
+    "sparser maps",
+    xy=(0.98, 0.93),
+    xytext=(0.78, 0.93),
+    xycoords="axes fraction",
+    textcoords="axes fraction",
+    ha="right",
+    va="center",
+    arrowprops=dict(arrowstyle="-|>", color="0.3", lw=1.5),
+    color="0.3",
+    style="italic",
 )
-sns.histplot(
-    data=df,
-    x="Sparsity",
-    hue="Method",
-    palette=dict_palette,
-    bins=300,
-    element="step",
-    linewidth=1.2,
-    ax=axins,
-    legend=False,
-    log_scale=True,
-)
-axins.set_xlim(x1, x2)
-axins.set_ylim(0, ax.get_ylim()[1] * 0.6)
-axins.set_xticks([])
-axins.set_yticks([])
-axins.set_xlabel("")
-axins.set_ylabel("")
-
-mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5", ls="--")
 
 legend = ax.get_legend()
 legend.set_title("Alignment Method")
