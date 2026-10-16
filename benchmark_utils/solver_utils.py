@@ -11,7 +11,7 @@ from benchmark_utils.datasets_utils import Dataset, Fold
 
 
 def align_one_fold(
-    fold: Fold, group_algo, target: str, solver_name: str
+    fold: Fold, group_algo, target: str, solver_name: str, output_dir: Path
 ) -> None:
     # Time the alignment/transform process
     start_time = perf_counter()
@@ -19,6 +19,10 @@ def align_one_fold(
     if target == "template_in_sample":
         group_algo.fit(fold.dict_alignment, "template")
         fold.dict_aligned = group_algo.transform(fold.dict_decoding)
+        np.save(
+            output_dir / f"fold_{fold.index}" / "template.npy",
+            group_algo.template,
+        )
     elif target == "template_out_of_sample":
         group_algo.fit(fold.dict_alignment, "leave_one_subject_out")
         fold.dict_aligned = group_algo.transform(fold.dict_decoding)
@@ -104,6 +108,8 @@ def compute_alignment(
         if dataset.name == "HCP":
             align_one_fold_hcp(fold, group_algo, solver_name, output_dir)
         else:
-            align_one_fold(fold, group_algo, dataset.target, solver_name)
+            align_one_fold(
+                fold, group_algo, dataset.target, solver_name, output_dir
+            )
 
     return dataset
