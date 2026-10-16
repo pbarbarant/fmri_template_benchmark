@@ -13,14 +13,3 @@ HCP_CONDITIONS_DIR = DATA_ROOT / "hcp"
 
 # Path to gray matter mask
 GM_MASK = DATA_ROOT / "gm_mask.nii.gz"
-
-# Path to the ffx faces_adult zmap for the FaceBody task,
-# used for plotting the surface maps in the paper.
-IBC_FACEBODY_GROUP_ZMAP = (
-    DATA_ROOT
-    / "ibc"
-    / "smooth_derivatives"
-    / "group"
-    / "FaceBody"
-    / "ffx_faces_adult.nii.gz",
-)
