@@ -2,17 +2,19 @@
 from pathlib import Path
 
 import matplotlib as mpl
-import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import nibabel as nib
 import numpy as np
+from joblib import Parallel, delayed
+from matplotlib import gridspec
 from matplotlib.colors import LinearSegmentedColormap
 from nilearn import datasets, plotting
-from nilearn.glm.thresholding import threshold_stats_img
-from nilearn.image import largest_connected_component_img, math_img, mean_img
+from nilearn.image import (
+    math_img,
+    mean_img,
+)
 from nilearn.plotting import cm
 from nilearn.surface import SurfaceImage
-
-from benchmark_utils.conf import IBC_FACEBODY_GROUP_ZMAP
 
 # Setup
 plt.rcParams.update(
@@ -32,11 +34,24 @@ figures_path = data_path.parent / "outputs" / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 # Constants
+# Glasser (HCP-MMP1) labels on the 164k fsaverage mesh
+FFC_LABELS = {
+    "left": (
+        Path(__file__).parent.parent
+        / "fsaverage.label.L.164k_fsavg_L.label.gii",
+        "L_FFC_ROI",
+    ),
+    "right": (
+        Path(__file__).parent.parent
+        / "fsaverage.label.R.164k_fsavg_R.label.gii",
+        "R_FFC_ROI",
+    ),
+}
 N_PARCELS = 400
 DATASET = f"IBC_{N_PARCELS}/FaceBody"
-METHODS = ["Euclidean", "Procrustes", "Optimal Transport", "Ridge"]
+METHODS = ["Anatomical", "Procrustes", "Optimal Transport", "Ridge"]
 METHOD_PATHS = {
-    "Euclidean": data_path / DATASET / "Anatomical",
+    "Anatomical": data_path / DATASET / "Anatomical",
     "Procrustes": data_path / DATASET / "Procrustes",
     "Optimal Transport": data_path / DATASET / "ot",
     "Ridge": data_path / DATASET / "Ridge",
@@ -46,22 +61,6 @@ METHOD_PATHS = {
 mesh = "fsaverage5"
 fsaverage_meshes = datasets.load_fsaverage(mesh=mesh)
 curv_sign = datasets.load_fsaverage_data(mesh=mesh, data_type="curvature")
-
-clean_map, threshold = threshold_stats_img(
-    IBC_FACEBODY_GROUP_ZMAP,
-    alpha=0.05,
-    height_control="fdr",
-    two_sided=False,
-)
-masked_map = largest_connected_component_img(
-    math_img("(img > 4)", img=clean_map)
-)
-
-roi_surf = SurfaceImage.from_volume(
-    mesh=fsaverage_meshes["pial"],
-    volume_img=masked_map,
-    interpolation="nearest_most_frequent",
-)
 
 
 def project_to_surface(img, interpolation="linear"):
@@ -114,6 +113,7 @@ def draw_zoom_box(
             linestyle=linestyle,
             linewidth=linewidth,
             zorder=1e10,
+            clip_on=False,
         )
 
 
@@ -138,66 +138,106 @@ ymax = ymin + 50
 width, height = 0.15, 0.15
 
 
-# Plot each method
-for i, method in enumerate(METHODS):
-    # Classifier weights (top row)
-    ax_weights = fig.add_subplot(grid[0, i], projection="3d")
-    ax_weights.set_title(METHODS[i])
-    img_paths = list(
+def load_weights_volume(method):
+    """Average fold weights and normalize by their max."""
+    img_paths = sorted(
         (METHOD_PATHS[method] / "template_in_sample").glob(
             "*/coefs_Faces_adult.nii.gz"
         )
     )
-    surface_img = project_to_surface(
-        math_img(
-            "img/img.max()", img=mean_img(img_paths)
-        ),  # Average the results across folds
-    )
-    plot_surface(
-        ax_weights,
-        surface_img,
-        cmap,
-    )
-    plotting.plot_surf_contours(
-        surf_mesh=fsaverage_meshes["inflated"],
-        roi_map=roi_surf,
-        hemi="both",
-        levels=[1],
-        legend=False,
-        colors=["royalblue"],
-        view="ventral",
-        axes=ax_weights,
-    )
+    return math_img("img/img.max()", img=mean_img(img_paths))
 
-    # Add zoomed inset
-    # Plot the same surface in the inset with the same parameters
+
+def load_ffc_surface():
+    """FFC labels resampled to fsaverage5 (its vertices are the first ones of
+    the 164k mesh) as a SurfaceImage."""
+    n_vertices = fsaverage_meshes["pial"].parts["left"].n_vertices
+    data = {}
+    for hemi, (path, name) in FFC_LABELS.items():
+        label_img = nib.load(path)
+        keys = {label.label: label.key for label in label_img.labeltable.labels}
+        in_label = label_img.darrays[0].data[:n_vertices] == keys[name]
+        data[hemi] = in_label.astype(np.uint8)
+    return SurfaceImage(mesh=fsaverage_meshes["pial"], data=data)
+
+
+def mean_weight_in_label(weights_surf, ffc_surf):
+    """Mean weight (positive and negative) over the FFC label, per hemisphere."""
+    return {
+        hemi: weights_surf.data.parts[hemi][
+            ffc_surf.data.parts[hemi] > 0
+        ].mean()
+        for hemi in FFC_LABELS
+    }
+
+
+def draw_panel(ax, surface_img, roi_surf=None):
+    """Draw weights on a 3D axis, with the ROI contour if given."""
+    plot_surface(ax, surface_img, cmap)
+    if roi_surf is not None:
+        plotting.plot_surf_contours(
+            surf_mesh=fsaverage_meshes["inflated"],
+            roi_map=roi_surf,
+            hemi="both",
+            levels=[1],
+            legend=False,
+            colors=["royalblue"],
+            view="ventral",
+            axes=ax,
+        )
+
+
+def score_label(method):
+    """Mean weight in the left and right FFC labels."""
+    mean = mean_weights[method]
+    return f"Mean weight\nL: {mean['left']:.2f}  R: {mean['right']:.2f}"
+
+
+ffc_surf = load_ffc_surface()
+
+# Load all methods once, in parallel, then project and score them
+weight_imgs = dict(
+    zip(
+        METHODS,
+        Parallel(n_jobs=len(METHODS), prefer="threads")(
+            delayed(load_weights_volume)(m) for m in METHODS
+        ),
+    )
+)
+surface_imgs = {m: project_to_surface(w) for m, w in weight_imgs.items()}
+
+mean_weights = {
+    m: mean_weight_in_label(surf, ffc_surf) for m, surf in surface_imgs.items()
+}
+
+# Plot each method
+for i, method in enumerate(METHODS):
+    surface_img = surface_imgs[method]
+
+    # Full view (top row)
+    ax_weights = fig.add_subplot(grid[0, i], projection="3d")
+    ax_weights.set_title(method)
+    draw_panel(ax_weights, surface_img, ffc_surf)
+
+    # Zoomed view (bottom row)
     ax_inset = fig.add_subplot(grid[1, i], projection="3d")
-    plot_surface(
-        ax_inset,
-        surface_img,
-        cmap,
-    )
-    plotting.plot_surf_contours(
-        surf_mesh=fsaverage_meshes["inflated"],
-        roi_map=roi_surf,
-        hemi="both",
-        levels=[1],
-        legend=False,
-        colors=["royalblue"],
-        view="ventral",
-        axes=ax_inset,
-    )
-
-    # Apply zoom by setting the limits based on focus region
+    draw_panel(ax_inset, surface_img, ffc_surf)
     ax_inset.set_xlim(xmin, xmax)
     ax_inset.set_ylim(ymin, ymax)
-
-    # To adjust the zoom level, you can set the limits to a smaller range
     ax_inset.set_axis_off()
+    ax_inset.text2D(
+        0.5,
+        -0.02,
+        score_label(method),
+        transform=ax_inset.transAxes,
+        ha="center",
+        va="top",
+        fontsize=8,
+    )
 
     zmin, _ = ax_inset.get_zlim()
 
-    # Draw box on the inset
+    # Zoom box on the inset and the corresponding box on the main plot
     draw_zoom_box(
         ax_inset,
         xmin,
@@ -209,8 +249,6 @@ for i, method in enumerate(METHODS):
         linestyle="-",
         linewidth=1,
     )
-
-    # Draw corresponding box on the main plot
     draw_zoom_box(
         ax_weights,
         xmin,
