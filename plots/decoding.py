@@ -6,7 +6,7 @@ import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import t, ttest_1samp
+from scipy.stats import t
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
 from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
@@ -32,17 +32,21 @@ STAR_THRESHOLDS = [[1.0, "ns"], [0.05, "*"], [0.01, "**"], [0.001, "***"]]
 # --------------------------------------------------------------------------
 # Statistical tests
 # --------------------------------------------------------------------------
-def corrected_dependent_ttest(data1, data2):
-    """Paired t-test with Nadeau & Bengio variance correction."""
-    data1, data2 = np.asarray(data1), np.asarray(data2)
-    n = len(data1)
-    differences = data2 - data1
+def corrected_one_sample_ttest(differences):
+    """One-sample t-test against 0 with Nadeau & Bengio variance correction."""
+    differences = np.asarray(differences)
+    n = len(differences)
     sd = np.std(differences, ddof=1)
-    test_training_ratio = 1 / n
+    test_training_ratio = 1 / (n - 1)
     denominator = np.sqrt(1 / n + test_training_ratio) * sd
     t_stat = differences.mean() / denominator
     p = 2.0 * t.sf(abs(t_stat), n - 1)
     return t_stat, p
+
+
+def corrected_dependent_ttest(data1, data2):
+    """Paired t-test with Nadeau & Bengio variance correction."""
+    return corrected_one_sample_ttest(np.asarray(data2) - np.asarray(data1))
 
 
 class CorrectedDependentTTest(StatTest):
@@ -56,16 +60,16 @@ class CorrectedDependentTTest(StatTest):
         )
 
 
-class OneSampleTTest(StatTest):
+class CorrectedOneSampleTTest(StatTest):
     @staticmethod
-    def statannotations_to_scipy_ttest_1samp(group1, group2, **stats_params):
-        return ttest_1samp(group1, popmean=0, **stats_params)
+    def _against_zero(group1, group2):
+        return corrected_one_sample_ttest(group1)
 
     def __init__(self):
         super().__init__(
-            func=self.statannotations_to_scipy_ttest_1samp,
-            test_long_name="One-sample t-test",
-            test_short_name="One-sample t-test",
+            func=self._against_zero,
+            test_long_name="Corrected one-sample t-test",
+            test_short_name="Corrected 1-sample t-test",
             stat_name="t",
             alpha=0.05,
         )
@@ -246,7 +250,10 @@ def _absolute_plot(data, palette, pairs, ncols=3):
 
 
 def _diff_plot(data, pivot, palette, ylabel):
-    """Per-subject differences; one-sample t-test of each solver against 0."""
+    """Per-subject differences; Nadeau-Bengio corrected t-tests.
+
+    Each solver is tested against 0, and against Optimal Transport.
+    """
     pivot = pivot.sort_values(["task_name", "solver_name", "subject"])
     solvers = sorted(pivot["solver_name"].unique().tolist())
     tasks = sorted(pivot["task_name"].unique().tolist())
@@ -277,7 +284,7 @@ def _diff_plot(data, pivot, palette, ylabel):
         ax,
         pivot,
         pairs,
-        OneSampleTTest(),
+        CorrectedOneSampleTTest(),
         y="cv_score_diff",
         hue="solver_name",
         order=tasks,
