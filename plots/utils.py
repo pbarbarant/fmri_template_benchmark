@@ -56,6 +56,7 @@ def get_results_dataframe(
         .str.replace("_", " ")
     )
     df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")
+    df["task_name"] = df["task_name"].str.replace("Forrest", "StudyForrest")
 
     # Handle Anatomical solver - only keep template_out_of_sample
     mask_anat = df["solver_name"] == "Anatomical"
@@ -87,26 +88,29 @@ def get_results_dataframe(
     return df.sort_values(["task_name", "solver_target"])
 
 
+# Shades per solver, from darkest to lightest:
+# (Out-of-Sample, In-Sample, Pairwise)
+SOLVER_SHADES = {
+    "Anatomical": ("#3182bd",),
+    "Optimal Transport": ("#e6550d", "#fd8d3c", "#fdae6b"),
+    "Procrustes": ("#31a354", "#74c476", "#a1d99b"),
+    "Ridge": ("#756bb1", "#9e9ac8", "#bcbddc"),
+    "Shared Response": ("#d4ac0d", "#f1c40f", "#f7dc6f"),
+}
+TARGET_SHADE = {"Out-of-Sample": 0, "In-Sample": 1, "Pairwise": 2}
+
+
 def create_palette(df: pd.DataFrame) -> dict:
     """Create color palette for solvers."""
-    solvers_keys = sorted(df.solver_target.unique())
-    # For each solver swap the order of the In-Sample and Out-of-Sample solvers
-    solvers_keys = [
-        s.replace("\nIn-Sample", "\nOut-of-Sample")
-        if "\nIn-Sample" in s
-        else s.replace("\nOut-of-Sample", "\nIn-Sample")
-        for s in solvers_keys
-    ]
-    palette = sns.color_palette("tab20c", n_colors=18)
-    palette = [
-        c for i, c in enumerate(palette) if i not in (1, 2, 3, 7, 11, 15)
-    ]
-    # Copy the colors of the Out-of-Sample solvers
-    for solver in solvers_keys:
-        if "Out-of-Sample" in solver:
-            base_solver = solver.replace("\nOut-of-Sample", "")
-            idx = solvers_keys.index(solver)
-            solvers_keys.append(base_solver)
-            palette.append(palette[idx])
+    fallback = iter(sns.color_palette("tab10"))
+    palette = {}
+    for key in sorted(df.solver_target.unique()):
+        solver, _, target = key.partition("\n")
+        if solver not in SOLVER_SHADES:
+            SOLVER_SHADES[solver] = (next(fallback),) * 3
+        shades = SOLVER_SHADES[solver]
+        palette[key] = shades[min(TARGET_SHADE.get(target, 0), len(shades) - 1)]
+        # Bare solver name uses the Out-of-Sample color
+        palette[solver] = shades[0]
 
-    return {k: v for k, v in zip(solvers_keys, palette)}
+    return palette
