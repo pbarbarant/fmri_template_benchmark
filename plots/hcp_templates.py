@@ -15,7 +15,7 @@ solvers = {
     "ot": "Optimal Transport",
     "Procrustes": "Procrustes",
 }
-n_movies, n_subjects = 1, 100
+n_movies, n_subjects = 4, 100
 
 df = pd.read_csv(DATA_PATH.parent / "data/hcp/sub-100610_labels.csv")
 order = df.sort_values(["task", "condition"], kind="stable").index.values
