@@ -8,13 +8,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from decoding import corrected_dependent_ttest
 from joblib import load
 from matplotlib import ticker as mtick
 from matplotlib.colors import to_rgb
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import FancyBboxPatch
-from scipy.stats import false_discovery_control
+from scipy.stats import false_discovery_control, ttest_rel
 from tqdm import tqdm
 from utils import DATA_PATH, FIGURES_PATH
 
@@ -73,8 +72,8 @@ def stars_from_p(p):
 
 def winner_vs_anatomical(df):
     """Per (n_subjects, n_movies) cell: best method by mean accuracy, then a
-    paired t-test with Nadeau-Bengio correction (Anatomical - winner) across subjects
-    (same test as anat_vs_template), BH-corrected across the 16 cells."""
+    paired t-test (Anatomical - winner) across subjects , BH-corrected across
+    the 16 cells."""
     subj = (
         df.groupby(["n_subjects", "n_movies", "solver_name", "subject"])[
             "cv_scores"
@@ -99,7 +98,7 @@ def winner_vs_anatomical(df):
         if winner != "Anatomical":
             d1 = wide["Anatomical"].to_numpy()
             d2 = wide[winner].to_numpy()
-            row["p"] = corrected_dependent_ttest(d1, d2)[1]
+            row["p"] = ttest_rel(d1, d2)[1]
         rows.append(row)
 
     res = pd.DataFrame(rows)
