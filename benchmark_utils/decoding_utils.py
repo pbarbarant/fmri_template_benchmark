@@ -9,7 +9,7 @@ from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, cross_validate
 from sklearn.svm import LinearSVC
 
 from benchmark_utils.conf import N_JOBS
-from benchmark_utils.datasets_utils import Dataset, Fold
+from benchmark_utils.datasets_utils import Dataset, Fold, parse_target
 
 
 def save_weights(scores: dict, masker: NiftiMasker, output_dir: Path):
@@ -40,7 +40,11 @@ def decode_one_fold(
     subjects = list(fold.dict_aligned.keys())
     svc = LinearSVC(max_iter=max_iter, random_state=0)
     # Cross decoding in the case of the template
-    if target == "template_in_sample" or target == "template_out_of_sample":
+    # Out-of-sample template: decode the left-out subject like pairwise
+    _, left_out = parse_target(target)
+    if left_out is not None:
+        target = left_out
+    if target == "template_in_sample":
         cv_scores = []
         cv_subjects = []
         y = np.hstack([fold.dict_y[sub] for sub in subjects])
@@ -151,7 +155,7 @@ def evaluate_dataset(dataset: Dataset, max_iter=1000):
             "task_name": dataset.task_name,
             "chance_level": chance_level,
             "time": fold.time,
-            "target": dataset.target,
+            "target": parse_target(dataset.target)[0],
             "fold": fold.index,
             "solver_name": dataset.solver_name,
             "subject": cv_subjects,

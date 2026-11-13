@@ -4,7 +4,10 @@ from benchopt import BaseDataset, safe_import_context
 # - skipping import to speed up autocompletion in CLI.
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
-    from benchmark_utils.datasets_utils import DatasetParams
+    from benchmark_utils.datasets_utils import (
+        DatasetParams,
+        out_of_sample_targets,
+    )
 
 SUBJECTS = ["sub-01", "sub-02", "sub-03"]
 
@@ -20,7 +23,9 @@ class Dataset(BaseDataset):
     requirements = []
 
     parameters = {
-        "target": ["template_in_sample", "template_out_of_sample"] + SUBJECTS
+        "target": ["template_in_sample"]
+        + out_of_sample_targets(SUBJECTS)
+        + SUBJECTS
     }
 
     def get_data(self):

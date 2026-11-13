@@ -5,7 +5,11 @@ from benchopt import BaseDataset, safe_import_context
 # - getting requirements info when all dependencies are not installed.
 with safe_import_context() as import_ctx:
     from benchmark_utils.conf import IBC_TRIALS_ROOT
-    from benchmark_utils.datasets_utils import DatasetParams, parse_subjects
+    from benchmark_utils.datasets_utils import (
+        DatasetParams,
+        out_of_sample_targets,
+        parse_subjects,
+    )
 
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
@@ -19,11 +23,13 @@ class Dataset(BaseDataset):
     requirements = []
 
     data_path = IBC_TRIALS_ROOT / name
+    subjects = parse_subjects(data_path)
 
     parameters = {
         "n_parcels": [200, 400, 600, 800],
-        "target": ["template_in_sample", "template_out_of_sample"]
-        + parse_subjects(data_path),
+        "target": ["template_in_sample"]
+        + out_of_sample_targets(subjects)
+        + subjects,
     }
 
     def get_data(self, data_path=data_path):
@@ -33,7 +39,7 @@ class Dataset(BaseDataset):
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
 
-        subjects = parse_subjects(data_path)
+        subjects = self.subjects
         dataset_params = DatasetParams(
             name="IBC" + f"_{self.n_parcels}",
             subjects=subjects,

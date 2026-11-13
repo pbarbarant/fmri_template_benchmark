@@ -14,6 +14,20 @@ from sklearn.model_selection import LeaveOneGroupOut, StratifiedKFold
 
 from benchmark_utils.conf import GM_MASK
 
+OUT_OF_SAMPLE = "template_out_of_sample"
+
+
+def out_of_sample_targets(subjects: list[str]) -> list[str]:
+    """One target per left-out subject, e.g. 'template_out_of_sample:sub-01'."""
+    return [f"{OUT_OF_SAMPLE}:{s}" for s in subjects]
+
+
+def parse_target(target: str) -> tuple[str, str | None]:
+    """Split a target into (kind, left-out subject or None)."""
+    if target.startswith(OUT_OF_SAMPLE + ":"):
+        return OUT_OF_SAMPLE, target.split(":", 1)[1]
+    return target, None
+
 
 @dataclass
 class Fold:

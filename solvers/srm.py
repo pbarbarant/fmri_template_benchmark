@@ -32,10 +32,7 @@ class Solver(BaseSolver):
 
     def skip(self, dataset):
         # Skip in the case of SRM / external template
-        if (
-            dataset.target == "template_in_sample"
-            or dataset.target == "template_out_of_sample"
-        ):
+        if dataset.target.startswith("template_"):
             return False, None
         else:
             return (

@@ -5,9 +5,10 @@ import numpy as np
 from fmralign.alignment.utils import (
     _check_method,
     _fit_template,
+    _map_to_target,
 )
 
-from benchmark_utils.datasets_utils import Dataset, Fold
+from benchmark_utils.datasets_utils import Dataset, Fold, parse_target
 
 
 def align_one_fold(
@@ -15,17 +16,35 @@ def align_one_fold(
 ) -> None:
     # Time the alignment/transform process
     start_time = perf_counter()
+    _, left_out = parse_target(target)
 
     if target == "template_in_sample":
         group_algo.fit(fold.dict_alignment, "template")
         fold.dict_aligned = group_algo.transform(fold.dict_decoding)
+        (output_dir / f"fold_{fold.index}").mkdir(parents=True, exist_ok=True)
         np.save(
             output_dir / f"fold_{fold.index}" / "template.npy",
             group_algo.template,
         )
-    elif target == "template_out_of_sample":
-        group_algo.fit(fold.dict_alignment, "leave_one_subject_out")
-        fold.dict_aligned = group_algo.transform(fold.dict_decoding)
+    elif left_out is not None:
+        # Template learnt without the left-out subject, which is then mapped
+        # onto this same template: all subjects share one common space.
+        train = {k: v for k, v in fold.dict_alignment.items() if k != left_out}
+        group_algo.fit(train, "template")
+        fold.dict_aligned = group_algo.transform(
+            {k: fold.dict_decoding[k] for k in train}
+        )
+        [estimator] = _map_to_target(
+            [fold.dict_alignment[left_out]],
+            group_algo.template,
+            group_algo.method_,
+            group_algo.labels_,
+            group_algo.n_jobs,
+            group_algo.verbose,
+        )
+        fold.dict_aligned[left_out] = estimator.transform(
+            fold.dict_decoding[left_out]
+        )
     else:
         group_algo.fit(fold.dict_alignment, fold.dict_alignment[target])
         fold.dict_aligned = group_algo.transform(fold.dict_decoding)
@@ -98,7 +117,7 @@ def compute_alignment(
         / dataset.name
         / dataset.task_name
         / dataset.solver_name
-        / dataset.target
+        / dataset.target.replace(":", "/")
     )
     output_dir.mkdir(exist_ok=True, parents=True)
     dataset.output_dir = output_dir
