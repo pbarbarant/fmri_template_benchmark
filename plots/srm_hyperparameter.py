@@ -9,7 +9,7 @@ import seaborn as sns
 from joblib import load
 from statannotations.Annotator import Annotator
 from tqdm import tqdm
-from utils import DATA_PATH, FIGURES_PATH
+from utils import DATA_PATH, FIGURES_PATH, apply_test_bh
 
 sns.set_theme(
     context="paper",
@@ -153,7 +153,7 @@ for ax, task in zip(g.axes.flat, g.col_names):
         value_name="cv_scores",
     )
 
-    pairs = [(20, k) for k in sorted(wide.columns) if k != 20]
+    pairs = [(80, k) for k in sorted(wide.columns) if k != 80]
 
     annotator = Annotator(
         ax,
@@ -165,14 +165,13 @@ for ax, task in zip(g.axes.flat, g.col_names):
     )
     annotator.configure(
         test="t-test_paired",
-        comparisons_correction="BH",
+        comparisons_correction=None,
         text_format="star",
-        correction_format="replace",
         hide_non_significant=False,
         loc="inside",
         verbose=0,
     )
-    annotator.apply_and_annotate()
+    apply_test_bh(annotator).annotate()
 
 sns.despine()
 g.figure.tight_layout()
