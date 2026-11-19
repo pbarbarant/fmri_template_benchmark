@@ -1,8 +1,14 @@
 # %%
+import glob
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
+from joblib import load
+from tqdm import tqdm
+from utils import DATA_PATH, FIGURES_PATH, create_palette
 
 sns.set_theme(
     context="paper",
@@ -14,6 +20,82 @@ sns.set_theme(
         "savefig.dpi": 300,
     },
 )
+
+
+def get_time_dataframe(
+    data_path: Path, n_parcels: int | None = None
+) -> pd.DataFrame:
+    """Load and preprocess all decoding results."""
+    results_paths = glob.glob(
+        str(data_path / "**" / "decoding_results.pkl"), recursive=True
+    )
+
+    res_list = []
+    for path in tqdm(results_paths):
+        path = Path(path)
+        results = load(path)
+        res_list.append(pd.DataFrame(results))
+
+    df = pd.concat(res_list)
+
+    # Extract n_parcels into a new column
+    df["n_parcels"] = df["dataset_name"].str.extract(r"_(\d+)$").astype("Int64")
+
+    if n_parcels is not None:
+        df = df[df["n_parcels"] == n_parcels]
+
+    # Clean dataset names
+    df = df[~df["dataset_name"].str.startswith(("Simulated", "HCP"))]
+    df["dataset_name"] = df["dataset_name"].str.replace(
+        r"_[0-9]+$", "", regex=True
+    )
+
+    # Drop any SRM apart from SRM_80
+    df = df[
+        ~(
+            (df["solver_name"].str.startswith("SRM"))
+            & (df["solver_name"] != "SRM_80")
+        )
+    ]
+
+    # Clean solver and task names
+    df["solver_name"] = (
+        df["solver_name"]
+        .str.replace("ot", "Optimal Transport")
+        .str.replace("SRM_80", "Shared Response")
+        .str.replace("_", " ")
+    )
+    df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")
+    df["task_name"] = df["task_name"].str.replace("Forrest", "StudyForrest")
+
+    # Handle Anatomical solver - only keep template_in_sample
+    mask_anat = df["solver_name"] == "Anatomical"
+    df_anat = df[mask_anat & (df["target"] == "template_in_sample")].copy()
+    df_non_anat = df[~mask_anat].copy()
+
+    # Create solver_target labels
+    df_anat["solver_target"] = df_anat["solver_name"]
+    df_non_anat["solver_target"] = np.select(
+        [
+            df_non_anat["target"] == "template_in_sample",
+            df_non_anat["target"] == "template_out_of_sample",
+        ],
+        [
+            df_non_anat["solver_name"] + "\nIn-Sample",
+            df_non_anat["solver_name"] + "\nOut-of-Sample",
+        ],
+        default=df_non_anat["solver_name"] + "\nPairwise",
+    )
+
+    df = pd.concat([df_anat, df_non_anat])
+
+    # Add subject counts to task names
+    anat_counts = df.groupby("task_name")["subject"].nunique().to_dict()
+    df["task_name"] = df["task_name"].apply(
+        lambda x: f"{x} (N={anat_counts.get(x, 0)})"
+    )
+
+    return df.sort_values(["task_name", "solver_target"])
 
 
 def sum_time(df: pd.DataFrame):
@@ -110,7 +192,7 @@ def time_comparison(
 
 
 # Main execution
-df = get_results_dataframe(DATA_PATH, n_parcels=400)
+df = get_time_dataframe(DATA_PATH, n_parcels=400)
 dict_palette = create_palette(df)
 
 # Generate and save all plots
