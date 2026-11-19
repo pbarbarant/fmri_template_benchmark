@@ -21,7 +21,7 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
-    parameters = {"n_components": [10, 20, 40, 60, 80]}
+    parameters = {"n_components": [10, 20, 40, 60, 80, 100]}
 
     # List of packages needed to run the solver. See the corresponding
     # section in objective.py
