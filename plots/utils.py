@@ -5,11 +5,36 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from joblib import load
+from scipy.stats import false_discovery_control
 from tqdm import tqdm
 
 DATA_PATH = Path(__file__).parent.parent / "outputs"
 FIGURES_PATH = DATA_PATH.parent / "outputs" / "figures"
 FIGURES_PATH.mkdir(parents=True, exist_ok=True)
+
+
+def apply_test_bh(annotator, family=None):
+    """Run the configured test, then replace every p-value by its BH-adjusted
+    value so that stars reflect adjusted p-values.
+
+    `family(group1, group2)` returns a key; BH is applied separately within
+    each family (default: one family for all pairs of the annotator).
+
+    statannotations' own `comparisons_correction="BH"` only flags rejections
+    at alpha: stars are still computed from *raw* p-values (it can only turn
+    them into "ns"), so `**`/`***` would be uncorrected. The annotator must be
+    configured with `comparisons_correction=None`.
+    """
+    annotator.apply_test()
+    families = {}
+    for a in annotator.annotations:
+        key = family(a.data.group1, a.data.group2) if family else None
+        families.setdefault(key, []).append(a)
+    for anns in families.values():
+        adjusted = false_discovery_control([a.data.pvalue for a in anns])
+        for a, p in zip(anns, adjusted):
+            a.data.pvalue = p
+    return annotator
 
 
 def get_results_dataframe(
@@ -40,11 +65,11 @@ def get_results_dataframe(
         r"_[0-9]+$", "", regex=True
     )
 
-    # Drop any SRM apart from SRM_20
+    # Drop any SRM apart from SRM_80
     df = df[
         ~(
             (df["solver_name"].str.startswith("SRM"))
-            & (df["solver_name"] != "SRM_20")
+            & (df["solver_name"] != "SRM_80")
         )
     ]
 
@@ -52,7 +77,7 @@ def get_results_dataframe(
     df["solver_name"] = (
         df["solver_name"]
         .str.replace("ot", "Optimal Transport")
-        .str.replace("SRM_20", "Shared Response")
+        .str.replace("SRM_80", "Shared Response")
         .str.replace("_", " ")
     )
     df["task_name"] = df["task_name"].str.replace("RSVPLanguage", "Language")

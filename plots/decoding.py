@@ -9,7 +9,13 @@ import seaborn as sns
 from scipy.stats import t
 from statannotations.Annotator import Annotator
 from statannotations.stats.StatTest import StatTest
-from utils import DATA_PATH, FIGURES_PATH, create_palette, get_results_dataframe
+from utils import (
+    DATA_PATH,
+    FIGURES_PATH,
+    apply_test_bh,
+    create_palette,
+    get_results_dataframe,
+)
 
 sns.set_theme(
     context="paper",
@@ -78,7 +84,7 @@ class CorrectedOneSampleTTest(StatTest):
 def annotate_stats(
     ax, data, pairs, test, y, hue, order, hue_order, plot, loc="inside"
 ):
-    """Run `test` on `pairs`, BH-correct, draw stars, return a stats table.
+    """Run `test` on `pairs`, BH-correct within each task, draw stars.
 
     Within each (task, group) the rows must be sorted by subject so that
     paired tests compare the same subjects.
@@ -96,15 +102,14 @@ def annotate_stats(
     )
     annotator.configure(
         test=test,
-        comparisons_correction="BH",
+        comparisons_correction=None,  # Apply BH correction manually
         hide_non_significant=False,
-        correction_format="replace",
         loc=loc,
         verbose=0,
     )
 
     annotator._pvalue_format.pvalue_thresholds = STAR_THRESHOLDS
-    annotator.apply_test().annotate()
+    apply_test_bh(annotator, family=lambda g1, g2: g1[0]).annotate()
 
 
 def within_solver_pairs(data):
