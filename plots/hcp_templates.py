@@ -176,7 +176,10 @@ def plot(
                 ax.view_init(elev=-270, azim=90)
 
     sm = ScalarMappable(cmap="coolwarm", norm=Normalize(-vmax, vmax))
-    fig.colorbar(sm, ax=axes, location=location, shrink=0.4, aspect=30, pad=pad)
+    cbar = fig.colorbar(
+        sm, ax=axes, location=location, shrink=0.4, aspect=30, pad=pad
+    )
+    cbar.set_label("(z)", fontsize=fs)
     fig.savefig(
         FIGURES_PATH / path, dpi=300, bbox_inches="tight", facecolor="white"
     )
